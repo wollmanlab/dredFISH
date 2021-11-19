@@ -273,5 +273,5 @@ if __name__ == '__main__':
     xy[:,1] = data.obs['stage_y']
     data.obsm['stage'] = xy
     """ Save Data """
-    self.fishdata.add_and_save_data(data,dtype='h5ad',dataset=self.dataset)
+    pos_class.fishdata.add_and_save_data(data,dtype='h5ad',dataset=pos_class.dataset)
     """ Manually Check Data and save to /bigstore/GeneralStorage/Data/dredFISH as dataset.h5ad"""
