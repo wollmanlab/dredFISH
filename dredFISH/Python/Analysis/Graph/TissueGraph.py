@@ -130,12 +130,13 @@ class TissueGraph:
         return
   
     
-    def ContractGraph(self,TypeVec):
+    def ContractGraph(self,TypeVec=None):
         """ContractGraph : reduce graph size by merging neighbors of same type. 
             Given a vector of types, will contract the graph to merge vertices that are 
             both next to each other and of the same type. 
         
-        Input: a vector of Types for each node. If TypeVec is not provided will attempty to use the Type property of the graph itself. 
+        Input: TypeVec - a vector of Types for each node. 
+               If TypeVec is not provided will attempty to use the Type property of the graph itself. 
         
         Output: a new TissueGraph after vertices merging. 
         """
@@ -144,9 +145,13 @@ class TissueGraph:
         nm=self._G.vs["name"]
         EL[:,0] = np.take(nm,EL[:,0])
         EL[:,1] = np.take(nm,EL[:,1])
-
+        
+        # Figure out which type to use
+        if any(TypeVec == None): 
+            TypeVec = self.Type
+            
         # only keep edges where neighbors are of same types
-        EL = EL[np.take(self.Type,EL[:,0]) == np.take(self.Type,EL[:,1]),:]
+        EL = EL[np.take(TypeVec,EL[:,0]) == np.take(TypeVec,EL[:,1]),:]
         
         # remake a graph with potentially many components
         IsoZonesGraph = Graph(n=self.N, edges=EL)
@@ -201,7 +206,6 @@ class TissueGraph:
         CondEntropy: calculate conditional entropy of the tissue graph
                      cond entropy is the difference between graph entropy based on pagerank and type entropy
         """
-
         Pzones = self._G.pagerank()
         Entropy_Zone = -np.sum(Pzones*np.log2(Pzones))
         
@@ -214,5 +218,16 @@ class TissueGraph:
         
         CondEntropy = Entropy_Zone-Entropy_Types
         return(CondEntropy)
+    
+    def FindLocalMicroenvironments(self,MinEnvSize): 
+        """
+        FindLocalMicroenvironments identifies most informative local microenvironment length-scale (um) for each vertex in the graph
+                                   Calculations are based on KL between env and all minus KL of permuted 
+        """
+        
+        
+        
+    
+        
             
            
