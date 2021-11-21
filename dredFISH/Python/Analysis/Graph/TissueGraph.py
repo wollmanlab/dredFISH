@@ -130,7 +130,7 @@ class TissueGraph:
         return
   
     
-    def ContractGraph(self,TypeVec=None):
+    def ContractGraph(self,TypeVec = None):
         """ContractGraph : reduce graph size by merging neighbors of same type. 
             Given a vector of types, will contract the graph to merge vertices that are 
             both next to each other and of the same type. 
@@ -160,24 +160,26 @@ class TissueGraph:
 
         # because we used both type and proximity, the original graph (based only on proximity)
         # that was a single component graph will be broken down to multiple components 
-        # decompose is a method from igraph that returns a list of all individual components (i.e. zones) 
-        DecomposedZones = Graph.decompose(IsoZonesGraph) 
+        # finding clusters for each component. 
+        cmp = IsoZonesGraph.components()
+        IxMapping = np.asarray(cmp.membership)
+                
+        ZoneName, ZoneSingleIx, ZoneSize = np.unique(IxMapping, return_counts=True,return_index=True)
         
-        IxMapping = np.empty(self.N)
-        ZoneTypes = []
-        ZoneXY=np.empty((len(DecomposedZones),2))
-        
-        for i in range(len(DecomposedZones)):
-            ix=DecomposedZones[i].vs.get_attribute_values("name")
-            IxMapping[ix]=i
-            ZoneTypes.append(self.Type[ix[0]])
-            ZoneXY[i,:]=np.mean(self.XY[ix,:],axis=0)
-
-        
+ 
+        # create a new Tissue graph by copying existing one, contracting, and updating XY
         ZoneGraph = TissueGraph()
-        ZoneGraph.BuildSpatialGraph(ZoneXY)
-        ZoneGraph.Type = ZoneTypes
-        ZoneGraph._G.vs["Size"] = [x.vcount() for x in DecomposedZones]
+        ZoneGraph._G = self._G.copy()
+        
+        comb = {"X" : "mean",
+               "Y" : "mean",
+               "Type" : "ignore",
+               "name" : "ignore"}
+        
+        ZoneGraph._G.contract_vertices(IxMapping,combine_attrs=comb)
+        ZoneGraph._G.vs["Size"] = ZoneSize
+        ZoneGraph._G.vs["name"] = ZoneName
+        ZoneGraph._G.vs["Type"] = TypeVec[ZoneSingleIx]
         ZoneGraph.UpstreamMap = IxMapping
         
         return(ZoneGraph)
@@ -211,9 +213,9 @@ class TissueGraph:
         
         # validate that type exists
         if self.Type == None: 
-            raise ValueError("Cann't calculate cond-entropy without Types, please check")
+            raise ValueError("Can't calculate cond-entropy without Types, please check")
             
-        Ptypes = self.TypeFreq(); 
+        Ptypes = self.TypeFreq() 
         Entropy_Types=-np.sum(Ptypes*np.log2(Ptypes))
         
         CondEntropy = Entropy_Zone-Entropy_Types
@@ -224,10 +226,4 @@ class TissueGraph:
         FindLocalMicroenvironments identifies most informative local microenvironment length-scale (um) for each vertex in the graph
                                    Calculations are based on KL between env and all minus KL of permuted 
         """
-        
-        
-        
-    
-        
-            
-           
+        #TODO

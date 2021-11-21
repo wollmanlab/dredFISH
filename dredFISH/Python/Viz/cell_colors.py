@@ -13,6 +13,8 @@ def colors_from_list(lab, mat, lum=50):
     """
     Returns dict with pairs mapping labels to RGB colorspace
     """
+    
+    # 
     mat.index = lab
     mat = mat.groupby(mat.index).mean()
     
@@ -102,6 +104,9 @@ def traverse_dend(labels, dend):
 def avg_dend(dend, counts):
     """
     Find average gene counts for all nodes in dendrogram 
+    
+    dend: a dendrogram set as a table...
+    counts: a count matrix in a panda dataframe for all leaves (lowest level in the dendrogram)
     """
     dend_labels = set(list(dend["C"].values) + list(dend["A"].values) + list(dend["B"].values))
     dend_counts = pd.DataFrame(columns=counts.keys())
