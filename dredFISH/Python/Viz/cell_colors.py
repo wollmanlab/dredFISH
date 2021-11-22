@@ -10,7 +10,7 @@ from sklearn.decomposition import PCA
 from copy import copy
 import pdb
 
-def colors_from_list(lab, mat, lum=50):
+def colors_from_list(lab, mat, lum=None):
     """
     Returns dict with pairs mapping labels to RGB colorspace
 
@@ -29,11 +29,16 @@ def colors_from_list(lab, mat, lum=50):
     mat.index = lab
     mat = mat.groupby(mat.index).mean()
     
-    color = get_tsne(mat, tsne_dim=2)
+    if lum == None:
+        color = get_tsne(mat, tsne_dim=3)
+        color[2] = scale_vec(color[2], 0, 100)
+    else:
+        color = get_tsne(mat, tsne_dim=2)
+        color[2] = lum
     color[0] = scale_vec(color[0], -128, 127)
     color[1] = scale_vec(color[1], -128, 127)
-    color = color.rename(columns={0:"A",1:"B"})
-    color["L"] = lum
+    color = color.rename(columns={0:"A", 1:"B", 2:"L"})
+    
     color["vec"] = list(map(vec2lab, color.values))
     color["rgb"] = list(map(lab2rgb, color["vec"]))
     

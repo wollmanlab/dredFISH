@@ -17,13 +17,13 @@ dend["C"]=dend["C"].astype(str)
 # list colors
 fpath = "/home/rlittman/JSTA_classified_celltypes/data/hippocampus.merfish.jsta.segmented.counts.csv.gz"
 counts = get_aggregate_counts(fpath) 
-color_1 = colors_from_list(counts.index, copy(counts))
+color_1 = colors_from_list(counts.index, copy(counts), lum=50)
 
-sub_labels = cut_dend(dend, meta["cell_type_low"].values, 0.125)
-cell_map = ct2subct(meta["cell_type_low"], sub_labels)
+sub_labels = cut_dend(dend, copy(meta["cell_type_low"].values), 0.125)
+cell_map = ct2subct(copy(meta["cell_type_low"].values), sub_labels)
 sub_labels = list(map(lambda x: cell_map[x], counts.index))
-color_2 = colors_from_list(sub_labels, copy(counts))
+color_2 = colors_from_list(sub_labels, copy(counts), lum=50)
 
 # dendrogram colors 
 dend_counts = avg_dend(dend, counts)
-color_3 = colors_from_list(dend_counts.index, dend_counts)
+color_3 = colors_from_list(dend_counts.index, dend_counts, lum=50)
