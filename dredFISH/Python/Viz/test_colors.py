@@ -19,7 +19,7 @@ fpath = "/home/rlittman/JSTA_classified_celltypes/data/hippocampus.merfish.jsta.
 counts = get_aggregate_counts(fpath) 
 color_1 = colors_from_list(counts.index, copy(counts))
 
-sub_labels = cut_dend(dend, meta["cell_type_low"], 0.125)
+sub_labels = cut_dend(dend, meta["cell_type_low"].values, 0.125)
 cell_map = ct2subct(meta["cell_type_low"], sub_labels)
 sub_labels = list(map(lambda x: cell_map[x], counts.index))
 color_2 = colors_from_list(sub_labels, copy(counts))
