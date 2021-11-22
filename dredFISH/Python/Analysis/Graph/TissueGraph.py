@@ -2,6 +2,9 @@
 
 A collection of files to analyze tissues using Graph representation
 
+Tissue graphs can be created either using XY possition of centroids OR by contracting existing graph
+to create coarser zone. 
+
 This file should be imported as a module and contains the following
 main functions:
 
@@ -20,10 +23,41 @@ from collections import Counter
 import numpy as np
 import warnings
 
-class TissueGraph: 
+from sklearn.neighbors import NearestNeighbors
+
+##### Some simple accessory funcitons
+def funcKL(P,Q): 
+    ix = P>0
+    return(np.sum(P[ix]*np.log2(P[ix]/Q[ix])))
+
+def funcJSD(P,Q):
+    M=0.5*P + 0.5*Q
+    return(0.5*funcKL(P,M) + 0.5*funcKL(Q,M))
+
+
+###### Main class
+# class TissueMultiGraph: 
+#     """
+#        TisseMultiGraph - responsible for storing multiple layers (each a TissueGraph) and 
+#                          the relationships between them. 
+#     """
+#     def __init__(self):
+#         self.Layers
+#         self.LayerMappings
+#         return None
+    
+class TissueGraph:
+    """TissueGraph - main class responsible for maximally informative biocartography.
+                     class 
+    
+            
+    """
     def __init__(self): 
         self._G = None
         self.UpstreamMap = None
+        self.Corners # at least 3 columns: X,Y,iternal/external,type?    
+        self.Lines # at least 3 columns: i,j (indecies of Corders),iternal/external,type?
+        self.Tri
         return None
         
     @property
@@ -78,6 +112,9 @@ class TissueGraph:
         self._G.vs["X"]=XY[:,0]
         self._G.vs["Y"]=XY[:,1]
         
+        # TODO (Jonathan) 
+        # initalize self.Corners and self.Lines
+        
         # set up names
         self._G.vs["name"]=list(range(self.N))
         return(self)
@@ -128,7 +165,15 @@ class TissueGraph:
         # stores Types as graph vertex attributes. 
         self._G.vs["Type"]=TypeVec
         return
-  
+    
+    
+    def UpdatedSpatialDataOfContractedGraph(self): 
+        # Updates Corners and Lines (mostly internal/external and possibly type and other data)
+        
+        
+    def plot(self): 
+        # voroni graph, colors by type, edges only external make it nice :)     
+    
     
     def ContractGraph(self,TypeVec = None):
         """ContractGraph : reduce graph size by merging neighbors of same type. 
@@ -221,9 +266,31 @@ class TissueGraph:
         CondEntropy = Entropy_Zone-Entropy_Types
         return(CondEntropy)
     
-    def FindLocalMicroenvironments(self,MinEnvSize): 
+    def FindLocalMicroenvironments(self,MinEnvSize = 10,MaxEnvSize = 1000,UpdateGraph = True): 
         """
-        FindLocalMicroenvironments identifies most informative local microenvironment length-scale (um) for each vertex in the graph
-                                   Calculations are based on KL between env and all minus KL of permuted 
+        FindLocalMicroenvironments identifies most informative local microenvironment length-scale (um) 
+                                   repeates this for each vertex in the graph. 
+                                   
+                                   Calculations are based on KL between env and all minus KL of permuted
+                                   
+        Inputs: 
+                    MinEnvSize  : smallest number of items in a local microenvironment.
+                    UpdateGraph : if TRUE (default) update the EnvIX dictionary (in addition to returning vector of values)
+                    
+        Outputs: 
+                    EnbIX       : A dictionary with environment indexes for each vertex (key'ed by it index)
+                   
+                   
+        Algorithm: 
+                    First we establish a baseline of randomness, what is the KL div of random samples of increasing sizes. 
+                    Then for each vertex check for increasing distances 
+                    
+                    
         """
-        #TODO
+        
+        
+        # Use KNN to create approx distances to all
+        nbrs = NearestNeighbors(n_neighbors=MaxEnvSize, algorithm='auto').fit(self.XY)
+        distances, indices = nbrs.kneighbors(self.XY)
+        avgdst = np.mean(distances,axis=0)
+        avgsz = np.arange(nbrs.n_neighbors) 
