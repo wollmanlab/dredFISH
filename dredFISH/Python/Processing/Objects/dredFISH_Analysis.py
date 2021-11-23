@@ -94,11 +94,17 @@ class dredFISH_Position_Class(object):
         """ Load Total Image """
         if self.verbose:
             self.update_user('Loading Total Image')
-        if self.total_acq=='interpret':
+        if self.total_acq=='infer':
             self.total_acq = np.array([i for i in self.image_metadata.acqnames if 'nucstain' in i])[-1]
             self.total_image = self.image_metadata.stkread(Position=self.posname,
                                                            Channel=self.parameters['total_channel'],
                                                            acq=self.total_acq).mean(2).astype(float)
+            self.background_acq = np.array([i for i in self.image_metadata.acqnames if 'background' in i])[-1]
+            self.background_image = self.image_metadata.stkread(Position=self.posname,
+                                                           Channel=self.parameters['total_channel'],
+                                                           acq=self.background_acq).mean(2).astype(float)
+            self.total_image = self.total_image-self.background_image
+            
         elif self.total_acq=='none':
             self.total_image = np.dstack([self.signal_dict[hybe] for readout,hybe,channel in self.bitmap]).mean(2)
         else:
