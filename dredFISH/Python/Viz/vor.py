@@ -1,6 +1,18 @@
 import numpy as np
 from shapely.geometry import Polygon
 from collections import defaultdict
+from scipy.spatial import Voronoi
+
+def voronoi_intersect_box(XY):
+    """
+    Find Voronoi points within bounding box
+    """
+    _, bb = bounding_box(XY)
+    diameter = np.linalg.norm(bb.ptp(axis=0))
+    boundary_polygon = Polygon(bb)
+    
+    vp = list(voronoi_polygons(Voronoi(XY), diameter))
+    return [p.intersection(boundary_polygon) for p in vp]
 
 def voronoi_polygons(voronoi, diameter):
     """

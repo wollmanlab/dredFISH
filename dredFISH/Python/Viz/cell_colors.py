@@ -9,7 +9,7 @@ from sklearn.decomposition import PCA
 
 from scipy.ndimage.interpolation import rotate
 
-from utils import scale_vec
+from .utils import scale_vec
 
 import pdb
 import math
