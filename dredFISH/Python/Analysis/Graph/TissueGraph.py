@@ -22,9 +22,13 @@ from scipy.spatial import Delaunay,Voronoi
 from scipy import interpolate
 from collections import Counter
 import numpy as np
+import matplotlib.pyplot as plt
 import warnings
 
 from sklearn.neighbors import NearestNeighbors
+
+from Viz.cell_colors import *
+from Viz.vor import *
 
 ##### Some simple accessory funcitons
 def funcKL(P,Q): 
@@ -63,9 +67,9 @@ class TissueGraph:
         self.MaxEnvSize = 1000
         self._G = None
         self.UpstreamMap = None
-        self.Corners # at least 3 columns: X,Y,iternal/external,type?    
-        self.Lines # at least 3 columns: i,j (indecies of Corders),iternal/external,type?
-        self.Tri
+        self.Corners = None # at least 3 columns: X,Y,iternal/external,type?    
+        self.Lines = None # at least 3 columns: i,j (indecies of Corders),iternal/external,type?
+        self.Tri = None
         return None
         
     @property
@@ -174,14 +178,86 @@ class TissueGraph:
         self._G.vs["Type"]=TypeVec
         return
     
-    
-    def UpdatedSpatialDataOfContractedGraph(self): 
-        # Updates Corners and Lines (mostly internal/external and possibly type and other data)
-        return None
+    def plot(self, XY=None, cell_type=None, color_dict={}, size=(12,8), inner=False, scatter=False):
+        """
+        Plot cell type or zone 
+        """
+        if type(XY) == type(None):
+            XY = self.XY
+        if type(cell_type) == type(None):
+            cell_type=self.Type
+
+        vp = voronoi_intersect_box(XY)
+
+        fig, ax = plt.subplots(figsize=size)
+
+        if type(self.UpstreamMap) == type(None):
+            for i in range(len(vp)):
+                p = vp[i]
+                if p.area == 0:
+                    continue
+                if hasattr(p, "geoms"):
+                    for subp in p.geoms:
+                        x, y = zip(*subp.exterior.coords)
+                        ax.plot(x, y, color="black",alpha=1,linewidth=1,linestyle="solid")
+                        ax.fill(*zip(*subp.exterior.coords),color=color_dict[cell_type[i]],alpha=0.5)
+                else:
+                    x, y = zip(*p.exterior.coords)
+                    ax.plot(x, y, color="black",alpha=1,linewidth=1,linestyle="solid")
+                    ax.fill(*zip(*p.exterior.coords),color=color_dict[cell_type[i]],alpha=0.5)
+                if scatter == True:
+                    ax.scatter(x=XY[i][0],y=XY[i][1],c="black",s=10,alpha=1)
+        else:
+            for i in range(len(vp)):
+                poly_idx = np.where(self.UpstreamMap==i)[0]
+
+                if len(poly_idx) == 0:
+                    continue
+
+                if inner == True:
+                    for idx in poly_idx:
+                        p = vp[idx]
+
+                        if p.area == 0:
+                            continue
+                        if hasattr(p, "geoms"):
+                            for subp in p.geoms:
+                                x, y = zip(*subp.exterior.coords)
+                                ax.plot(x, y, color=color_dict[cell_type[poly_idx[0]]],alpha=0.5,linewidth=0.75,linestyle="dotted")
+                        else:
+                            x, y = zip(*p.exterior.coords)
+                            ax.plot(x, y, color=color_dict[cell_type[poly_idx[0]]],alpha=1,linewidth=0.75,linestyle="dotted")
+
+                p = vp[poly_idx[0]]
+                
+                for idx, x in enumerate(poly_idx):
+                    if idx == 0:
+                        continue
+                    p = p.union(vp[x])
+                    
+                if p.area == 0:
+                    continue
+                
+                if hasattr(p, "geoms"):
+                    for subp in p.geoms:
+                        x, y = zip(*subp.exterior.coords)
+                        ax.plot(x, y, color="black",alpha=0.5,linewidth=1,linestyle="solid")
+                        ax.fill(*zip(*subp.exterior.coords),color=color_dict[cell_type[poly_idx[0]]],alpha=0.5)
+                else:
+                    x, y = zip(*p.exterior.coords)
+                    ax.plot(x, y, color="black",alpha=0.5,linewidth=1,linestyle="solid")
+                    ax.fill(*zip(*p.exterior.coords),color=color_dict[cell_type[poly_idx[0]]],alpha=0.5)
+                if scatter == True:
+                    for idx in poly_idx:
+                        ax.scatter(x=XY[idx][0],y=XY[idx][1],c="black",s=10,alpha=1)
+
+#     def UpdatedSpatialDataOfContractedGraph(self): 
+#         # Updates Corners and Lines (mostly internal/external and possibly type and other data)
         
-    def plot(self): 
-        # voroni graph, colors by type, edges only external make it nice :) 
-        return None
+        
+# #     def fplot(self):
+# #         return 1
+#         # voroni graph, colors by type, edges only external make it nice :)     
     
     
     def ContractGraph(self,TypeVec = None):
