@@ -19,6 +19,7 @@ Many other accessory functions that are used to set/get TissueGraph information.
 # dependeices
 from igraph import *
 from scipy.spatial import Delaunay,Voronoi
+from scipy import interpolate
 from collections import Counter
 import numpy as np
 import warnings
@@ -34,6 +35,12 @@ def funcJSD(P,Q):
     M=0.5*P + 0.5*Q
     return(0.5*funcKL(P,M) + 0.5*funcKL(Q,M))
 
+def CountValues(V,refvals):
+    Cnt = Counter(V)
+    cntdict = dict(Cnt)
+    missing = list(set(refvals) - set(V))
+    cntdict.update(zip(missing, np.zeros(len(missing))))
+    return(cntdict)
 
 ###### Main class
 # class TissueMultiGraph: 
@@ -52,7 +59,8 @@ class TissueGraph:
     
             
     """
-    def __init__(self): 
+    def __init__(self):
+        self.MaxEnvSize = 1000
         self._G = None
         self.UpstreamMap = None
         self.Corners # at least 3 columns: X,Y,iternal/external,type?    
@@ -169,10 +177,11 @@ class TissueGraph:
     
     def UpdatedSpatialDataOfContractedGraph(self): 
         # Updates Corners and Lines (mostly internal/external and possibly type and other data)
-        
+        return None
         
     def plot(self): 
-        # voroni graph, colors by type, edges only external make it nice :)     
+        # voroni graph, colors by type, edges only external make it nice :) 
+        return None
     
     
     def ContractGraph(self,TypeVec = None):
@@ -244,9 +253,11 @@ class TissueGraph:
         """
         if self.Type == None: 
             raise ValueError("Type not yet assigned, can't count frequencies")
-        Ptypes=np.array(list(Counter(self.Type).values()))
+        unqTypes = np.unique(self.Type) 
+        cntdict = CountValues(self.Type,unqTypes)
+        Ptypes = np.array([cntdict.get(k) for k in sorted(cntdict.keys())])
         Ptypes=Ptypes/np.sum(Ptypes)
-        return(Ptypes)
+        return Ptypes,unqTypes
                              
     def CondEntropy(self):
         """
@@ -266,31 +277,73 @@ class TissueGraph:
         CondEntropy = Entropy_Zone-Entropy_Types
         return(CondEntropy)
     
-    def FindLocalMicroenvironments(self,MinEnvSize = 10,MaxEnvSize = 1000,UpdateGraph = True): 
+    def LocalTypeFreq(self):
+        # first, create the list of types (unique values) we care about
+        Ptypes,UnqTypes = self.TypeFreq()
+        
+        # create nearest neighbors data
+        nbrs = NearestNeighbors(n_neighbors=self.MaxEnvSize, algorithm='auto').fit(self.XY)
+        distances, indices = nbrs.kneighbors(self.XY)
+        
+        # use these to build local frequencies
+        LocalFreq = np.zeros((self.MaxEnvSize,self.N,len(UnqTypes)))
+        for k in range(self.MaxEnvSize): 
+            ix = indices[:,0:k]
+            f = lambda ind : funcKL(CountValues(self.Type[ind],UnqTypes),Ptypes)
+            LocalFreq[k,:,:]=np.apply_along_axis(f,ix,axis=1)
+
+        return LocalFreq
+                                    
+  
+    def calcSpatialCoherencePerVertex(self): 
         """
-        FindLocalMicroenvironments identifies most informative local microenvironment length-scale (um) 
-                                   repeates this for each vertex in the graph. 
+        calcSpatialCoherencePerVertex calculates the information score (KL(sample,global) - KL(random,global)) for increasing size of environment. 
+                                      within an environment, cells are sorted eclidean distance.  
                                    
-                                   Calculations are based on KL between env and all minus KL of permuted
+                                      Calculations are based on KL between env and all minus KL of permuted
+                                      the difference to global is "Signal" and we subtract from it (in log scale) the 
+                                      samping noise (binomial and all that...)
                                    
         Inputs: 
-                    MinEnvSize  : smallest number of items in a local microenvironment.
-                    UpdateGraph : if TRUE (default) update the EnvIX dictionary (in addition to returning vector of values)
+                    none, everything is in self 
                     
         Outputs: 
-                    EnbIX       : A dictionary with environment indexes for each vertex (key'ed by it index)
+                    KLdiff       : a matrix of scores as function of env size (score = KL to global 0 KL of random to global) 
                    
                    
         Algorithm: 
                     First we establish a baseline of randomness, what is the KL div of random samples of increasing sizes. 
-                    Then for each vertex check for increasing distances 
+                    Then for each vertex check for increasing distances what is the differene between the "signal" defined as KL to global 
+                    and the "noise" defined by KL of random sample (accounting for sample size effectively).  
                     
                     
         """
+
+        # global type distribution that we'll compare to
+        Ptypes,UnqTypes = self.TypeFreq()
+                          
+        # First create an array such that for each node, we get the sampling noise effect 
+        iter = 3 # repeat sampling a few times, i.e. expected values over 
+        rndKL = np.zeros(max(avgsz))
+        for k in range(max(avgsz)): 
+            for i in range(iter): 
+                Psample = CountValues(np.random.choice(self.Type,size=k),UnqTypes)
+                rndKL[k]=rndKL[k]+funcKL(Psample,Ptypes)
+        
+        rndKL=rndKL/iter            
+    
+        # now find the KL from global for actual data
+        LocalFreq = self.LocalTypeFreq()
+        KL2g = numpy.apply_over_axes(lambda P : funcKL(P,Ptypes), LocalFreq, axes)
+        
+        KLdiff = KL2g - KLsampling
+                       
+        return(KLdiff)               
         
         
-        # Use KNN to create approx distances to all
-        nbrs = NearestNeighbors(n_neighbors=MaxEnvSize, algorithm='auto').fit(self.XY)
-        distances, indices = nbrs.kneighbors(self.XY)
-        avgdst = np.mean(distances,axis=0)
-        avgsz = np.arange(nbrs.n_neighbors) 
+        
+
+        
+        
+        
+        
