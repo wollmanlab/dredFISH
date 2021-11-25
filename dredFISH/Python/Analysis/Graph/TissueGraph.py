@@ -27,8 +27,8 @@ import warnings
 
 from sklearn.neighbors import NearestNeighbors
 
-from Viz.cell_colors import *
-from Viz.vor import *
+# from Viz.cell_colors import *
+# from Viz.vor import *
 
 ##### Some simple accessory funcitons
 def funcKL(P,Q): 
@@ -88,7 +88,14 @@ class TissueGraph:
             return self._G
         else: 
             raise ValueError('Graph was not initalized, please build a graph first with BuildSpatialGraph')
-  
+    
+    @property
+    def NodeSize(self):
+        if self._G is not None:
+            return np.asarray(self._G.vs['Size'])
+        else: 
+            raise ValueError('Graph was not initalized, please build a graph first with BuildSpatialGraph or ContractGraph methods')
+    
     def BuildSpatialGraph(self,XY):
         """
         BuildSpatialGraph will create an igrah using Delaunay triangulation
@@ -110,19 +117,17 @@ class TissueGraph:
         # start with triangulation
         dd=Delaunay(XY)
 
-        # create adjacency matrix
-        AdjMat=np.zeros([XY.shape[0],XY.shape[0]]).astype(np.bool_)
-        for x in dd.simplices:
-            AdjMat[x[0],x[1]]=True
-            AdjMat[x[1],x[0]]=True
-            AdjMat[x[0],x[2]]=True
-            AdjMat[x[2],x[0]]=True
-            AdjMat[x[1],x[2]]=True
-            AdjMat[x[2],x[1]]=True
-    
-        self._G = Graph.Adjacency(AdjMat,mode="undirected").simplify()
+        # create Graph from edge list
+        EL = np.zeros((dd.simplices.shape[0]*3,2))
+        for i in range(dd.simplices.shape[0]): 
+            EL[i*3,:]=[dd.simplices[i,0],dd.simplices[i,1]]
+            EL[i*3+1,:]=[dd.simplices[i,0],dd.simplices[i,2]]
+            EL[i*3+2,:]=[dd.simplices[i,1],dd.simplices[i,2]]
+
+        self._G = Graph(n=XY.shape[0],edges=EL,directed=False).simplify()
         self._G.vs["X"]=XY[:,0]
         self._G.vs["Y"]=XY[:,1]
+        self._G.vs["Size"]=np.ones(len(XY[:,1]))
         
         # TODO (Jonathan) 
         # initalize self.Corners and self.Lines
@@ -340,14 +345,15 @@ class TissueGraph:
         CondEntropy: calculate conditional entropy of the tissue graph
                      cond entropy is the difference between graph entropy based on pagerank and type entropy
         """
-        Pzones = self._G.pagerank()
+        Pzones = self.NodeSize
+        Pzones = Pzones/np.sum(Pzones)
         Entropy_Zone = -np.sum(Pzones*np.log2(Pzones))
         
         # validate that type exists
         if self.Type == None: 
             raise ValueError("Can't calculate cond-entropy without Types, please check")
             
-        Ptypes = self.TypeFreq() 
+        Ptypes = self.TypeFreq()[0] 
         Entropy_Types=-np.sum(Ptypes*np.log2(Ptypes))
         
         CondEntropy = Entropy_Zone-Entropy_Types
