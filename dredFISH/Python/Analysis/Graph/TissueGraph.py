@@ -19,11 +19,12 @@ Many other accessory functions that are used to set/get TissueGraph information.
 # dependeices
 from igraph import *
 from scipy.spatial import Delaunay,Voronoi
-from scipy import interpolate
 from collections import Counter
 import numpy as np
 import matplotlib.pyplot as plt
 import warnings
+from scipy.optimize import minimize_scalar
+import scanpy as sc
 
 from sklearn.neighbors import NearestNeighbors
 
@@ -46,7 +47,10 @@ def CountValues(V,refvals):
     cntdict.update(zip(missing, np.zeros(len(missing))))
     return(cntdict)
 
-###### Main class
+
+
+###### Main TissueGraph classes
+
 # class TissueMultiGraph: 
 #     """
 #        TisseMultiGraph - responsible for storing multiple layers (each a TissueGraph) and 
@@ -96,46 +100,32 @@ class TissueGraph:
         else: 
             raise ValueError('Graph was not initalized, please build a graph first with BuildSpatialGraph or ContractGraph methods')
     
-    def BuildSpatialGraph(self,XY):
+    @property
+    def State(self):
         """
-        BuildSpatialGraph will create an igrah using Delaunay triangulation
-
-        Params: 
-            XY - centroid regions to build a graph around
-
-        Out: 
-            G - an igraph 
-
+            returns the state of each node. State could either be a transcriptional basis (PNMF) of cells 
+            or the local frequency of types around it (environments)
         """
-        # validate input
-        if not isinstance(XY, np.ndarray):
-            raise ValueError('XY must be a numpy array')
+        if self._G is None: 
+            raise ValueError('Graph was not initalized, please build a graph first with BuildSpatialGraph or ContractGraph methods')
         
-        if not XY.shape[1]==2:
-            raise ValueError('XY must have only two columns')
+        X = self._G.vs["State"]
+        return(X)
+    
+    @State.setter
+    def State(self,X): 
+        """ Updates the transcriptional data (basis)
+        """
+        
+        # validate that graph is initialized
+        if self._G is None: 
+            raise ValueError('Graph was not initalized, please build a graph first with BuildSpatialGraph or ContractGraph methods')
             
-        # start with triangulation
-        dd=Delaunay(XY)
-
-        # create Graph from edge list
-        EL = np.zeros((dd.simplices.shape[0]*3,2))
-        for i in range(dd.simplices.shape[0]): 
-            EL[i*3,:]=[dd.simplices[i,0],dd.simplices[i,1]]
-            EL[i*3+1,:]=[dd.simplices[i,0],dd.simplices[i,2]]
-            EL[i*3+2,:]=[dd.simplices[i,1],dd.simplices[i,2]]
-
-        self._G = Graph(n=XY.shape[0],edges=EL,directed=False).simplify()
-        self._G.vs["X"]=XY[:,0]
-        self._G.vs["Y"]=XY[:,1]
-        self._G.vs["Size"]=np.ones(len(XY[:,1]))
-        
-        # TODO (Jonathan) 
-        # initalize self.Corners and self.Lines
-        
-        # set up names
-        self._G.vs["name"]=list(range(self.N))
-        return(self)
-
+        if self.N != X.shape[0]:
+            raise ValueError('Basis matrix must have the same number of rows as nodes in the cell graph')
+            
+        self._G.vs["State"]=X
+    
     @property
     def XY(self):
         """
@@ -182,6 +172,46 @@ class TissueGraph:
         # stores Types as graph vertex attributes. 
         self._G.vs["Type"]=TypeVec
         return
+    
+    def BuildSpatialGraph(self,XY):
+        """
+        BuildSpatialGraph will create an igrah using Delaunay triangulation
+
+        Params: 
+            XY - centroid regions to build a graph around
+
+        Out: 
+            G - an igraph 
+
+        """
+        # validate input
+        if not isinstance(XY, np.ndarray):
+            raise ValueError('XY must be a numpy array')
+        
+        if not XY.shape[1]==2:
+            raise ValueError('XY must have only two columns')
+            
+        # start with triangulation
+        dd=Delaunay(XY)
+
+        # create Graph from edge list
+        EL = np.zeros((dd.simplices.shape[0]*3,2))
+        for i in range(dd.simplices.shape[0]): 
+            EL[i*3,:]=[dd.simplices[i,0],dd.simplices[i,1]]
+            EL[i*3+1,:]=[dd.simplices[i,0],dd.simplices[i,2]]
+            EL[i*3+2,:]=[dd.simplices[i,1],dd.simplices[i,2]]
+
+        self._G = Graph(n=XY.shape[0],edges=EL,directed=False).simplify()
+        self._G.vs["X"]=XY[:,0]
+        self._G.vs["Y"]=XY[:,1]
+        self._G.vs["Size"]=np.ones(len(XY[:,1]))
+        
+        # TODO (Jonathan) 
+        # initalize self.Corners and self.Lines
+        
+        # set up names
+        self._G.vs["name"]=list(range(self.N))
+        return(self)
     
     def plot(self, XY=None, cell_type=None, color_dict={}, size=(12,8), inner=False, scatter=False):
         """
@@ -264,6 +294,85 @@ class TissueGraph:
 # #         return 1
 #         # voroni graph, colors by type, edges only external make it nice :)     
     
+    
+    
+    def Cluster(self,data):
+        """
+            Find optimial clusters (using recursive leiden)
+            optimization is done on resolution parameter and hierarchial clustering
+            
+        """
+        verbose = True
+        def OptLeiden(res,datatoopt,ix,currcls):
+            """Basic optimization routine for Leiden resolution parameter in Scanpy
+            """
+            # calculate leiden clustering
+            sc.tl.leiden(datatoopt,resolution=res)
+            TypeVec = np.asarray(datatoopt.obs['leiden'])
+            
+            # merge TypeVec with full cls vector
+            dash = np.array((1,),dtype='object')
+            dash[0]='_' 
+            newcls = currcls.copy()
+            newcls[ix] = newcls[ix]+dash+TypeVec
+            
+            ZG = self.ContractGraph(newcls)
+            entropy = ZG.CondEntropy()
+            return(-entropy)
+        
+        sc.pp.neighbors(data, n_neighbors=10, n_pcs=0)
+        if verbose: 
+            print(f"Calling initial optimization")
+        emptycls = np.asarray(['' for _ in range(self.N)],dtype='object')
+        sol = minimize_scalar(OptLeiden, args = (data,np.arange(self.N),emptycls),
+                                         bounds = (0.1,30), 
+                                         method='bounded',
+                                         options={'xatol': 1e-1, 'disp': 3})
+        initRes = sol['x']
+        ent_best = sol['fun']
+        if verbose: 
+            print(f"Initial entropy was: {-ent_best} number of evals: {sol['nfev']}")
+        sc.tl.leiden(data,resolution=initRes)
+        cls = np.asarray(data.obs['leiden'])
+        if verbose:
+            u=np.unique(cls)
+            print(f"Initial types found: {len(u)}")
+        
+        def DescentTree(cls,ix,ent_best):
+            
+            dash = np.array((1,),dtype='object')
+            dash[0]='_' 
+            unqcls = np.unique(cls[ix])
+            
+            if verbose: 
+                print(f"descending the tree")
+            for i in range(len(unqcls)):
+                newcls = cls.copy()
+                ix = np.where(cls == unqcls[i])
+                smalldata = data[ix]
+                sc.pp.neighbors(smalldata, n_neighbors=10, n_pcs=0)
+                sol = minimize_scalar(OptLeiden, args = (smalldata,ix,newcls),
+                                                 bounds = (0.1,30), 
+                                                 method='bounded',
+                                                 options={'xatol': 1e-1, 'disp': 2})
+                ent = sol['fun']
+                if verbose: 
+                    print(f"split groun {i} into optimal parts, entropy {-ent}")
+                if ent < ent_best:
+                    if verbose: 
+                        print(f"split improves entropy - descending")
+                    ent_best=ent
+                    sc.tl.leiden(smalldata,resolution=sol['x'])
+                    nxtlvl = np.asarray(smalldata.obs['leiden'])
+                    newcls[cls==unqcls[i]] = cls[cls==unqcls[i]]+dash+nxtlvl
+                    cls = newcls.copy()
+                    cls = DescentTree(cls,ix,ent_best)
+                    
+            return(cls)
+        
+        finalCls = DescentTree(cls,np.arange(self.N),ent_best) 
+    
+        return(finalCls)
     
     def ContractGraph(self,TypeVec = None):
         """ContractGraph : reduce graph size by merging neighbors of same type. 
@@ -375,8 +484,8 @@ class TissueGraph:
             LocalFreq[k,:,:]=np.apply_along_axis(f,ix,axis=1)
 
         return LocalFreq
-                                    
-  
+    
+    
     def calcSpatialCoherencePerVertex(self): 
         """
         calcSpatialCoherencePerVertex calculates the information score (KL(sample,global) - KL(random,global)) for increasing size of environment. 
