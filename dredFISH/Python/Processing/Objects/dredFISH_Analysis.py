@@ -229,6 +229,8 @@ class dredFISH_Position_Class(object):
         for column in self.cell_metadata.columns:
             data.obs[column] = np.array(self.cell_metadata[column])
         data.obs_names_make_unique()
+        """ Remove Nans"""
+        data = data[np.isnan(data.layers['total_vectors'].sum(1))==False]
         self.data = data
         self.fishdata.add_and_save_data(self.data,
                                         dtype='h5ad',
@@ -257,9 +259,14 @@ if __name__ == '__main__':
     image_metadata = Metadata(metadata_path)
     hybes = np.array([i for i in image_metadata.acqnames if 'hybe' in i])
     posnames = np.unique(image_metadata.image_table[image_metadata.image_table.acq==hybes[0]].Position)
+    np.random.shuffle(posnames)
     for posname in tqdm(posnames):
-        pos_class = dredFISH_Position_Class(metadata_path,dataset,posname,cword_config,verbose=False)
-        pos_class.main()
+        try:
+            pos_class = dredFISH_Position_Class(metadata_path,dataset,posname,cword_config,verbose=False)
+            pos_class.main()
+        except Exception as e:
+            print(posname)
+            print(e)
     """ Merge Positions """
     data_list = []
     for posname in posnames:
@@ -279,5 +286,7 @@ if __name__ == '__main__':
     xy[:,1] = data.obs['stage_y']
     data.obsm['stage'] = xy
     """ Save Data """
+    """ Remove Nans"""
+    data = data[np.isnan(data.layers['total_vectors'].sum(1))==False]
     pos_class.fishdata.add_and_save_data(data,dtype='h5ad',dataset=pos_class.dataset)
     """ Manually Check Data and save to /bigstore/GeneralStorage/Data/dredFISH as dataset.h5ad"""

@@ -1,0 +1,122 @@
+absl-py==1.0.0
+anndata==0.7.8
+astunparse==1.6.3
+Bottleneck @ file:///tmp/build/80754af9/bottleneck_1607575130224/work
+cachetools==4.2.4
+cellpose==0.7.2
+certifi==2021.10.8
+charset-normalizer==2.0.8
+cycler==0.11.0
+DateTime==4.3
+dill==0.3.4
+-e git+https://github.com/wollmanlab/dredFISH@9e137c4e10ade4ced9f37b525ea84993446ea00d#egg=dredfish
+edt==2.1.1
+fastremap==1.12.2
+filelock==3.4.0
+flatbuffers==2.0
+flowdec==1.1.0
+fonttools==4.28.2
+gast==0.4.0
+google-api-core==2.2.2
+google-auth==2.3.3
+google-auth-oauthlib==0.4.6
+google-cloud-core==2.2.1
+google-cloud-storage==1.43.0
+google-crc32c==1.3.0
+google-pasta==0.2.0
+google-resumable-media==2.1.0
+googleapis-common-protos==1.53.0
+grpcio==1.42.0
+h5py==3.6.0
+idna==3.3
+igraph @ file:///home/conda/feedstock_root/build_artifacts/python-igraph_1636141412574/work
+imagecodecs @ file:///tmp/build/80754af9/imagecodecs_1635529108216/work
+imageio==2.13.0
+importlib-metadata==4.8.2
+Jinja2 @ file:///home/conda/feedstock_root/build_artifacts/jinja2_1636510082894/work
+joblib @ file:///tmp/build/80754af9/joblib_1635411271373/work
+keras==2.7.0
+Keras-Preprocessing==1.1.2
+kiwisolver==1.3.2
+leidenalg==0.8.8
+libclang==12.0.0
+llvmlite==0.37.0
+Markdown==3.3.6
+MarkupSafe @ file:///home/conda/feedstock_root/build_artifacts/markupsafe_1635833544680/work
+matplotlib==3.5.0
+mkl-fft==1.3.1
+mkl-random @ file:///tmp/build/80754af9/mkl_random_1626186066731/work
+mkl-service==2.4.0
+mock @ file:///tmp/build/80754af9/mock_1607622725907/work
+munkres==1.1.4
+natsort==8.0.0
+networkx==2.6.3
+numba @ file:///tmp/build/80754af9/numba_1635174338764/work
+numexpr @ file:///tmp/build/80754af9/numexpr_1618856529730/work
+numpy @ file:///tmp/build/80754af9/numpy_and_numpy_base_1626264704411/work
+oauthlib==3.1.1
+olefile @ file:///Users/ktietz/demo/mc3/conda-bld/olefile_1629805411829/work
+opencv-python-headless==4.5.4.60
+opt-einsum==3.3.0
+packaging==21.3
+pandas==1.3.4
+patsy==0.5.2
+Pillow==8.4.0
+PIMS @ file:///home/conda/feedstock_root/build_artifacts/pims_1592596346202/work
+protobuf==3.19.1
+pyasn1==0.4.8
+pyasn1-modules==0.2.8
+-e git+https://github.com/wollmanlab/PyImages.git@79ef334cdd794f503a5db193d0fb5f4da4a07ece#egg=pyimages
+pynndescent==0.5.5
+pyparsing==3.0.6
+PyQt5==5.15.6
+PyQt5-Qt5==5.15.2
+PyQt5-sip==12.9.0
+pyqtgraph==0.11.0rc0
+-e git+https://github.com/wollmanlab/PySpots.git@76447462fb5f0330db810f0def3a06e42dc75d0e#egg=pyspots
+python-dateutil @ file:///tmp/build/80754af9/python-dateutil_1626374649649/work
+pytorch-ranger==0.1.1
+pytz==2021.3
+PyWavelets==1.2.0
+PyYAML @ file:///home/conda/feedstock_root/build_artifacts/pyyaml_1636139833192/work
+requests==2.26.0
+requests-oauthlib==1.3.0
+rsa==4.8
+scanpy==1.8.2
+scikit-image==0.18.3
+scikit-learn @ file:///tmp/build/80754af9/scikit-learn_1635187048948/work
+scikit-misc==0.1.4
+scipy==1.7.3
+seaborn @ file:///tmp/build/80754af9/seaborn_1629307859561/work
+setuptools-scm==6.3.2
+sinfo==0.3.4
+sip==4.19.13
+six @ file:///tmp/build/80754af9/six_1623709665295/work
+slicerator==1.0.0
+statsmodels @ file:///tmp/build/80754af9/statsmodels_1614022848006/work
+stdlib-list==0.8.0
+tables @ file:///tmp/build/80754af9/pytables_1607975397488/work
+tensorboard==2.7.0
+tensorboard-data-server==0.6.1
+tensorboard-plugin-wit==1.8.0
+tensorflow-estimator==2.7.0
+tensorflow-gpu==2.7.0
+tensorflow-io-gcs-filesystem==0.22.0
+termcolor==1.1.0
+texttable @ file:///home/conda/feedstock_root/build_artifacts/texttable_1626204417032/work
+threadpoolctl==3.0.0
+tifffile @ file:///home/conda/feedstock_root/build_artifacts/tifffile_1635944860688/work
+tomli==1.2.2
+torch==1.10.0
+torch-optimizer==0.3.0
+tornado @ file:///tmp/build/80754af9/tornado_1606942317143/work
+tqdm==4.62.3
+trackpy @ file:///home/conda/feedstock_root/build_artifacts/trackpy_1618301362522/work
+typing_extensions @ file:///home/conda/feedstock_root/build_artifacts/typing_extensions_1637155965157/work
+umap-learn==0.5.2
+urllib3==1.26.7
+Werkzeug==2.0.2
+wrapt==1.13.3
+xlrd==1.2.0
+zipp==3.6.0
+zope.interface==5.4.0
