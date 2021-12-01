@@ -26,7 +26,13 @@ import warnings
 from scipy.optimize import minimize_scalar
 import scanpy as sc
 
+from IPython import embed
+
 from sklearn.neighbors import NearestNeighbors
+
+from scipy.special import rel_entr
+import torch
+import time
 
 # from Viz.cell_colors import *
 # from Viz.vor import *
@@ -45,7 +51,9 @@ def CountValues(V,refvals):
     cntdict = dict(Cnt)
     missing = list(set(refvals) - set(V))
     cntdict.update(zip(missing, np.zeros(len(missing))))
-    return(cntdict)
+    Pv = np.array([cntdict.get(k) for k in sorted(cntdict.keys())])
+    Pv=Pv/np.sum(Pv)
+    return(Pv)
 
 
 
@@ -68,7 +76,8 @@ class TissueGraph:
             
     """
     def __init__(self):
-        self.MaxEnvSize = 1000
+        self.MaxEnvSize = 3000
+        self.nbrs = None
         self._G = None
         self.UpstreamMap = None
         self.Corners = None # at least 3 columns: X,Y,iternal/external,type?    
@@ -160,8 +169,9 @@ class TissueGraph:
             warnings.warn("Type was not initalized - returning None")
             return(None)
         
-        # if we are here, then there is a Type attribute. Just return it, 
-        return(self._G.vs["Type"])
+        # if we are here, then there is a Type attribute. Just return it,
+        TypeVec = np.asarray(self._G.vs["Type"])
+        return TypeVec
         
     
     @Type.setter
@@ -170,7 +180,7 @@ class TissueGraph:
             Assign Type values, stores them using igraph attributes. 
         """
         # stores Types as graph vertex attributes. 
-        self._G.vs["Type"]=TypeVec
+        self._G.vs["Type"]=np.asarray(TypeVec)
         return
     
     def BuildSpatialGraph(self,XY):
@@ -317,8 +327,8 @@ class TissueGraph:
             newcls[ix] = newcls[ix]+dash+TypeVec
             
             ZG = self.ContractGraph(newcls)
-            entropy = ZG.CondEntropy()
-            return(-entropy)
+            Entropy = ZG.CondEntropy()
+            return(-Entropy)
         
         sc.pp.neighbors(data, n_neighbors=10, n_pcs=0)
         if verbose: 
@@ -391,7 +401,7 @@ class TissueGraph:
         EL[:,1] = np.take(nm,EL[:,1])
         
         # Figure out which type to use
-        if any(TypeVec == None): 
+        if TypeVec is None: 
             TypeVec = self.Type
             
         # only keep edges where neighbors are of same types
@@ -407,10 +417,9 @@ class TissueGraph:
         # finding clusters for each component. 
         cmp = IsoZonesGraph.components()
         IxMapping = np.asarray(cmp.membership)
-                
+        
         ZoneName, ZoneSingleIx, ZoneSize = np.unique(IxMapping, return_counts=True,return_index=True)
         
- 
         # create a new Tissue graph by copying existing one, contracting, and updating XY
         ZoneGraph = TissueGraph()
         ZoneGraph._G = self._G.copy()
@@ -441,13 +450,15 @@ class TissueGraph:
         """
             TypeFreq: return the catogorical probability for each type
         """
-        if self.Type == None: 
+        if self.Type is None: 
             raise ValueError("Type not yet assigned, can't count frequencies")
         unqTypes = np.unique(self.Type) 
-        cntdict = CountValues(self.Type,unqTypes)
-        Ptypes = np.array([cntdict.get(k) for k in sorted(cntdict.keys())])
-        Ptypes=Ptypes/np.sum(Ptypes)
+        Ptypes = CountValues(self.Type,unqTypes)
+        
         return Ptypes,unqTypes
+    
+    # TODO: this should use NodeSize in case we are calculating this on the contracted graph
+    
                              
     def CondEntropy(self):
         """
@@ -469,22 +480,53 @@ class TissueGraph:
         return(CondEntropy)
     
     def LocalTypeFreq(self):
+        """
+        Calculates the type frequency from 1 to self.MaxEnvSize for each node. 
+        As this is a lot of probabilities, we store those as sparse matrix (torch.sparse)
+        
+        This method is similar to what "calcSpatialCoherencePerVertex" is doing but returning 
+        the intermediate environment as sprase array where as the "calcSpatialCoherencePerVertex"
+        uses these frequencies on the fly to calculate KL and local environment length scales
+        """
         # first, create the list of types (unique values) we care about
         Ptypes,UnqTypes = self.TypeFreq()
         
         # create nearest neighbors data
-        nbrs = NearestNeighbors(n_neighbors=self.MaxEnvSize, algorithm='auto').fit(self.XY)
-        distances, indices = nbrs.kneighbors(self.XY)
+        (distances,indices) = self.SpatialNeighbors
         
         # use these to build local frequencies
-        LocalFreq = np.zeros((self.MaxEnvSize,self.N,len(UnqTypes)))
+        LocalFreq = np.zeros((self.N,len(UnqTypes),self.MaxEnvSize))
+        unq,TypeCode = np.unique(self.Type, return_inverse=True)
+        TypeCode = TypeCode.astype(np.int_)
+        TypeInt = TypeCode[indices]
+        
+        LF = torch.sparse_coo_tensor(size=(self.N,len(UnqTypes),self.MaxEnvSize))
+        Totals = np.zeros((self.N,len(UnqTypes)),dtype="int16")
         for k in range(self.MaxEnvSize): 
-            ix = indices[:,0:k]
-            f = lambda ind : funcKL(CountValues(self.Type[ind],UnqTypes),Ptypes)
-            LocalFreq[k,:,:]=np.apply_along_axis(f,ix,axis=1)
-
-        return LocalFreq
+            np.add.at(Totals,(np.arange(self.N),TypeInt[:,k]),1)
+            SpInd = np.array([np.arange(self.N),TypeInt[:,k],k*np.ones(self.N)]).astype("int64")
+            SpVal = Totals[np.arange(self.N),TypeInt[:,k]]/(k+1)
+            LF = LF + torch.sparse_coo_tensor(SpInd,SpVal,size=(self.N,len(UnqTypes),self.MaxEnvSize))
+        
+        return LF
     
+    @property
+    def SpatialNeighbors(self):
+        if self.nbrs is None: 
+            # create nearest neighbors data
+            nbrs = NearestNeighbors(n_neighbors=self.MaxEnvSize+1, algorithm='auto').fit(self.XY)
+            distances, indices = nbrs.kneighbors(self.XY)
+            indices = np.array(indices)
+            indices = indices[:,1:indices.shape[1]]
+            distances = np.array(distances)
+            distances = distances[:,1:distances.shape[1]]
+            self.nbrs = {'indices' : indices,
+                         'distances' : distances}
+        else: 
+            indices = self.nbrs['indices']
+            distances = self.nbrs['distances']
+            
+        return (distances,indices)
     
     def calcSpatialCoherencePerVertex(self): 
         """
@@ -509,27 +551,71 @@ class TissueGraph:
                     
                     
         """
-
+        verbose = True
+        start = time.time()
+        if verbose: 
+            print("Estimating sampling effect (KLsampling)")
         # global type distribution that we'll compare to
         Ptypes,UnqTypes = self.TypeFreq()
                           
         # First create an array such that for each node, we get the sampling noise effect 
-        iter = 3 # repeat sampling a few times, i.e. expected values over 
-        rndKL = np.zeros(max(avgsz))
-        for k in range(max(avgsz)): 
-            for i in range(iter): 
-                Psample = CountValues(np.random.choice(self.Type,size=k),UnqTypes)
-                rndKL[k]=rndKL[k]+funcKL(Psample,Ptypes)
-        
-        rndKL=rndKL/iter            
+        iter = 10 # repeat sampling a few times, i.e. expected values over 
+        rndKL = np.zeros(self.MaxEnvSize)
+
+        for k in range(self.MaxEnvSize):
+            TypeSample = np.reshape(np.random.choice(self.Type,size = (k+1)*iter) , (-1, iter))
+            P = np.apply_along_axis(lambda V : CountValues(V,UnqTypes),axis=0,arr = TypeSample)
+            rndKLiter = np.apply_along_axis(lambda P : funcKL(P,Ptypes),axis=0,arr = P )
+            rndKL[k]=rndKLiter.mean()
     
+        KLsampling = np.broadcast_to(rndKL, (self.N,len(rndKL)))
+        if verbose: 
+            print(f"Calculation tool {time.time()-start:.2f}")
+        
+        
         # now find the KL from global for actual data
-        LocalFreq = self.LocalTypeFreq()
-        KL2g = numpy.apply_over_axes(lambda P : funcKL(P,Ptypes), LocalFreq, axes)
+        Ptypes = Ptypes.reshape(-1,1)
+        Ptypes = Ptypes.T
+        
+        if verbose: 
+            print(f"Calculating nearest neighbors up to {self.MaxEnvSize}")
+        
+        # create nearest neighbors data
+        (distances,indices) = self.SpatialNeighbors
+            
+        unq,TypeCode = np.unique(self.Type, return_inverse=True)
+        TypeCode = TypeCode.astype(np.int_)
+        TypeInt = TypeCode[indices]
+        
+        TypeInt = torch.from_numpy(TypeInt)
+        
+        if verbose: 
+            print(f"Calculation tool {time.time()-start:.2f}")
+            
+        KL2g = np.zeros((self.N,self.MaxEnvSize))
+
+        # count by increasing env size by one and each time add 1 to the Total "bean counter"
+        Totals = torch.zeros((self.N,len(UnqTypes)),dtype=torch.int16)
+        # Totals = np.zeros((self.N,len(UnqTypes)),dtype="int16")
+        
+        if verbose: 
+            print(f"Calculating KL divergence for all cells per environment size of {TypeInt.shape[1]}")
+        for k in range(TypeInt.shape[1]): 
+            if k % 50 ==0: 
+                print(f"iter: {k} time: {time.time()-start:.2f}")
+            # bean counting
+            # np.add.at(Totals,(np.arange(self.N),TypeInt[:,k]),1)
+            Totals.index_put_((torch.arange(self.N),TypeInt[:,k]), torch.ones(self.N,dtype=torch.int16), accumulate=True)
+                             
+            # probabilities (each time renormalize to sum=1)
+            P = Totals/(k+1)
+            # element wise KL divergence (p*log(p/q))
+            mat = rel_entr(P, Ptypes)
+            # get entropy in bits
+            KL2g[:,k]=np.sum(mat.numpy(), axis=1)/np.log(2)
         
         KLdiff = KL2g - KLsampling
-                       
-        return(KLdiff)               
+        return (KLdiff,KL2g,KLsampling)               
         
         
         
