@@ -227,16 +227,16 @@ class TissueGraph:
         """
         Plot cell type or zone 
         """
-        if type(XY) == type(None):
+        if XY is None:
             XY = self.XY
-        if type(cell_type) == type(None):
+        if cell_type) is None:
             cell_type=self.Type
 
         vp = voronoi_intersect_box(XY)
 
         fig, ax = plt.subplots(figsize=size)
 
-        if type(self.UpstreamMap) == type(None):
+        if self.UpstreamMap is None:
             for i in range(len(vp)):
                 p = vp[i]
                 if p.area == 0:
@@ -442,9 +442,9 @@ class TissueGraph:
         """ 
             Ntypes: returns number of unique types in the graph
         """ 
-        if self.Type == None: 
+        if self.Type is None: 
             raise ValueError("Type not yet assigned, can't count how many")
-        return(len(numpy.unique(self.Type)))
+        return(len(np.unique(self.Type)))
                              
     def TypeFreq(self): 
         """
@@ -470,7 +470,7 @@ class TissueGraph:
         Entropy_Zone = -np.sum(Pzones*np.log2(Pzones))
         
         # validate that type exists
-        if self.Type == None: 
+        if self.Type is None: 
             raise ValueError("Can't calculate cond-entropy without Types, please check")
             
         Ptypes = self.TypeFreq()[0] 
