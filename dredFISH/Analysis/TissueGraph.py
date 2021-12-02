@@ -229,7 +229,7 @@ class TissueGraph:
         """
         if XY is None:
             XY = self.XY
-        if cell_type) is None:
+        if cell_type is None:
             cell_type=self.Type
 
         vp = voronoi_intersect_box(XY)
