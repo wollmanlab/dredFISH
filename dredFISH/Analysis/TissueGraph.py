@@ -33,9 +33,10 @@ from sklearn.neighbors import NearestNeighbors
 from scipy.special import rel_entr
 import torch
 import time
+import pdb
 
-# from Viz.cell_colors import *
-# from Viz.vor import *
+from dredFISH.Visualization.cell_colors import *
+from dredFISH.Visualization.vor import * 
 
 ##### Some simple accessory funcitons
 def funcKL(P,Q): 
@@ -223,35 +224,121 @@ class TissueGraph:
         self._G.vs["name"]=list(range(self.N))
         return(self)
     
-    def plot(self, XY=None, cell_type=None, color_dict={}, size=(12,8), inner=False, scatter=False):
+    def plot(self, XY=None, cell_type=None, color_dict={}, fpath=None, graph_params=None):
         """
-        Plot cell type or zone 
+        Plot cell type or zone as a Voronoi diagram
+
+        Input
+        -----
+        XY : coordinates of each cell
+        cell_type : list of cell labels 
+        color_dict : mapping of cell type to color space
+        graph_params : current matplotlib plot parameters passed via a dictionary
+            figsize
+            border_color, border_alpha, border_lw, border_ls
+            poly_alpha
+            inner, inner_alpha
+            scatter
+            scatter_color, scatter_alpha, scatter_size
+        fpath : file path for figure to be saved to 
+
+        Output
+        ------
+        fig : 
+
         """
+
+        # default graphing parameters 
+        if graph_params is None:
+            graph_params={}
+
+        graph_param_defaults ={}
+        graph_param_defaults["figsize"]=(12,8)
+        graph_param_defaults["border_color"]="black"
+        graph_param_defaults["border_alpha"]=1
+        graph_param_defaults["border_lw"]=1
+        graph_param_defaults["border_ls"]="solid"
+        graph_param_defaults["poly_alpha"]=0.5
+        graph_param_defaults["inner"]=False
+        graph_param_defaults["inner_alpha"]=1
+        graph_param_defaults["inner_lw"]=0.75
+        graph_param_defaults["inner_ls"]="dotted"
+        graph_param_defaults["scatter"]=False
+        graph_param_defaults["scatter_color"]="black"
+        graph_param_defaults["scatter_alpha"]=1
+        graph_param_defaults["scatter_size"]=3
+
+        for x in graph_param_defaults:
+            if x not in graph_params:
+                graph_params[x]=graph_param_defaults[x]
+
         if XY is None:
             XY = self.XY
         if cell_type is None:
             cell_type=self.Type
 
+        # generate Voronoi polygons that intersect bounding box
         vp = voronoi_intersect_box(XY)
 
-        fig, ax = plt.subplots(figsize=size)
+        fig, ax = plt.subplots(figsize=graph_params["figsize"])
 
+        def plot_single_poly(coords, ax, graph_params, color="blue", inner=False):
+            """
+            Helper function to plot a polygon using graph params
+
+            Input
+            -----
+            coords : coordinates of polygon edges
+            ax : figure axis for plotting  
+            graph_params : graph parameters as a dictionary
+            color : color of polygon
+            inner : should inner polygons be colored (specific to zone plots)
+            """
+
+            nofill = False
+            if inner:
+                nofill = True
+                border_color = color
+                border_alpha = graph_params["inner_alpha"]
+                border_lw = graph_params["inner_lw"]
+                border_ls = graph_params["inner_ls"]
+            else:
+                border_color = graph_params["border_color"]
+                border_alpha = graph_params["border_alpha"]
+                border_lw = graph_params["border_lw"]
+                border_ls = graph_params["border_ls"]
+                poly_color = color
+                poly_alpha = graph_params["poly_alpha"]
+
+            x, y = zip(*coords)
+            ax.plot(x, y, 
+                color=border_color,
+                alpha=border_alpha,
+                linewidth=border_lw,
+                linestyle=border_ls)
+
+            if not nofill:
+                ax.fill(*zip(*coords),
+                    color=poly_color,
+                    alpha=poly_alpha)
+
+
+        # cell level
         if self.UpstreamMap is None:
             for i in range(len(vp)):
                 p = vp[i]
+
                 if p.area == 0:
                     continue
+
                 if hasattr(p, "geoms"):
                     for subp in p.geoms:
-                        x, y = zip(*subp.exterior.coords)
-                        ax.plot(x, y, color="black",alpha=1,linewidth=1,linestyle="solid")
-                        ax.fill(*zip(*subp.exterior.coords),color=color_dict[cell_type[i]],alpha=0.5)
+                        coords = subp.exterior.coords
+                        plot_single_poly(coords, ax, graph_params, color=color_dict[cell_type[i]])
                 else:
-                    x, y = zip(*p.exterior.coords)
-                    ax.plot(x, y, color="black",alpha=1,linewidth=1,linestyle="solid")
-                    ax.fill(*zip(*p.exterior.coords),color=color_dict[cell_type[i]],alpha=0.5)
-                if scatter == True:
-                    ax.scatter(x=XY[i][0],y=XY[i][1],c="black",s=10,alpha=1)
+                    coords = p.exterior.coords
+                    plot_single_poly(coords, ax, graph_params, color=color_dict[cell_type[i]])
+        # zone and beyond level
         else:
             for i in range(len(vp)):
                 poly_idx = np.where(self.UpstreamMap==i)[0]
@@ -259,52 +346,46 @@ class TissueGraph:
                 if len(poly_idx) == 0:
                     continue
 
-                if inner == True:
-                    for idx in poly_idx:
-                        p = vp[idx]
-
-                        if p.area == 0:
-                            continue
-                        if hasattr(p, "geoms"):
-                            for subp in p.geoms:
-                                x, y = zip(*subp.exterior.coords)
-                                ax.plot(x, y, color=color_dict[cell_type[poly_idx[0]]],alpha=0.5,linewidth=0.75,linestyle="dotted")
-                        else:
-                            x, y = zip(*p.exterior.coords)
-                            ax.plot(x, y, color=color_dict[cell_type[poly_idx[0]]],alpha=1,linewidth=0.75,linestyle="dotted")
-
-                p = vp[poly_idx[0]]
+                agr_p = p = vp[poly_idx[0]]
                 
-                for idx, x in enumerate(poly_idx):
-                    if idx == 0:
+                # iterate through all polygons within some zone 
+                for idx in poly_idx:
+                    p = vp[idx]
+                    agr_p = agr_p.union(p)
+
+                    if p.area == 0:
                         continue
-                    p = p.union(vp[x])
-                    
-                if p.area == 0:
+                    # inner polygon lines 
+                    if hasattr(p, "geoms"):
+                        for subp in p.geoms:
+                            coords = subp.exterior.coords
+                            plot_single_poly(coords, ax, graph_params, color=color_dict[cell_type[poly_idx[0]]], inner=graph_params["inner"])
+                    else:
+                        coords = p.exterior.coords
+                        plot_single_poly(coords, ax, graph_params, color=color_dict[cell_type[poly_idx[0]]], inner=graph_params["inner"])
+                
+                if agr_p.area == 0:
                     continue
                 
-                if hasattr(p, "geoms"):
-                    for subp in p.geoms:
-                        x, y = zip(*subp.exterior.coords)
-                        ax.plot(x, y, color="black",alpha=0.5,linewidth=1,linestyle="solid")
-                        ax.fill(*zip(*subp.exterior.coords),color=color_dict[cell_type[poly_idx[0]]],alpha=0.5)
+                # borders
+                if hasattr(agr_p, "geoms"):
+                    for subp in agr_p.geoms:
+                        coords = subp.exterior.coords
+                        plot_single_poly(coords, ax, graph_params, color=color_dict[cell_type[poly_idx[0]]])
                 else:
-                    x, y = zip(*p.exterior.coords)
-                    ax.plot(x, y, color="black",alpha=0.5,linewidth=1,linestyle="solid")
-                    ax.fill(*zip(*p.exterior.coords),color=color_dict[cell_type[poly_idx[0]]],alpha=0.5)
-                if scatter == True:
-                    for idx in poly_idx:
-                        ax.scatter(x=XY[idx][0],y=XY[idx][1],c="black",s=10,alpha=1)
+                    coords = agr_p.exterior.coords
+                    plot_single_poly(coords, ax, graph_params, color=color_dict[cell_type[poly_idx[0]]])
 
-#     def UpdatedSpatialDataOfContractedGraph(self): 
-#         # Updates Corners and Lines (mostly internal/external and possibly type and other data)
+        if graph_params["scatter"]:
+            ax.scatter(x=XY[:,0],y=XY[:,1],
+                c=graph_params["scatter_color"],
+                s=graph_params["scatter_size"],
+                alpha=graph_params["scatter_alpha"])
         
-        
-# #     def fplot(self):
-# #         return 1
-#         # voroni graph, colors by type, edges only external make it nice :)     
-    
-    
+        if fpath != None:
+            fig.savefig("fpath")
+        else:
+            return fig
     
     def Cluster(self,data):
         """
@@ -616,11 +697,4 @@ class TissueGraph:
         
         KLdiff = KL2g - KLsampling
         return (KLdiff,KL2g,KLsampling)               
-        
-        
-        
-
-        
-        
-        
         
