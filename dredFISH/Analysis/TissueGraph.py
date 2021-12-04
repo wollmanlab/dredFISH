@@ -244,7 +244,7 @@ class TissueGraph:
 
         Output
         ------
-        fig : 
+        fig : graphic for plotting if not provided with file path for saving plot 
 
         """
 

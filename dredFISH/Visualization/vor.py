@@ -8,20 +8,41 @@ from copy import copy
 from scipy.spatial import Voronoi
 from scipy.ndimage import binary_fill_holes, gaussian_filter
 
-def voronoi_intersect_box(XY):
+def voronoi_intersect_box(XY, bb_params=None):
     """
     Find Voronoi points within bounding box
 
     Input
     -----
     XY : XY coordinates
+    bb_params : bounding box params for bounding_box_grid
 
     Output
     ------
     list : set of polygons from Voronoi diagram intersecting bounding box
 
     """
-    _, bb = bounding_box_grid(XY)
+    if bb_params is None:      
+        _, bb = bounding_box_grid(XY)
+    else:
+        bb_defaults["scale"] = 25
+        bb_defaults["padding"] = 10
+        bb_defaults["threshold"] = 50
+        bb_defaults["sd"] = 0.1
+        bb_defaults["fill"]=True
+
+        for x in bb_default:
+            if x not in bb_params:
+                bb_params[x]=bb_defaults[x]
+
+        _, bb = bounding_box_grid(XY,
+            bb_params["scale"],
+            bb_params["padding"],
+            bb_params["threshold"],
+            bb_params["sd"],
+            not bb_params["fill"])
+
+
     diameter = np.linalg.norm(bb.ptp(axis=0))
     boundary_polygon = Polygon(bb)
     
