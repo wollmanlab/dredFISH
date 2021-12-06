@@ -1,6 +1,6 @@
-"""TissueGraph functions
+"""TissueGraph 
 
-A collection of files to analyze tissues using Graph representation
+Main class used to analyze tissues using Graph representation
 
 Tissue graphs can be created either using XY possition of centroids OR by contracting existing graph
 to create coarser zone. 
@@ -23,12 +23,12 @@ from collections import Counter
 import numpy as np
 import matplotlib.pyplot as plt
 import warnings
-from scipy.optimize import minimize_scalar
-import scanpy as sc
 
 from IPython import embed
 
 from sklearn.neighbors import NearestNeighbors
+
+from dredFISH.Analysis.Taxonomy import *
 
 from scipy.special import rel_entr
 import torch
@@ -38,24 +38,18 @@ import time
 # from Viz.vor import *
 
 ##### Some simple accessory funcitons
-def funcKL(P,Q): 
-    ix = P>0
-    return(np.sum(P[ix]*np.log2(P[ix]/Q[ix])))
-
-def funcJSD(P,Q):
-    M=0.5*P + 0.5*Q
-    return(0.5*funcKL(P,M) + 0.5*funcKL(Q,M))
-
-def CountValues(V,refvals):
+def CountValues(V,refvals,sz = None):
     Cnt = Counter(V)
+    if sz is not None: 
+        for i in range(len(V)): 
+            Cnt.update({V[i] : sz[i]-1}) # V[i] is already represented, so we need to subtract 1 from sz[i]  
+            
     cntdict = dict(Cnt)
     missing = list(set(refvals) - set(V))
     cntdict.update(zip(missing, np.zeros(len(missing))))
     Pv = np.array([cntdict.get(k) for k in sorted(cntdict.keys())])
     Pv=Pv/np.sum(Pv)
     return(Pv)
-
-
 
 ###### Main TissueGraph classes
 
@@ -76,15 +70,22 @@ class TissueGraph:
             
     """
     def __init__(self):
-        self.MaxEnvSize = 3000
+        self.MaxEnvSize = 1000
+        self.MinEnvSize = 10
+        
+        self.EnvSize = None
+        
         self.nbrs = None
         self._G = None
         self.UpstreamMap = None
+        self.TX = Taxonomy()
+        
         self.Corners = None # at least 3 columns: X,Y,iternal/external,type?    
         self.Lines = None # at least 3 columns: i,j (indecies of Corders),iternal/external,type?
         self.Tri = None
         return None
-        
+    
+       
     @property
     def N(self):
         """Size of the tissue graph
@@ -165,12 +166,12 @@ class TissueGraph:
                 warns when None. 
         """
         # validate that Type attribute was initialized 
-        if "Type" not in self._G.vs.attribute_names():
+        if self.TX.leaflabels is None:
             warnings.warn("Type was not initalized - returning None")
             return(None)
         
         # if we are here, then there is a Type attribute. Just return it,
-        TypeVec = np.asarray(self._G.vs["Type"])
+        TypeVec = np.asarray(self.TX.leaflabels)
         return TypeVec
         
     
@@ -179,8 +180,8 @@ class TissueGraph:
         """
             Assign Type values, stores them using igraph attributes. 
         """
-        # stores Types as graph vertex attributes. 
-        self._G.vs["Type"]=np.asarray(TypeVec)
+        # stores Types inside the taxonomy object 
+        self.TX.leaflabels=np.asarray(TypeVec)
         return
     
     def BuildSpatialGraph(self,XY):
@@ -304,86 +305,10 @@ class TissueGraph:
 # #         return 1
 #         # voroni graph, colors by type, edges only external make it nice :)     
     
+  
+
     
-    
-    def Cluster(self,data):
-        """
-            Find optimial clusters (using recursive leiden)
-            optimization is done on resolution parameter and hierarchial clustering
-            
-        """
-        verbose = True
-        def OptLeiden(res,datatoopt,ix,currcls):
-            """Basic optimization routine for Leiden resolution parameter in Scanpy
-            """
-            # calculate leiden clustering
-            sc.tl.leiden(datatoopt,resolution=res)
-            TypeVec = np.asarray(datatoopt.obs['leiden'])
-            
-            # merge TypeVec with full cls vector
-            dash = np.array((1,),dtype='object')
-            dash[0]='_' 
-            newcls = currcls.copy()
-            newcls[ix] = newcls[ix]+dash+TypeVec
-            
-            ZG = self.ContractGraph(newcls)
-            Entropy = ZG.CondEntropy()
-            return(-Entropy)
-        
-        sc.pp.neighbors(data, n_neighbors=10, n_pcs=0)
-        if verbose: 
-            print(f"Calling initial optimization")
-        emptycls = np.asarray(['' for _ in range(self.N)],dtype='object')
-        sol = minimize_scalar(OptLeiden, args = (data,np.arange(self.N),emptycls),
-                                         bounds = (0.1,30), 
-                                         method='bounded',
-                                         options={'xatol': 1e-1, 'disp': 3})
-        initRes = sol['x']
-        ent_best = sol['fun']
-        if verbose: 
-            print(f"Initial entropy was: {-ent_best} number of evals: {sol['nfev']}")
-        sc.tl.leiden(data,resolution=initRes)
-        cls = np.asarray(data.obs['leiden'])
-        if verbose:
-            u=np.unique(cls)
-            print(f"Initial types found: {len(u)}")
-        
-        def DescentTree(cls,ix,ent_best):
-            
-            dash = np.array((1,),dtype='object')
-            dash[0]='_' 
-            unqcls = np.unique(cls[ix])
-            
-            if verbose: 
-                print(f"descending the tree")
-            for i in range(len(unqcls)):
-                newcls = cls.copy()
-                ix = np.where(cls == unqcls[i])
-                smalldata = data[ix]
-                sc.pp.neighbors(smalldata, n_neighbors=10, n_pcs=0)
-                sol = minimize_scalar(OptLeiden, args = (smalldata,ix,newcls),
-                                                 bounds = (0.1,30), 
-                                                 method='bounded',
-                                                 options={'xatol': 1e-1, 'disp': 2})
-                ent = sol['fun']
-                if verbose: 
-                    print(f"split groun {i} into optimal parts, entropy {-ent}")
-                if ent < ent_best:
-                    if verbose: 
-                        print(f"split improves entropy - descending")
-                    ent_best=ent
-                    sc.tl.leiden(smalldata,resolution=sol['x'])
-                    nxtlvl = np.asarray(smalldata.obs['leiden'])
-                    newcls[cls==unqcls[i]] = cls[cls==unqcls[i]]+dash+nxtlvl
-                    cls = newcls.copy()
-                    cls = DescentTree(cls,ix,ent_best)
-                    
-            return(cls)
-        
-        finalCls = DescentTree(cls,np.arange(self.N),ent_best) 
-    
-        return(finalCls)
-    
+       
     def ContractGraph(self,TypeVec = None):
         """ContractGraph : reduce graph size by merging neighbors of same type. 
             Given a vector of types, will contract the graph to merge vertices that are 
@@ -426,13 +351,13 @@ class TissueGraph:
         
         comb = {"X" : "mean",
                "Y" : "mean",
-               "Type" : "ignore",
                "name" : "ignore"}
         
         ZoneGraph._G.contract_vertices(IxMapping,combine_attrs=comb)
         ZoneGraph._G.vs["Size"] = ZoneSize
         ZoneGraph._G.vs["name"] = ZoneName
-        ZoneGraph._G.vs["Type"] = TypeVec[ZoneSingleIx]
+        ZoneGraph.Type = TypeVec[ZoneSingleIx]
+        ZoneGraph.TX.linkage = self.TX.linkage
         ZoneGraph.UpstreamMap = IxMapping
         
         return(ZoneGraph)
@@ -442,9 +367,9 @@ class TissueGraph:
         """ 
             Ntypes: returns number of unique types in the graph
         """ 
-        if self.Type == None: 
+        if self.Type is None: 
             raise ValueError("Type not yet assigned, can't count how many")
-        return(len(numpy.unique(self.Type)))
+        return(len(np.unique(self.Type)))
                              
     def TypeFreq(self): 
         """
@@ -452,12 +377,10 @@ class TissueGraph:
         """
         if self.Type is None: 
             raise ValueError("Type not yet assigned, can't count frequencies")
-        unqTypes = np.unique(self.Type) 
-        Ptypes = CountValues(self.Type,unqTypes)
+        unqTypes = np.unique(self.Type)
+        Ptypes = CountValues(self.Type,unqTypes,self.NodeSize)
         
         return Ptypes,unqTypes
-    
-    # TODO: this should use NodeSize in case we are calculating this on the contracted graph
     
                              
     def CondEntropy(self):
@@ -470,7 +393,7 @@ class TissueGraph:
         Entropy_Zone = -np.sum(Pzones*np.log2(Pzones))
         
         # validate that type exists
-        if self.Type == None: 
+        if self.Type is None: 
             raise ValueError("Can't calculate cond-entropy without Types, please check")
             
         Ptypes = self.TypeFreq()[0] 
@@ -557,6 +480,9 @@ class TissueGraph:
             print("Estimating sampling effect (KLsampling)")
         # global type distribution that we'll compare to
         Ptypes,UnqTypes = self.TypeFreq()
+        # include all tree nodes
+        Ptypes = Ptypes[np.newaxis,:]
+        Ptypes = self.TX.MultilevelFrequency(Ptypes)
                           
         # First create an array such that for each node, we get the sampling noise effect 
         iter = 10 # repeat sampling a few times, i.e. expected values over 
@@ -565,14 +491,24 @@ class TissueGraph:
         for k in range(self.MaxEnvSize):
             TypeSample = np.reshape(np.random.choice(self.Type,size = (k+1)*iter) , (-1, iter))
             P = np.apply_along_axis(lambda V : CountValues(V,UnqTypes),axis=0,arr = TypeSample)
-            rndKLiter = np.apply_along_axis(lambda P : funcKL(P,Ptypes),axis=0,arr = P )
+            
+            # P=P.T
+            P = self.TX.MultilevelFrequency(P.T)
+            
+            # Ptypes_mat = np.broadcast_to(Ptypes,P.shape)
+            
+            mat = rel_entr(P, Ptypes)
+
+            rndKLiter = np.sum(mat, axis=1)/np.log(2)
             rndKL[k]=rndKLiter.mean()
     
         KLsampling = np.broadcast_to(rndKL, (self.N,len(rndKL)))
         if verbose: 
             print(f"Calculation tool {time.time()-start:.2f}")
         
-        
+        # for debuging purposes...
+        # return (None,None,KLsampling)  
+                
         # now find the KL from global for actual data
         Ptypes = Ptypes.reshape(-1,1)
         Ptypes = Ptypes.T
@@ -593,34 +529,76 @@ class TissueGraph:
             print(f"Calculation tool {time.time()-start:.2f}")
             
         KL2g = np.zeros((self.N,self.MaxEnvSize))
-
-        # count by increasing env size by one and each time add 1 to the Total "bean counter"
-        Totals = torch.zeros((self.N,len(UnqTypes)),dtype=torch.int16)
-        # Totals = np.zeros((self.N,len(UnqTypes)),dtype="int16")
         
+        # create the mapping betweeb leaf type and ALL tree types
+        treemat = self.TX.TreeAsMat()
+        treemap = np.zeros(treemat.shape[1],dtype='object')
+        treemapsz = np.zeros(treemap.shape,dtype='object')
+        treemapweight = np.zeros(treemap.shape,dtype='object')
+        for i in range(treemat.shape[1]):
+            treemap[i] = np.flatnonzero(treemat[:,i])
+            treemapsz[i] = np.ones(len(treemap[i]))
+            treemapweight[i] = treemat[treemap[i],i]
+            
+        # Convert TypeInt to TypeIntTree that accounts for ALL tree types
+        RowTracker = np.zeros(TypeInt.shape,dtype='object')
+        TypeIntTree = np.zeros(TypeInt.shape,dtype='object')
+        WeightTracker = np.zeros(TypeInt.shape,dtype='object')
+
+        for i in range(TypeIntTree.shape[0]):
+            i_treemapsz = np.array([i*x for x in treemapsz],dtype='object')
+            TypeIntTree[i,:] = treemap[TypeInt[i,:]]
+            RowTracker[i,:] = i_treemapsz[TypeInt[i,:]]
+            WeightTracker[i,:] = treemapweight[TypeInt[i,:]] 
+            
+        # count by increasing env size by one and each time add 1 to the Total "bean counter"
+        # we are adding 1 to the leaf and all "upstream" composite types from the tree
+        Totals = torch.zeros((self.N,treemat.shape[0]),dtype=torch.double)
+
         if verbose: 
             print(f"Calculating KL divergence for all cells per environment size of {TypeInt.shape[1]}")
+        
         for k in range(TypeInt.shape[1]): 
             if k % 50 ==0: 
                 print(f"iter: {k} time: {time.time()-start:.2f}")
             # bean counting
-            # np.add.at(Totals,(np.arange(self.N),TypeInt[:,k]),1)
-            Totals.index_put_((torch.arange(self.N),TypeInt[:,k]), torch.ones(self.N,dtype=torch.int16), accumulate=True)
+
+            ix_type = torch.from_numpy(np.hstack(TypeIntTree[:,k]).astype(dtype=np.int64))
+            ix_rows = torch.from_numpy(np.hstack(RowTracker[:,k]).astype(dtype=np.int64)) 
+            weights = torch.from_numpy(np.hstack(WeightTracker[:,k])) 
+    
+            Totals.index_put_((ix_rows,ix_type),weights, accumulate=True)
                              
-            # probabilities (each time renormalize to sum=1)
-            P = Totals/(k+1)
+            # probabilities (each time renormalize all rows to sum=1)
+            row_sums = Totals.sum(axis = 1)
+            P = Totals / row_sums[:,None]
+            
             # element wise KL divergence (p*log(p/q))
             mat = rel_entr(P, Ptypes)
             # get entropy in bits
             KL2g[:,k]=np.sum(mat.numpy(), axis=1)/np.log(2)
         
         KLdiff = KL2g - KLsampling
+        
+        self.EnvSize = np.zeros(self.N,dbtype='int64')
+        for i in range(self.N):
+            self.EnvSize[i]=np.argmax(KLdiff[i,self.MinEnvSize:])+self.MinEnvSize
+        
         return (KLdiff,KL2g,KLsampling)               
         
-        
-        
 
-        
+    def extractEnvironments(self):
+        unqlbl = np.unique(self.Type)
+        (distances,indices) = self.SpatialNeighbors
+        Env = np.zeros((self.N,len(unqlbl)))
+        for i in range(self.N):
+            Env[i,:]=CountValues(self.Type[indices[i,0:self.EnvSize[i]]],unqlbl)
+    
+        # get treemat
+        treemat = self.TX.TreeAsMat() 
+        Env = np.matmul(Env,treemat.T)
+    
+        return(Env)
         
         
         
