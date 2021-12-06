@@ -132,26 +132,3 @@ def avg_dend(dend, counts):
         dend_counts.loc[x] = counts.loc[[True if x in labels else False for x in counts.index]].mean()
     
     return dend_counts.dropna()
-
-def rotate(origin, point, angle):
-    """
-    Rotate a point counterclockwise by a given angle around a given origin. The angle should be given in radians.
-
-    https://stackoverflow.com/questions/34372480/rotate-point-about-another-point-in-degrees-python
-
-    Input
-    -----
-    origin : origin over which rotation takes place
-    point : points to be rotated
-    angle: angle of rotation
-
-    Output
-    ------
-    tuple : rotated points 
-    """
-    ox, oy = origin
-    px, py = point
-
-    qx = ox + math.cos(angle) * (px - ox) - math.sin(angle) * (py - oy)
-    qy = oy + math.sin(angle) * (px - ox) + math.cos(angle) * (py - oy)
-    return qx, qy

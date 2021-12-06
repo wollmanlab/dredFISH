@@ -7,15 +7,14 @@ from colormath.color_conversions import convert_color
 from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
 
-from scipy.ndimage.interpolation import rotate
+from scipy.spatial.transform import Rotation
 
-from .utils import scale_vec
+from dredFISH.Visualization.utils import scale_vec
 
-import pdb
 import math
 
 
-def colors_from_list(lab, mat, lum=None, rot=None):
+def colors_from_list(lab, mat, lum=None, rot=None, axis=2):
     """
     Returns dict with pairs mapping labels to RGB colorspace
 
@@ -24,8 +23,9 @@ def colors_from_list(lab, mat, lum=None, rot=None):
     lab : list of labels 
     mat : matrix containing items to be mapped to color space by their attributes
         e.g. gene expression matrix 
-    lum : luminosity value for CIELAB color 
+    lum : luminosity value for CIELAB color bounded between 0-100
     rot : rotation of t-SNE transformation
+    axis : axis of rotation
 
     Output
     ------
@@ -36,10 +36,10 @@ def colors_from_list(lab, mat, lum=None, rot=None):
     mat = mat.groupby(mat.index).mean()
     
     if lum == None:
-        color = get_tsne(mat, tsne_dim=3, rotation=rot)
+        color = get_tsne(mat, tsne_dim=3, rotation=rot, axis=axis)
         color[2] = scale_vec(color[2], 0, 100)
     else:
-        color = get_tsne(mat, tsne_dim=2, rotation=rot)
+        color = get_tsne(mat, tsne_dim=2, rotation=rot, axis=axis)
         color[2] = lum
     color[0] = scale_vec(color[0], -128, 127)
     color[1] = scale_vec(color[1], -128, 127)
@@ -79,7 +79,7 @@ def vec2lab(x):
     """
     return LabColor(lab_l=x[2],lab_a=x[0],lab_b=x[1])
 
-def get_tsne(mat, pca_dim=20, tsne_dim=2, rs=0, prplx=30, rotation=None):
+def get_tsne(mat, pca_dim=20, tsne_dim=2, rs=0, prplx=30, rotation=None, axis=2):
     """
     Fit t-SNE to cell counts to get color vector 
 
@@ -91,6 +91,7 @@ def get_tsne(mat, pca_dim=20, tsne_dim=2, rs=0, prplx=30, rotation=None):
     rs : random seed for t-SNE
     prplx : perplexity for t-SNE
     rotation : rotation in radians of t-SNE transformation
+    axis : axis of rotation
 
     Output
     ------
@@ -102,8 +103,24 @@ def get_tsne(mat, pca_dim=20, tsne_dim=2, rs=0, prplx=30, rotation=None):
     pca_mat = pca.fit_transform(mat)
     tsne_mat = tsne.fit_transform(pca_mat)
 
-    # rotation about the origin 
+    # rotation about the origin of some axis 
+    # if t-SNE has two dimensions, then the axis is always Z
     if rotation != None:
-        tsne_mat = list(map(lambda x : rotate((0, 0), x, math.radians(rotation)), tsne_mat.values))
+        if tsne_dim == 2:
+            tsne_mat = np.append(tsne_mat, np.zeros((np.shape(tsne_mat)[0], 1)), 1)
+            rotation_vector = math.radians(rotation) * np.array([0, 0, 1])
+        elif axis == 2:
+            rotation_vector = math.radians(rotation) * np.array([0, 0, 1])
+        elif axis == 1:
+            rotation_vector = math.radians(rotation) * np.array([0, 1, 0])
+        elif axis == 0:
+            rotation_vector = math.radians(rotation) * np.array([1, 0, 0])
+        else:
+            raise ValueError("Invalid axis value")
+
+        tsne_mat = Rotation.from_rotvec(rotation_vector).apply(tsne_mat)
+        
+        if tsne_dim == 2:
+            tsne_mat = tsne_mat[:, :-1]
         
     return pd.DataFrame(tsne_mat, columns=range(tsne_dim), index=mat.index)
