@@ -24,7 +24,7 @@ from scipy.optimize import minimize_scalar
 from IPython import embed
 
 
-def buildgraph(X,n_neighbors = 15,metric = 'correlation',accuracy = 2):
+def buildgraph(X,n_neighbors = 15,metric = 'correlation',accuracy = 4):
     
     # update number of neighbors (x accuracy) to increase accuracy
     # at the same time checks if we have enough rows 
@@ -32,7 +32,7 @@ def buildgraph(X,n_neighbors = 15,metric = 'correlation',accuracy = 2):
     n_neighbors_with_extras = min(X.shape[0]-1,n_neighbors * accuracy)
     
     # perform nn search (using accuracy x number of neighbors to improve accuracy)
-    knn = pynndescent.NNDescent(X,n_neighbors = n_neighbors_with_extras ,metric=metric)
+    knn = pynndescent.NNDescent(X,n_neighbors = n_neighbors_with_extras ,metric=metric,diversify_prob=0.5)
     
     # get indices and remove self. 
     (indices,distances) = knn.neighbor_graph
@@ -198,8 +198,13 @@ class Taxonomy:
             ix=get_children(nodelist[i])
             treemat[i,ix]=1
         
-        row_sums = treemat.sum(axis = 1)
-        treemat = treemat / row_sums[: , np.newaxis]
+        # nornmalize treemat by row so that each node has the same influence, no matter if it's a leaf or internal
+        # row_sums = treemat.sum(axis = 1)
+        # treemat = treemat / row_sums[: , np.newaxis]
+        
+        # normalize by spreading each leaf weight to all upstream internal nodes 
+        row_sums = treemat.sum(axis = 0)
+        treemat = treemat / row_sums[np.newaxis,:]
         
         self.treeasmat = treemat
         return treemat 

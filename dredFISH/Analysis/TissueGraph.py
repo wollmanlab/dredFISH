@@ -58,15 +58,65 @@ def CountValues(V,refvals,sz = None):
 
 ###### Main TissueGraph classes
 
-# class TissueMultiGraph: 
-#     """
-#        TisseMultiGraph - responsible for storing multiple layers (each a TissueGraph) and 
-#                          the relationships between them. 
-#     """
-#     def __init__(self):
-#         self.Layers
-#         self.LayerMappings
-#         return None
+class TissueMultiGraph: 
+    """
+       TisseMultiGraph - responsible for storing multiple layers (each a TissueGraph) and 
+                         the relationships between them. 
+    """
+    def __init__(self):
+        self.Layers = list()
+        self.Kvec = np.ceil(np.power(1.5,np.arange(start=6,stop=16,step=0.25))).astype(np.int64)
+        return None
+    
+    def createCellAndZoneLayers(self,XY,PNMF): 
+        
+        # creating first layer - cell tissue graph
+        TG = TissueGraph()
+        TG.BuildSpatialGraph(XY)
+        
+        # cluster cell types optimally
+        celltypes = TG.TX.RecursiveLeidenWithTissueGraphCondEntropy(PNMF,TG,metric = 'cosine',single_level=True)
+        TG.Type = celltypes
+        
+        # build a tree
+        TG.TX.BuildTree()
+        
+        # add layer
+        self.Layers.append(TG)
+        
+        # contract and create the Zone graph
+        ZG = TG.ContractGraph()
+        ZG.MaxEnvSize = max(self.Kvec)
+        
+        # groundwork toward environments: find optimal env size for each isozone: 
+        (KLdiff,KL2g,KLsampling) = ZG.calcSpatialCoherencePerVertex(self.Kvec)
+        
+        self.Layers.append(ZG)
+        return None
+        
+        
+        
+    def addEnvironmentLayer(self): 
+        # check that cell/zone was already created. 
+        if len(self.Layers)==0: 
+            raise ValueError('Please initialize MultiLayer graph by creating Cell and isozone layers first')
+        
+        # Extract environments from existing last graph
+        Env = self.Layers[-1].extractEnvironments()
+        
+        # cluster 
+        envtypes = self.Layers[-1].TX.RecursiveLeidenWithTissueGraphCondEntropy(Env,self.Layers[-1],metric = 'cosine',single_level=True)
+        
+        # create the graph
+        EG = self.Layers[-1].ContractGraph()
+        EG.TX.BuildTree()
+        
+        # find environments
+        (KLdiff,KL2g,KLsampling) = EG.calcSpatialCoherencePerVertex(self.Kvec)
+        
+        # add layer
+        self.Layers.append(EG)
+        
     
 class TissueGraph:
     """TissueGraph - main class responsible for maximally informative biocartography.
@@ -75,7 +125,7 @@ class TissueGraph:
             
     """
     def __init__(self):
-        self.MaxEnvSize = 1000
+        self.MaxEnvSize = 500
         self.MinEnvSize = 10
         
         self.EnvSize = None
@@ -85,9 +135,9 @@ class TissueGraph:
         self.UpstreamMap = None
         self.TX = Taxonomy()
         
-        self.Corners = None # at least 3 columns: X,Y,iternal/external,type?    
-        self.Lines = None # at least 3 columns: i,j (indecies of Corders),iternal/external,type?
-        self.Tri = None
+        self.BoundingBox = None 
+        self.Lines = None # x_start,y_start,x_end,y_end,line_type,cell1,cell2
+        self.Tri = None # xy of corners (after bounding box intersection), poly_type  
         return None
         
     @property
@@ -222,7 +272,10 @@ class TissueGraph:
         self._G.vs["Size"]=np.ones(len(XY[:,1]))
         
         # TODO (Jonathan) 
-        # initalize self.Corners and self.Lines
+        # initalize Bounding Box, Lines, and Tri
+        self.BoundingBox = "JONATHAN - PLEASE FIX ME!!!!"
+        self.Lines = "JONATHAN - PLEASE FIX ME!!!!"
+        self.Tri = "JONATHAN - PLEASE FIX ME!!!!"
         
         # set up names
         self._G.vs["name"]=list(range(self.N))
@@ -515,6 +568,7 @@ class TissueGraph:
                "name" : "ignore"}
         
         ZoneGraph._G.contract_vertices(IxMapping,combine_attrs=comb)
+        ZoneGraph._G.simplify()
         ZoneGraph._G.vs["Size"] = ZoneSize
         ZoneGraph._G.vs["name"] = ZoneName
         ZoneGraph.Type = TypeVec[ZoneSingleIx]
@@ -614,7 +668,7 @@ class TissueGraph:
             
         return (distances,indices)
     
-    def calcSpatialCoherencePerVertex(self): 
+    def calcSpatialCoherencePerVertex(self,Kvec=None): 
         """
         calcSpatialCoherencePerVertex calculates the information score (KL(sample,global) - KL(random,global)) for increasing size of environment. 
                                       within an environment, cells are sorted eclidean distance.  
@@ -646,24 +700,27 @@ class TissueGraph:
         # include all tree nodes
         Ptypes = Ptypes[np.newaxis,:]
         Ptypes = self.TX.MultilevelFrequency(Ptypes)
-                          
+        
         # First create an array such that for each node, we get the sampling noise effect 
-        iter = 10 # repeat sampling a few times, i.e. expected values over 
-        rndKL = np.zeros(self.MaxEnvSize)
+        iter = 30 # repeat sampling a few times, i.e. expected values over 
 
-        for k in range(self.MaxEnvSize):
+        if Kvec is None: 
+            Kvec = np.arange(self.MaxEnvSize)
+            
+        rndKL = np.zeros(len(Kvec))
+
+        for i in range(len(Kvec)):
+            k=Kvec[i]
             TypeSample = np.reshape(np.random.choice(self.Type,size = (k+1)*iter) , (-1, iter))
             P = np.apply_along_axis(lambda V : CountValues(V,UnqTypes),axis=0,arr = TypeSample)
             
             # P=P.T
             P = self.TX.MultilevelFrequency(P.T)
             
-            # Ptypes_mat = np.broadcast_to(Ptypes,P.shape)
-            
             mat = rel_entr(P, Ptypes)
 
             rndKLiter = np.sum(mat, axis=1)/np.log(2)
-            rndKL[k]=rndKLiter.mean()
+            rndKL[i]=rndKLiter.mean()
     
         KLsampling = np.broadcast_to(rndKL, (self.N,len(rndKL)))
         if verbose: 
@@ -689,7 +746,7 @@ class TissueGraph:
         if verbose: 
             print(f"Calculation tool {time.time()-start:.2f}")
             
-        KL2g = np.zeros((self.N,self.MaxEnvSize))
+        KL2g = np.zeros((self.N,len(Kvec)))
         
         # create the mapping betweeb leaf type and ALL tree types
         treemat = self.TX.TreeAsMat()
@@ -697,8 +754,8 @@ class TissueGraph:
         treemapsz = np.zeros(treemap.shape,dtype='object')
         treemapweight = np.zeros(treemap.shape,dtype='object')
         for i in range(treemat.shape[1]):
-            treemap[i] = np.flatnonzero(treemat[:,i])
-            treemapsz[i] = np.ones(len(treemap[i]))
+            treemap[i] = np.flatnonzero(treemat[:,i]).astype(np.int64)
+            treemapsz[i] = np.ones(len(treemap[i]),dtype=np.int64)
             treemapweight[i] = treemat[treemap[i],i]
             
         # Convert TypeInt to TypeIntTree that accounts for ALL tree types
@@ -707,9 +764,9 @@ class TissueGraph:
         WeightTracker = np.zeros(TypeInt.shape,dtype='object')
 
         for i in range(TypeIntTree.shape[0]):
-            i_treemapsz = np.array([i*x for x in treemapsz],dtype='object')
+            # i_treemapsz = np.array([i*x for x in treemapsz],dtype='object')
             TypeIntTree[i,:] = treemap[TypeInt[i,:]]
-            RowTracker[i,:] = i_treemapsz[TypeInt[i,:]]
+            RowTracker[i,:] = i*treemapsz[TypeInt[i,:]]
             WeightTracker[i,:] = treemapweight[TypeInt[i,:]] 
             
         # count by increasing env size by one and each time add 1 to the Total "bean counter"
@@ -718,29 +775,60 @@ class TissueGraph:
 
         if verbose: 
             print(f"Calculating KL divergence for all cells per environment size of {TypeInt.shape[1]}")
-        for k in range(TypeInt.shape[1]): 
-            if k % 50 ==0: 
-                print(f"iter: {k} time: {time.time()-start:.2f}")
-            # bean counting
-
-            ix_type = torch.from_numpy(np.hstack(TypeIntTree[:,k]).astype(dtype=np.int64))
-            ix_rows = torch.from_numpy(np.hstack(RowTracker[:,k]).astype(dtype=np.int64)) 
-            weights = torch.from_numpy(np.hstack(WeightTracker[:,k])) 
-    
+            
+        cnt=0; 
+        for i in range(len(Kvec)-1):
+            ix=np.arange(start = Kvec[i],stop = Kvec[i+1],step=1)
+            print(f"iter: {i} time: {time.time()-start:.2f}")
+            ix_type = np.hstack(np.hstack(TypeIntTree[:,ix]))
+            ix_type = torch.from_numpy(ix_type)
+            ix_rows = np.hstack(np.hstack(RowTracker[:,ix])) 
+            ix_rows = torch.from_numpy(ix_rows)
+            weights = np.hstack(np.hstack(WeightTracker[:,ix]))
+            weights = torch.from_numpy(weights)
+            
             Totals.index_put_((ix_rows,ix_type),weights, accumulate=True)
-                             
+            
             # probabilities (each time renormalize all rows to sum=1)
             row_sums = Totals.sum(axis = 1)
             P = Totals / row_sums[:,None]
             
             # element wise KL divergence (p*log(p/q))
             mat = rel_entr(P, Ptypes)
+            
             # get entropy in bits
-            KL2g[:,k]=np.sum(mat.numpy(), axis=1)/np.log(2)
+            KL2g[:,i]=np.sum(mat.numpy(), axis=1)/np.log(2)
+            
+#         for i in range(max(Kvec)): 
+#             if i % 50 ==0: 
+#                 print(f"iter: {i} time: {time.time()-start:.2f}")
+#             # bean counting
+#             ix_type = np.hstack(TypeIntTree[:,i])
+#             ix_type = torch.from_numpy(ix_type)
+#             ix_rows = np.hstack(RowTracker[:,i]) 
+#             ix_rows = torch.from_numpy(ix_rows)
+#             weights = np.hstack(WeightTracker[:,i])
+#             weights = torch.from_numpy(weights)
+    
+#             Totals.index_put_((ix_rows,ix_type),weights, accumulate=True)
+                             
+#             # probabilities (each time renormalize all rows to sum=1)
+#             row_sums = Totals.sum(axis = 1)
+#             P = Totals / row_sums[:,None]
+            
+#             if i == Kvec[cnt]:
+#                 # element wise KL divergence (p*log(p/q))
+#                 mat = rel_entr(P, Ptypes)
+            
+#                 # get entropy in bits
+#                 KL2g[:,cnt]=np.sum(mat.numpy(), axis=1)/np.log(2)
+                
+#                 # advance cnt
+#                 cnt=cnt+1
         
         KLdiff = KL2g - KLsampling
         
-        self.EnvSize = np.zeros(self.N,dbtype='int64')
+        self.EnvSize = np.zeros(self.N,dtype='int64')
         for i in range(self.N):
             self.EnvSize[i]=np.argmax(KLdiff[i,self.MinEnvSize:])+self.MinEnvSize
         
