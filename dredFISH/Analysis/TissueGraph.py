@@ -26,6 +26,8 @@ import warnings
 from scipy.optimize import minimize_scalar
 import scanpy as sc
 
+import matplotlib.cm as cm
+
 from IPython import embed
 
 from sklearn.neighbors import NearestNeighbors
@@ -65,17 +67,20 @@ class TissueMultiGraph:
     """
     def __init__(self):
         self.Layers = list()
+        self.VertexDict = None
+        self.EdgeDict = None
+        self.ScalarEnvSize = 10
         self.Kvec = np.ceil(np.power(1.5,np.arange(start=6,stop=16,step=0.25))).astype(np.int64)
         return None
     
-    def createCellAndZoneLayers(self,XY,PNMF): 
+    def createCellAndZoneLayers(self,XY,PNMF,initRes = None): 
         
         # creating first layer - cell tissue graph
         TG = TissueGraph()
         TG.BuildSpatialGraph(XY)
         
         # cluster cell types optimally
-        celltypes = TG.TX.RecursiveLeidenWithTissueGraphCondEntropy(PNMF,TG,metric = 'cosine',single_level=True)
+        celltypes = Taxonomy.RecursiveLeidenWithTissueGraphCondEntropy(PNMF,TG,metric = 'cosine',single_level=True,initRes = initRes)
         TG.Type = celltypes
         
         # build a tree
@@ -86,37 +91,81 @@ class TissueMultiGraph:
         
         # contract and create the Zone graph
         ZG = TG.ContractGraph()
+        ZG.TX.linkage = TG.TX.linkage
         ZG.MaxEnvSize = max(self.Kvec)
         
         # groundwork toward environments: find optimal env size for each isozone: 
-        (KLdiff,KL2g,KLsampling) = ZG.calcSpatialCoherencePerVertex(self.Kvec)
-        
+        # (KLdiff,KL2g,KLsampling) = ZG.calcSpatialCoherencePerVertex(self.Kvec)
+        ZG.EnvSize = self.ScalarEnvSize
         self.Layers.append(ZG)
         return None
         
-        
+    def addEnvironmentLayers(self,n=0,verbose = True):    
+        """ add multiple layers, either until we are out of entropy, or predefined number n
+        """
+        cnt=0
+        start = time.time()
+        if n<=0: 
+            Ent = self.Layers[-1].CondEntropy()
+            while Ent>0:
+                self.addEnvironmentLayer()
+                Ent = self.Layers[-1].CondEntropy()
+                cnt += 1
+                if verbose:
+                    print(f"Env Layer: {cnt} Entropy: {Ent} Time: {time.time()-start:.2f}")
+        else: 
+            for i in range(n):
+                self.addEnvironmentLayer()
+                cnt += 1
+                if verbose:
+                    Ent = self.Layers[-1].CondEntropy()
+                    print(f"Env Layer: {cnt} Entropy: {Ent} Time: {time.time()-start:.2f}")
         
     def addEnvironmentLayer(self): 
         # check that cell/zone was already created. 
         if len(self.Layers)==0: 
             raise ValueError('Please initialize MultiLayer graph by creating Cell and isozone layers first')
         
+       
         # Extract environments from existing last graph
         Env = self.Layers[-1].extractEnvironments()
-        
-        # cluster 
-        envtypes = self.Layers[-1].TX.RecursiveLeidenWithTissueGraphCondEntropy(Env,self.Layers[-1],metric = 'cosine',single_level=True)
-        
+
+        # cluster using this environment
+        envtypes = Taxonomy.RecursiveLeidenWithTissueGraphCondEntropy(Env,self.Layers[-1],metric = 'cosine',single_level=True)
+
         # create the graph
-        EG = self.Layers[-1].ContractGraph()
+        EG = self.Layers[-1].ContractGraph(envtypes)
         EG.TX.BuildTree()
-        
+
         # find environments
-        (KLdiff,KL2g,KLsampling) = EG.calcSpatialCoherencePerVertex(self.Kvec)
+        # (KLdiff,KL2g,KLsampling) = EG.calcSpatialCoherencePerVertex(self.Kvec)
+        EG.EnvSize = self.ScalarEnvSize
         
         # add layer
         self.Layers.append(EG)
+        return None
         
+    def MapTypeToCellLevel(self,lvl):
+        TypeVec = self.Layers[lvl].Type.astype(np.int64)
+        if lvl>0:
+            ix=self.Layers[lvl].UpstreamMap
+            for i in np.arange(lvl-1,0,-1):
+                ix=ix[self.Layers[i].UpstreamMap]
+            TypeVec = TypeVec[ix]
+        
+        return(TypeVec)
+    
+    
+    def scatter(self,lvl):
+        myenvtype = self.MapTypeToCellLevel(lvl)
+        unqenv = np.unique(myenvtype)
+        colors = cm.rainbow(np.linspace(0, 1, len(unqenv)))
+        colors = colors[np.random.permutation(colors.shape[0]),:]
+        envcolors = colors[myenvtype,:]
+        plt.figure(figsize=(15, 15))
+
+        plt.scatter(x=self.Layers[0].X,y=self.Layers[0].Y,s=2,c=envcolors)
+        plt.show()
     
 class TissueGraph:
     """TissueGraph - main class responsible for maximally informative biocartography.
@@ -163,6 +212,10 @@ class TissueGraph:
             return np.asarray(self._G.vs['Size'])
         else: 
             raise ValueError('Graph was not initalized, please build a graph first with BuildSpatialGraph or ContractGraph methods')
+    
+    @NodeSize.setter
+    def NodeSize(self,Nsz):
+        self._G.vs["Size"]=Nsz
     
     @property
     def State(self):
@@ -556,7 +609,9 @@ class TissueGraph:
         cmp = IsoZonesGraph.components()
         IxMapping = np.asarray(cmp.membership)
         
-        ZoneName, ZoneSingleIx, ZoneSize = np.unique(IxMapping, return_counts=True,return_index=True)
+        ZoneName, ZoneSingleIx = np.unique(IxMapping, return_index=True)
+        # zone size sums the current graph zone size per each aggregate (i.e. zone or microenv)
+        ZoneSize = np.bincount(self.Type.astype(np.int64), weights=self.NodeSize)
         
         # create a new Tissue graph by copying existing one, contracting, and updating XY
         ZoneGraph = TissueGraph()
@@ -572,7 +627,6 @@ class TissueGraph:
         ZoneGraph._G.vs["Size"] = ZoneSize
         ZoneGraph._G.vs["name"] = ZoneName
         ZoneGraph.Type = TypeVec[ZoneSingleIx]
-        ZoneGraph.TX.linkage = self.TX.linkage
         ZoneGraph.UpstreamMap = IxMapping
         
         return(ZoneGraph)
@@ -654,7 +708,8 @@ class TissueGraph:
     def SpatialNeighbors(self):
         if self.nbrs is None: 
             # create nearest neighbors data
-            nbrs = NearestNeighbors(n_neighbors=self.MaxEnvSize+1, algorithm='auto').fit(self.XY)
+            mxnbrs = min(self.N,self.MaxEnvSize+1)
+            nbrs = NearestNeighbors(n_neighbors=mxnbrs, algorithm='auto').fit(self.XY)
             distances, indices = nbrs.kneighbors(self.XY)
             indices = np.array(indices)
             indices = indices[:,1:indices.shape[1]]
@@ -678,7 +733,7 @@ class TissueGraph:
                                       samping noise (binomial and all that...)
                                    
         Inputs: 
-                    none, everything is in self 
+                    Kvec - optional vector of distnaces around each cell to test. In not provided will test all distances up to MaxEnvSize 
                     
         Outputs: 
                     KLdiff       : a matrix of scores as function of env size (score = KL to global 0 KL of random to global) 
@@ -799,33 +854,6 @@ class TissueGraph:
             # get entropy in bits
             KL2g[:,i]=np.sum(mat.numpy(), axis=1)/np.log(2)
             
-#         for i in range(max(Kvec)): 
-#             if i % 50 ==0: 
-#                 print(f"iter: {i} time: {time.time()-start:.2f}")
-#             # bean counting
-#             ix_type = np.hstack(TypeIntTree[:,i])
-#             ix_type = torch.from_numpy(ix_type)
-#             ix_rows = np.hstack(RowTracker[:,i]) 
-#             ix_rows = torch.from_numpy(ix_rows)
-#             weights = np.hstack(WeightTracker[:,i])
-#             weights = torch.from_numpy(weights)
-    
-#             Totals.index_put_((ix_rows,ix_type),weights, accumulate=True)
-                             
-#             # probabilities (each time renormalize all rows to sum=1)
-#             row_sums = Totals.sum(axis = 1)
-#             P = Totals / row_sums[:,None]
-            
-#             if i == Kvec[cnt]:
-#                 # element wise KL divergence (p*log(p/q))
-#                 mat = rel_entr(P, Ptypes)
-            
-#                 # get entropy in bits
-#                 KL2g[:,cnt]=np.sum(mat.numpy(), axis=1)/np.log(2)
-                
-#                 # advance cnt
-#                 cnt=cnt+1
-        
         KLdiff = KL2g - KLsampling
         
         self.EnvSize = np.zeros(self.N,dtype='int64')
@@ -836,15 +864,27 @@ class TissueGraph:
         
 
     def extractEnvironments(self):
+        """
+            returns the categorical distrobution of neighbors for each vertex in teh graph 
+            distance is determined by self.EnvSize that can be a scalar or a vector length self.N
+            categorical distribution is 
+        """
         unqlbl = np.unique(self.Type)
         (distances,indices) = self.SpatialNeighbors
         Env = np.zeros((self.N,len(unqlbl)))
+        
+        EnvSize = self.EnvSize
+        if np.isscalar(EnvSize): 
+            EnvSize = np.ones(self.N,dtype=np.int64)*EnvSize
+        
+        # make sure it's an int so numpy isn't mad at me
+        EnvSize = EnvSize.astype(np.int64)
+        
         for i in range(self.N):
-            Env[i,:]=CountValues(self.Type[indices[i,0:self.EnvSize[i]]],unqlbl)
+            Env[i,:]=CountValues(self.Type[indices[i,0:EnvSize[i]]],unqlbl)
     
-        # get treemat
-        treemat = self.TX.TreeAsMat() 
-        Env = np.matmul(Env,treemat.T)
+        # include multi-level information
+        Env = self.TX.MultilevelFrequency(Env) 
     
         return(Env)
         

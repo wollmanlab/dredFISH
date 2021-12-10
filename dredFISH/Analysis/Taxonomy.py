@@ -19,7 +19,7 @@ import time
 import numpy as np
 import torch
 import pandas as pd
-from scipy.optimize import minimize_scalar
+from scipy.optimize import minimize_scalar, minimize
 
 from IPython import embed
 
@@ -56,16 +56,23 @@ class Taxonomy:
         self.verbose = True
         return None
     
+    def TopicClusteringWithCondEntropy(self,Env,ZG):
+        """
+        Env  = data matrix for each vertex it's signature
+        """
+        
+        return
     
-    def RecursiveLeidenWithTissueGraphCondEntropy(self,X,TG,metric = 'correlation',single_level = False): 
+    @staticmethod
+    def RecursiveLeidenWithTissueGraphCondEntropy(X,TG,metric = 'correlation',single_level = False,initRes = None): 
         """
             Find optimial clusters (using recursive leiden)
             optimization is done on resolution parameter and allows for recursive descent to 
             further break clusters into subclusters as long as graph conditional entropy is increased. 
             
         """
-        # update self.data
-        self.data = X
+        
+        verbose = True
         
         # used for output if verbose = true
         start = time.time()
@@ -73,7 +80,7 @@ class Taxonomy:
         def OptLeiden(res,agraph,ix,currcls):
             """
             Basic optimization routine for Leiden resolution parameter. 
-            Implemented using igraph leiden 
+            Implemented using igraph leiden community detection
             """
             # calculate leiden clustering
             TypeVec = agraph.community_leiden(resolution_parameter=res,objective_function='modularity').membership
@@ -85,37 +92,38 @@ class Taxonomy:
             newcls[ix] = newcls[ix]+dash+TypeVec
             
             CG = TG.ContractGraph(newcls)
+            
             Entropy = CG.CondEntropy()
             return(-Entropy)
         
         # we start by performing first clustering
-        if self.verbose: 
+        if verbose: 
             print(f"Build similarity graph ")
         fullgraph = buildgraph(X,metric = metric)
-        if self.verbose:
+        if verbose:
             print(f"calculation took: {time.time()-start:.2f}")
         
-        if self.verbose: 
+        if verbose: 
             print(f"Calling initial optimization")
             
         emptycls = np.asarray(['' for _ in range(TG.N)],dtype='object')
-        sol = minimize_scalar(OptLeiden, args = (fullgraph,np.arange(TG.N),emptycls),
-                                         bounds = (0.1,30), 
-                                         method='bounded',
-                                         options={'xatol': 1e-2, 'disp': 3})
-        
-        if self.verbose:
+        if initRes is None:
+            sol = minimize_scalar(OptLeiden, args = (fullgraph,np.arange(TG.N),emptycls),
+                                             bounds = (0.1,30), 
+                                             method='bounded',
+                                             options={'xatol': 1e-2, 'disp': 3})
+            initRes = sol['x']
+            ent_best = sol['fun']
+            if verbose: 
+                print(f"Initial entropy was: {-ent_best} number of evals: {sol['nfev']}")
+
+        if verbose:
             print(f"calculation took: {time.time()-start:.2f}")
-        
-        initRes = sol['x']
-        ent_best = sol['fun']
-        if self.verbose: 
-            print(f"Initial entropy was: {-ent_best} number of evals: {sol['nfev']}")
         
         cls = fullgraph.community_leiden(resolution_parameter=initRes,objective_function='modularity').membership
         cls = np.asarray(cls).astype(str)
 
-        if self.verbose:
+        if verbose:
             u=np.unique(cls)
             print(f"Initial types found: {len(u)}")
             
