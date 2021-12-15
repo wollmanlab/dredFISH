@@ -88,6 +88,7 @@ class TissueMultiGraph:
         # cluster cell types optimally
         celltypes = Taxonomy.RecursiveLeidenWithTissueGraphCondEntropy(PNMF,TG,metric = 'cosine',single_level=True,initRes = initRes)
         TG.Type = celltypes
+        TG.TX.data = PNMF
         
         # build a tree
         TG.TX.BuildTree()
@@ -97,6 +98,14 @@ class TissueMultiGraph:
         
         # contract and create the Zone graph
         ZG = TG.ContractGraph()
+        
+        # add average of PNMF as data for each zone. 
+        df = pd.DataFrame(data = PNMF)
+        df['type']=ZG.UpstreamMap
+        avg = df.groupby(['type']).mean()
+        unqTypes = avg.index
+        ZG.TX.data = np.array(avg)
+        
         ZG.TX.linkage = TG.TX.linkage
         ZG.MaxEnvSize = max(self.Kvec)
         
@@ -127,20 +136,29 @@ class TissueMultiGraph:
                     Ent = self.Layers[-1].CondEntropy()
                     print(f"Env Layer: {cnt} Entropy: {Ent} Time: {time.time()-start:.2f}")
         
-    def addEnvironmentLayer(self): 
+    def addEnvironmentLayer(self,Cvec = np.arange(start=5,stop=16,step=5)): 
         # check that cell/zone was already created. 
         if len(self.Layers)==0: 
             raise ValueError('Please initialize MultiLayer graph by creating Cell and isozone layers first')
         
-       
         # Extract environments from existing last graph
-        Env = self.Layers[-1].extractEnvironments()
-
+        Env = self.Layers[-1].extractEnvironments(multilevel_freq = False)
+        Env = Env*self.ScalarEnvSize
+        Env = np.round(Env)
+        Env[Env>self.ScalarEnvSize]=self.ScalarEnvSize
+        
         # cluster using this environment
-        envtypes = Taxonomy.RecursiveLeidenWithTissueGraphCondEntropy(Env,self.Layers[-1],metric = 'cosine',single_level=True)
-
+        envtypes = Taxonomy.TreenomialMixtureModelWithCondEntropy(Env,self.Layers[-1],Cvec)
+        
         # create the graph
         EG = self.Layers[-1].ContractGraph(envtypes)
+        
+        # add average of Env as data for each zone. 
+        df = pd.DataFrame(data = Env)
+        df['type']=EG.UpstreamMap
+        avg = df.groupby(['type']).mean()
+        EG.TX.data = np.array(avg)
+        
         EG.TX.BuildTree()
 
         # find environments
@@ -1026,7 +1044,7 @@ class TissueGraph:
         return (KLdiff,KL2g,KLsampling)               
         
 
-    def extractEnvironments(self):
+    def extractEnvironments(self,return_freq = True,multilevel_freq = True):
         """
             returns the categorical distrobution of neighbors for each vertex in teh graph 
             distance is determined by self.EnvSize that can be a scalar or a vector length self.N
@@ -1034,22 +1052,37 @@ class TissueGraph:
         """
         unqlbl = np.unique(self.Type)
         (distances,indices) = self.SpatialNeighbors
-        Env = np.zeros((self.N,len(unqlbl)))
+        
         
         EnvSize = self.EnvSize
         if np.isscalar(EnvSize): 
             EnvSize = np.ones(self.N,dtype=np.int64)*EnvSize
         
+        
         # make sure it's an int so numpy isn't mad at me
         EnvSize = EnvSize.astype(np.int64)
         
-        for i in range(self.N):
-            Env[i,:]=CountValues(self.Type[indices[i,0:EnvSize[i]]],unqlbl)
+        # two options for output:
+        # 1) (default) probability vector adapted to account for tree
+        # 2) just the neighbor types to be used "raw"
+        if return_freq:
+            Env = np.zeros((self.N,len(unqlbl)))
+            for i in range(self.N):
+                Env[i,:]=CountValues(self.Type[indices[i,0:EnvSize[i]]],unqlbl)
     
-        # include multi-level information
-        Env = self.TX.MultilevelFrequency(Env) 
-    
+            # include multi-level information
+            if multilevel_freq:
+                Env = self.TX.MultilevelFrequency(Env) 
+        else:
+            Env = list()
+            for i in range(self.N):
+                Env.append(self.Type[indices[i,0:EnvSize[i]]])
+            Env = np.array(Env)
+            
         return(Env)
+    
+    
+    
         
         
         
