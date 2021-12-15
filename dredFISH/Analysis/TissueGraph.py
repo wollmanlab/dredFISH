@@ -26,6 +26,11 @@ import warnings
 from scipy.optimize import minimize_scalar
 import scanpy as sc
 
+from matplotlib.collections import LineCollection
+from matplotlib.collections import PatchCollection
+from descartes import PolygonPatch
+from shapely.geometry import Polygon
+
 import matplotlib.cm as cm
 
 from IPython import embed
@@ -33,6 +38,7 @@ from IPython import embed
 from sklearn.neighbors import NearestNeighbors
 
 from dredFISH.Analysis.Taxonomy import *
+from dredFISH.Visualization.vor import bounding_box_sc, voronoi_polygons
 
 from scipy.special import rel_entr
 import torch
@@ -185,8 +191,8 @@ class TissueGraph:
         self.TX = Taxonomy()
         
         self.BoundingBox = None 
-        self.Lines = None # x_start,y_start,x_end,y_end,line_type,cell1,cell2
-        self.Tri = None # xy of corners (after bounding box intersection), poly_type  
+        self.Tri = None 
+
         return None
         
     @property
@@ -324,16 +330,171 @@ class TissueGraph:
         self._G.vs["Y"]=XY[:,1]
         self._G.vs["Size"]=np.ones(len(XY[:,1]))
         
-        # TODO (Jonathan) 
-        # initalize Bounding Box, Lines, and Tri
-        self.BoundingBox = "JONATHAN - PLEASE FIX ME!!!!"
-        self.Lines = "JONATHAN - PLEASE FIX ME!!!!"
-        self.Tri = "JONATHAN - PLEASE FIX ME!!!!"
+        # initialize bounding box
+        _, bb = bounding_box_sc(XY)
+        self.BoundingBox = Polygon(bb)
+
+        diameter = np.linalg.norm(bb.ptp(axis=0))
+        vp = list(voronoi_polygons(Voronoi(XY), diameter))
+        vp = [p.intersection(self.BoundingBox) for p in vp]
+        self.Tri = {pdx: p for pdx, p in enumerate(vp)}
         
         # set up names
         self._G.vs["name"]=list(range(self.N))
         return(self)
     
+    def plot2(self, color_dict={}, cell_type=None, fpath=None, graph_params=None):
+        """
+        Plot cell type or zone as a Voronoi diagram
+
+        Input
+        -----
+        cell_type : list of cell labels 
+        color_dict : mapping of cell type to color space
+        graph_params : current matplotlib plot parameters passed via a dictionary
+            figsize
+            border_color, border_alpha, border_lw, border_ls
+            poly_alpha
+            inner, inner_alpha, inner_lw, inner_ls
+            scatter
+            scatter_color, scatter_alpha, scatter_size
+        fpath : file path for figure to be saved to 
+
+        Output
+        ------
+        fig : graphic for plotting if not provided with file path for saving plot 
+        """
+
+        # default graphing parameters 
+        if graph_params is None:
+            graph_params = {}
+
+        graph_param_defaults = {}
+        graph_param_defaults["figsize"] = (12,8)
+        graph_param_defaults["border_color"] = "black"
+        graph_param_defaults["border_alpha"] = 1
+        graph_param_defaults["border_lw"] = 1
+        graph_param_defaults["border_ls"] = "solid"
+        graph_param_defaults["poly_alpha"] = 0.5
+        graph_param_defaults["inner"] = False
+        graph_param_defaults["inner_alpha"] = 1
+        graph_param_defaults["inner_lw"] = 0.75
+        graph_param_defaults["inner_ls"] = "dotted"
+        graph_param_defaults["scatter"] = False
+        graph_param_defaults["scatter_color"] = "black"
+        graph_param_defaults["scatter_alpha"] = 0.05
+        graph_param_defaults["scatter_size"] = 3
+
+        for x in graph_param_defaults:
+            if x not in graph_params:
+                graph_params[x] = graph_param_defaults[x]
+
+        if cell_type is None:
+            cell_type = self.Type
+
+        faces = []
+        colors = []
+        color_segments = []
+        patches = []
+        segments = []
+
+        for k in self.Tri:
+            p = self.Tri[k]
+            
+            if p.area == 0:
+                continue
+            if hasattr(p, "geoms"):
+                for subp in p.geoms:
+                    coords = subp.exterior.coords
+                    faces += [coords]
+                    colors += [color_dict[cell_type[k]]]
+            else:
+                coords = p.exterior.coords
+                faces += [coords]
+                colors += [color_dict[cell_type[k]]]
+
+        # helper function to convert Polygon coordinates to segments 
+        get_segments = lambda x, y: [[[x[i], y[i]], [x[i + 1], y[i + 1]]] for i in range(len(x) - 1)]
+
+        for i in range(len(faces)):
+            patches.append(PolygonPatch(Polygon(faces[i]), fc=colors[i], ec=colors[i], lw=0.2, alpha=graph_params["poly_alpha"], zorder=1))
+            x, y = zip(*faces[i])
+            new_segments = get_segments(x, y)
+            segments += new_segments
+            color_segments += [colors[i] for idx in range(len(new_segments))]
+
+        bord_faces = []
+        bord_segments = []
+        if self.UpstreamMap is not None and graph_params["inner"]:
+
+            if self.UpstreamMap is None:
+                raise ValueError("Cannot plot inner-enviroments for base level")
+
+            for env in range(max(self.UpstreamMap) + 1):
+                polygon_idx = np.where(self.UpstreamMap == env)[0]
+
+                if len(polygon_idx) == 0:
+                    continue
+
+                aggr_p = self.Tri[polygon_idx[0]]
+                for k in polygon_idx:
+                    p = self.Tri[k]
+                    aggr_p = aggr_p.union(p)
+
+                if aggr_p.area == 0:
+                    continue
+
+                if hasattr(aggr_p, "geoms"):
+                    for subp in aggr_p.geoms:
+                        coords = subp.exterior.coords
+                        bord_faces += [coords]
+                else:
+                    coords = aggr_p.exterior.coords
+                    bord_faces += [coords]
+
+            for i in range(len(bord_faces)):
+                x, y = zip(*bord_faces[i])
+                bord_segments += get_segments(x, y)
+
+        if graph_params["scatter"]:
+            graph_params["scatter_alpha"] = 0
+
+        fig, ax = plt.subplots(figsize=graph_params["figsize"])
+        ax.add_collection(PatchCollection(patches, match_original=True))
+        ax.scatter(x=self.XY[:,0], y=self.XY[:,1],
+            c=graph_params["scatter_color"],
+            s=graph_params["scatter_size"],
+            alpha=graph_params["scatter_alpha"])
+
+        if graph_params["inner"]:
+            # outter lines 
+            ax.add_collection(LineCollection(bord_segments,
+                                colors=graph_params["border_color"],
+                                lw=graph_params["border_lw"],
+                                alpha=graph_params["border_alpha"],
+                                linestyle=graph_params["border_ls"]))
+            # inner lines
+            ax.add_collection(LineCollection(segments,
+                                colors=color_segments,
+                                lw=graph_params["inner_lw"],
+                                alpha=graph_params["inner_alpha"],
+                                linestyle=graph_params["inner_ls"])) 
+            
+        else:
+            # outer lines 
+            ax.add_collection(LineCollection(segments,
+                                            colors=graph_params["border_color"],
+                                            lw=graph_params["border_lw"],
+                                            alpha=graph_params["border_alpha"],
+                                            linestyle=graph_params["border_ls"]))
+
+        if fpath != None:
+            fig.savefig("fpath")
+        else:
+            return fig
+
+
+
     def plot(self, XY=None, cell_type=None, color_dict={}, fpath=None, graph_params=None):
         """
         Plot cell type or zone as a Voronoi diagram
@@ -616,6 +777,8 @@ class TissueGraph:
         # create a new Tissue graph by copying existing one, contracting, and updating XY
         ZoneGraph = TissueGraph()
         ZoneGraph._G = self._G.copy()
+        ZoneGraph.BoundingBox = copy(self.BoundingBox)
+        ZoneGraph.Tri = copy(self.Tri)
         
         comb = {"X" : "mean",
                "Y" : "mean",
