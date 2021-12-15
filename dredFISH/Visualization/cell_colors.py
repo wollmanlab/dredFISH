@@ -14,7 +14,7 @@ from dredFISH.Visualization.utils import scale_vec
 import math
 
 
-def colors_from_list(lab, mat, lum=None, rot=None, axis=2):
+def colors_from_list(lab, mat, lum=None, pca_dim=20, rot=None, axis=2):
     """
     Returns dict with pairs mapping labels to RGB colorspace
 
@@ -36,10 +36,10 @@ def colors_from_list(lab, mat, lum=None, rot=None, axis=2):
     mat = mat.groupby(mat.index).mean()
     
     if lum == None:
-        color = get_tsne(mat, tsne_dim=3, rotation=rot, axis=axis)
+        color = get_tsne(mat, pca_dim=pca_dim, tsne_dim=3, rotation=rot, axis=axis)
         color[2] = scale_vec(color[2], 0, 100)
     else:
-        color = get_tsne(mat, tsne_dim=2, rotation=rot, axis=axis)
+        color = get_tsne(mat, pca_dim=pca_dim, tsne_dim=2, rotation=rot, axis=axis)
         color[2] = lum
     color[0] = scale_vec(color[0], -128, 127)
     color[1] = scale_vec(color[1], -128, 127)

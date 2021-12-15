@@ -6,7 +6,8 @@ from collections import defaultdict, Counter
 from copy import copy
 
 from scipy.spatial import Voronoi
-from scipy.ndimage import binary_fill_holes, gaussian_filter
+from scipy.ndimage import binary_fill_holes, gaussian_filter, binary_erosion, binary_dilation
+from skimage.morphology import remove_small_objects
 
 def voronoi_intersect_box(XY, bb_params=None):
     """
@@ -23,24 +24,28 @@ def voronoi_intersect_box(XY, bb_params=None):
 
     """
     if bb_params is None:      
-        _, bb = bounding_box_grid(XY)
+        _, bb = bounding_box_sc(XY)
     else:
         bb_defaults["scale"] = 25
         bb_defaults["padding"] = 10
         bb_defaults["threshold"] = 50
         bb_defaults["sd"] = 0.1
         bb_defaults["fill"]=True
+        bb_defaults["small"] = 100
+        bb_defaults["xbins"] = 50
+        bb_defaults["ybins"] = 50
+
 
         for x in bb_default:
             if x not in bb_params:
                 bb_params[x]=bb_defaults[x]
 
-        _, bb = bounding_box_grid(XY,
-            bb_params["scale"],
+        _, bb = bounding_box_sc(XY,
+            bb_params["xbins"],
+            bb_params["ybins"],
             bb_params["padding"],
-            bb_params["threshold"],
             bb_params["sd"],
-            not bb_params["fill"])
+            bb_params["small"])
 
 
     diameter = np.linalg.norm(bb.ptp(axis=0))
@@ -49,7 +54,84 @@ def voronoi_intersect_box(XY, bb_params=None):
     vp = list(voronoi_polygons(Voronoi(XY), diameter))
     return [p.intersection(boundary_polygon) for p in vp]
 
-def bounding_box_grid(XY, scale=25, padding=10, threshold=50, sd=0.1, nofill=False):
+def bounding_box_sc(XY, n_xbins=50, n_ybins=50, padding=10, sd=0.1, small=100):
+    # construct grid using min and max values for X and Y values 
+    xmax = XY.max(0)[0]
+    xmin = XY.min(0)[0]
+    ymax = XY.max(0)[1]
+    ymin = XY.min(0)[1]
+
+    xbins = np.arange(xmin, xmax, n_xbins)
+    ybins = np.arange(ymin, ymax, n_ybins)
+
+    hist = np.histogram2d(XY[:, 0], XY[:, 1], bins=(xbins, ybins))
+
+    mask = np.array(hist[0] > 0) * 1
+    mask_filled = binary_fill_holes(mask)
+    mask_eroded = binary_erosion(mask_filled, iterations = 3)
+    mask_dilated = binary_dilation(mask_eroded, iterations = 3)
+    grid = remove_small_objects(mask_dilated, small)
+    grid = gaussian_filter(grid, sd)
+
+    grid_pad = np.zeros(grid.shape + np.array((padding * 2, padding * 2)))
+    grid_pad[padding: (grid_pad.shape[0] - padding), padding : (grid_pad.shape[1] - padding)] = grid
+    grid = grid_pad
+    border_grid = copy(grid)
+
+    for i in range(len(grid) - 1):
+        for j in range(len(grid[i]) - 1):
+            if grid[i, j] == 0 and sum([sum([grid[k + i, l + j] for k in range(-1, 2)]) for l in range(-1, 2)]):
+                border_grid[i, j] = 2
+    # coordinates 
+    x, y = np.where(border_grid == 2)
+    xy_coords = np.array(list(zip(x, y)))
+
+    # order coordinates 
+    order = find_order(xy_coords)
+    xy_coords = np.array([xy_coords[i] for i in order])
+
+    # construct mapping of grid with padding back to coordinates
+    hist2coord={}
+    for i in range(hist[0].shape[0]):
+        for j in range(hist[0].shape[1]):
+            hist2coord[(i+padding,j+padding)]=((hist[1][i]+hist[1][i+1])/2,(hist[2][j]+hist[2][j+1])/2)
+
+    for i in range(padding)[::-1]:
+        for j in range(hist[0].shape[1]):
+                a=hist2coord[(i+1,j+padding)]
+                b=hist2coord[(i+2,j+padding)]
+                hist2coord[(i,j+padding)]=np.array(a)+np.array(a)-np.array(b)
+
+    for i in range(hist[0].shape[0],hist[0].shape[0]+padding*2):
+        for j in range(hist[0].shape[1]):
+                a=hist2coord[(i-1,j+padding)]
+                b=hist2coord[(i-2,j+padding)]
+                hist2coord[(i,j+padding)]=np.array(a)+np.array(a)-np.array(b)
+
+    for i in range(hist[0].shape[0]+padding*2):
+        for j in range(padding)[::-1]:
+            a=hist2coord[(i,j+1)]
+            b=hist2coord[(i,j+2)]
+            hist2coord[(i,j)]=np.array(a)+np.array(a)-np.array(b)
+
+    for i in range(hist[0].shape[0]+padding*2):
+        for j in range(hist[0].shape[1],hist[0].shape[1]+padding*2):
+            a=hist2coord[(i,j-1)]
+            b=hist2coord[(i,j-2)]
+            hist2coord[(i,j)]=np.array(a)+np.array(a)-np.array(b)
+
+    # map grid to cell coordinates 
+    bb = np.array([hist2coord[tuple(x)] for x in xy_coords])
+
+    segments = []
+
+    for i in range(np.shape(bb)[0] - 1):
+        segments.append([list(bb[i, :]), list(bb[i + 1, :])])
+    segments.append([list(bb[i, :]), list(bb[0, :])])
+
+    return np.array(segments), bb
+
+def bounding_box_grid(XY, scale=25, padding=10, threshold=50, sd=0.1, small=100, nofill=False):
     """
     Find a bounding box over XY coordinates using a grid 
     
@@ -74,7 +156,7 @@ def bounding_box_grid(XY, scale=25, padding=10, threshold=50, sd=0.1, nofill=Fal
     ymax = XY.max(0)[1]
     ymin = XY.min(0)[1]
 
-    grid = np.zeros([((xmax - xmin) / scale).astype(int) + padding,((ymax - ymin) / scale).astype(int) + padding])
+    grid = np.zeros([((xmax - xmin) / scale).astype(int) + padding,((ymax - ymin) / scale).astype(int) + padding]).astype(int)
 
     # mappings for grid indices to the XY plane
     i2x = lambda i : (i * scale + xmin - scale * padding / 2)
@@ -87,6 +169,8 @@ def bounding_box_grid(XY, scale=25, padding=10, threshold=50, sd=0.1, nofill=Fal
             y = j2y(j)
             if np.min(np.sum(np.abs(XY - (x, y)), 1)) > threshold:
                 grid[i, j] = 1
+    
+    grid = remove_small_objects(grid, small)
 
     if not nofill:
         grid = 1 - binary_fill_holes(grid == 0)
