@@ -39,19 +39,17 @@ import numpy as np
 import pandas as pd
 import torch
 
-<<<<<<< HEAD
 import itertools
 import dill as pickle
 
 from scipy.spatial.distance import squareform
-=======
+
 from matplotlib.collections import LineCollection
 from matplotlib.collections import PatchCollection
 from descartes import PolygonPatch
 from shapely.geometry import Polygon
 
 import matplotlib.cm as cm
->>>>>>> 3e75b79bc7ff8b9b075f58714e2df1988c5dc287
 
 # for debuding mostly
 import warnings
@@ -412,9 +410,6 @@ class TissueGraph:
         self._G.vs["X"]=XY[:,0]
         self._G.vs["Y"]=XY[:,1]
         self._G.vs["Size"]=np.ones(len(XY[:,1]))
-<<<<<<< HEAD
-      
-=======
         
         # initialize bounding box
         _, bb = bounding_box_sc(XY)
@@ -425,7 +420,6 @@ class TissueGraph:
         vp = [p.intersection(self.BoundingBox) for p in vp]
         self.Tri = {pdx: p for pdx, p in enumerate(vp)}
         
->>>>>>> 3e75b79bc7ff8b9b075f58714e2df1988c5dc287
         # set up names
         self._G.vs["name"]=list(range(self.N))
         return(self)
