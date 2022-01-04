@@ -1,6 +1,35 @@
 """TissueGraph module. 
 
-The module contains two main classes: TissueGraph and TissueMultiGraph plus some accessory functions. 
+The module contains main classes required for maximally infomrative biocartography (MIB)
+MIB includes the following key classes: 
+
+TissueMultiGraph: the key organizing class used to create and manage graphs across layers (hence multi)
+
+main attributes: 
+    Layers = where we store specific spatial representation of cells, zones, microenvironments, and regions as graphs
+    Geoms = geometrical aspects of the TMG required for plotting. 
+    Views = data and methods for plotting maps. Views are defined with a detailed OOP class structure. 
+
+main methods:
+
+Misc: 
+    * save (and load during __init__ if fullfilename is provided)
+    
+Create: 
+    * create_cell_and_zone_layers - creates the first pair of Cell and Zone layers of the TMG
+    * create_communities_and_region_layers - create the second pair of layers (3 and 4) of the TMG
+    * add_contracted_layer_using_type - the actual addition of layer after contraction, used in each pair of layers that are added. 
+    * add_geoms
+    * add_view
+    
+Query: 
+    * map_to_cell_level -
+    * find_max_edge_level - 
+    * N
+    * Ntypes
+
+
+ 
 
 TissueGraph: the core class used to analyze tissues using Graph representation is TissueGraph 
 
@@ -9,23 +38,15 @@ to create coarser zone.
 
 main methods:
 
-    * BuildSpatialGraph - construct graph based on Delauny neighbors
-    * ContractGraph - find zones, i.e. spatially continous areas in the graph the same type
+    * build_spatial_graph - construct graph based on Delauny neighbors
+    * contract_graph - find zones, i.e. spatially continous areas in the graph the same type
     * CondEntopy - calculates the conditional entropy of a graph given types (or uses defaults existing types)
     * watershed - devide into regions based on watershed
-    * calcGraphEnvCoherenceUsingTreenomial - estimate spatial local coherence. 
+    * calc_graph_env_coherence_using_treenomial - estimate spatial local coherence. 
     
 Many other accessory functions that are used to set/get TissueGraph information.
 
-TissueMultiGraph: the key organizing class used to create and manage graphs across layers (hence multi)
 
-main methods: 
-
-    * save (and load during __init__ if fullfilename is provided)
-    * createCellAndZoneLayers - creates the first pair of Cell and Zone layers of the TMG
-    * createCommunitiesAndRegionsLayers - create the second pair of layers (3 and 4) of the TMG
-    * addContractedLayerUsingType - the actual addition of layer after contraction, used in each pair of layers that are added. 
-    * MapToCellLevel
     
 """
 
@@ -44,12 +65,10 @@ import dill as pickle
 
 from scipy.spatial.distance import squareform
 
-from matplotlib.collections import LineCollection
-from matplotlib.collections import PatchCollection
-from descartes import PolygonPatch
+from matplotlib.collections import LineCollection, PolyCollection
+# from descartes import PolygonPatch
 from shapely.geometry import Polygon
 
-import matplotlib.cm as cm
 
 # for debuding mostly
 import warnings
@@ -58,19 +77,22 @@ from IPython import embed
 
 # might move these to Viz, currently used in scatter
 import matplotlib.cm as cm
+from matplotlib.colors import ListedColormap
 import matplotlib.pyplot as plt
 
-from dredFISH.Analysis.Taxonomy import *
-from dredFISH.Visualization.vor import bounding_box_sc, voronoi_polygons
+from shapely.geometry import MultiPolygon, LineString, MultiLineString, Polygon
 
+from dredFISH.Analysis.Taxonomy import *
+
+from dredFISH.Visualization.vor import bounding_box_sc, voronoi_polygons
 from dredFISH.Visualization.cell_colors import *
 from dredFISH.Visualization.vor import * 
 
 
 ##### Some simple accessory funcitons
-def CountValues(V,refvals,sz = None,norm_to_one = True):
+def count_values(V,refvals,sz = None,norm_to_one = True):
     """
-    CountValues - simple tabulation with default values (refvals)
+    count_values - simple tabulation with default values (refvals)
     """
     Cnt = Counter(V)
     if sz is not None: 
@@ -110,19 +132,28 @@ class TissueMultiGraph:
                          the relationships between them. 
     """
     def __init__(self,fullfilename = None):
+        # init to empty
+        self.Layers = list()
+        self.Geoms = {}
+        self.Views = {}
+        
         if fullfilename is not None:
+            
+            # load from file
             TMGload = pickle.load(open(fullfilename,'rb'))
+            
+            # key data is stored in the Layers list
+            # Layers should always be saved, 
             self.Layers = TMGload.Layers
-            self.VertexDict = TMGload.VertexDict
-            self.EdgeDict = TMGload.EdgeDict
-            self.ScalarEnvSize = TMGload.ScalarEnvSize
-            self.Kvec = TMGload.Kvec
-        else: 
-            self.Layers = list()
-            self.VertexDict = None
-            self.EdgeDict = None
-            self.ScalarEnvSize = 10
-            self.Kvec = np.ceil(np.power(1.5,np.arange(start=6,stop=16,step=0.25))).astype(np.int64)
+            
+            # Geoms / Views 
+            if hasattr(TMGload,'Geoms'): 
+                self.Geoms = TMGload.Geoms
+                
+            if hasattr(TMGload,'Views'): 
+                self.Views = TMGload.Views
+            
+
         return None
     
     def save(self,fullfilename):
@@ -130,7 +161,7 @@ class TissueMultiGraph:
         """
         pickle.dump(self,open(fullfilename,'wb'),recurse=True)
         
-    def createCellAndZoneLayers(self,XY,PNMF): 
+    def create_cell_and_zone_layers(self,XY,PNMF): 
         """
         Creating cell and zone layers. 
         Cell layer is unique as it's the only one where spatial information is directly used with Voronoi
@@ -139,10 +170,10 @@ class TissueMultiGraph:
         # creating first layer - cell tissue graph
         TG = TissueGraph()
         TG.LayerType = "cells"
-        TG.BuildSpatialGraph(XY)
+        TG.build_spatial_graph(XY)
         
         # cluster cell types optimally
-        celltypes = Taxonomy.RecursiveLeidenWithTissueGraphCondEntropy(PNMF,TG,metric = 'cosine',single_level=True)
+        celltypes = Taxonomy.RecursiveLeidenWithTissueGraphcond_entropy(PNMF,TG,metric = 'cosine',single_level=True)
         
         # add types and key data
         TG.Type = celltypes
@@ -155,28 +186,28 @@ class TissueMultiGraph:
         self.Layers.append(TG)
         
         # contract and create the Zone graph
-        self.addContractedLayerUsingType(PNMF,celltypes)
+        self.add_contracted_layer_using_type(PNMF,celltypes)
         self.Layers[-1].LayerType = 'isozones'
         
         return None
     
-    def createCommunitiesAndRegionLayers(self,ordr=3):
+    def create_communities_and_region_layers(self,ordr=3):
         """
         Creating community and region layers. 
         Community layer is created based on watershed using local env coherence. 
         Region layer is calculated based on optimization of cond entropy betweens community and regions. 
         """
         # find existing environment 
-        Env = self.Layers[-1].extractEnvironments(ordr=ordr)
+        Env = self.Layers[-1].extract_environments(ordr=ordr)
         
         # get edge and node spatial coherence scores
-        (EdgeWeight,NodeWeight) = self.Layers[-1].calcGraphEnvCoherenceUsingTreenomial(Env)
+        (EdgeWeight,NodeWeight) = self.Layers[-1].calc_graph_env_coherence_using_treenomial(Env)
         
         # perform watershed with seeds as "peaks" in NodeWeight graph
         HoodId = self.Layers[-1].watershed(EdgeWeight,NodeWeight)
                 
         # add Community layers: 
-        self.addContractedLayerUsingType(Env,HoodId)
+        self.add_contracted_layer_using_type(Env,HoodId)
         self.Layers[-1].LayerType = 'isozones'
         
         # calculate true environments vector for all communities: 
@@ -185,7 +216,7 @@ class TissueMultiGraph:
         unqTypes = np.unique(ZoneTypes)
         for i in range(self.Layers[-1].N):
             ix = np.where(self.Layers[-1].UpstreamMap==i)
-            WatershedEnvs[i,:] = CountValues(ZoneTypes[ix].astype(np.int64),unqTypes,self.Layers[-2].NodeSize[ix],norm_to_one=False)
+            WatershedEnvs[i,:] = count_values(ZoneTypes[ix].astype(np.int64),unqTypes,self.Layers[-2].node_size[ix],norm_to_one=False)
             
         # calcualte pairwise distances between environments using treenomialJSD
         cmb = np.array(list(itertools.combinations(np.arange(WatershedEnvs.shape[0]), r=2)))
@@ -193,17 +224,17 @@ class TissueMultiGraph:
         cmb = torch.from_numpy(cmb)
         D = treenomialJSD(WatershedEnvs[cmb[:,0],:],WatershedEnvs[cmb[:,1],:])
         Dsqr = squareform(D)
-        commtypes = Taxonomy.RecursiveLeidenWithTissueGraphCondEntropy(Dsqr,self.Layers[-1],metric = 'precomputed',single_level=True)
+        commtypes = Taxonomy.RecursiveLeidenWithTissueGraphcond_entropy(Dsqr,self.Layers[-1],metric = 'precomputed',single_level=True)
                 
-        self.addContractedLayerUsingType(WatershedEnvs,commtypes)
+        self.add_contracted_layer_using_type(WatershedEnvs,commtypes)
     
-    def addContractedLayerUsingType(self,Env,TypeVec):
+    def add_contracted_layer_using_type(self,Env,TypeVec):
         """
-        addContractedLayerUsingType - uses TypeVec to contract the last graph in self (i.e. TMG) 
+        add_contracted_layer_using_type - uses TypeVec to contract the last graph in self (i.e. TMG) 
                                       calcualtes a few more things it needs and append the new layer to self
         """
         # create the graph
-        EG = self.Layers[-1].ContractGraph(TypeVec)
+        EG = self.Layers[-1].contract_graph(TypeVec)
         df = pd.DataFrame(data = Env)
         df['type']=EG.UpstreamMap
         avg = df.groupby(['type']).mean()
@@ -214,7 +245,7 @@ class TissueMultiGraph:
         # add layer
         self.Layers.append(EG)
                     
-    def MapToCellLevel(self,lvl,VecToMap = None,return_ix = False):
+    def map_to_cell_level(self,lvl,VecToMap = None,return_ix = False):
         """
         Maps values to first layer of the graph, mostly used for plotting. 
         lvl is the level we want to map all the way to 
@@ -237,6 +268,28 @@ class TissueMultiGraph:
         else: 
             return(VecToMap)
     
+    def find_max_edge_level(self):
+        """
+        determine the maximal level that an edges between two cell still exists in, i.e. it was not contracted
+        returns a dict with sorted edge tuples as keys and max level is values.   
+        """
+        
+        # create edge list with sorted tuples (the geom convention)
+        edge_list = list()
+        for e in self.Layers[0].G.es:
+            t=e.tuple
+            if t[0]>t[1]:
+                t=(t[1],t[0])
+            edge_list.append(t)
+        
+        np_edge_list = np.asarray(edge_list)
+        max_edge_levels = np.zeros(len(edge_list))
+        for lvl in range(1,len(self.Layers)):
+            Vs = self.map_to_cell_level(lvl,np.arange(self.N[lvl]))
+            max_edge_levels += Vs[np_edge_list[:,0]] == Vs[np_edge_list[:,1]]
+            
+        return dict(zip(edge_list,max_edge_levels))
+    
     @property
     def N(self):
         return([L.N for L in self.Layers])
@@ -246,50 +299,103 @@ class TissueMultiGraph:
         return([L.Ntypes for L in self.Layers])
     
     @property
-    def CondEntropy(self):
-        return([L.CondEntropy() for L in self.Layers])
+    def cond_entropy(self):
+        return([L.cond_entropy() for L in self.Layers])
     
-    def scatter(self,lvl = None):
-        """
-        Simple scatter using cell level XY colored by actual level type. 
+    def add_geoms(self):
+        """ 
+        Creates the geometies needed (boundingbox, lines, points, and polygons) to be used in views to create maps. 
         """
         
-        if lvl is None:
-            for i in range(len(self.Layers)):
-                self.scatter(i)
-            return None
-        
-        myenvtype = self.MapToCellLevel(lvl)
-        unqenv = np.unique(myenvtype)
-        colors = cm.rainbow(np.linspace(0, 1, len(unqenv)))
-        colors = colors[np.random.permutation(colors.shape[0]),:]
-        envcolors = colors[myenvtype,:]
-        plt.figure(figsize=(15, 15))
+        # Bounding box with adding bounding box based on cell XY
+        # initialize bounding box
+        XY = self.Layers[0].XY
+        _, bb = bounding_box_sc(XY)
+        self.Geoms['BoundingBox'] = Polygon(bb)
 
-        plt.scatter(x=self.Layers[0].X,y=self.Layers[0].Y,s=2,c=envcolors)
-        plt.show()
+        # 
+        diameter = np.linalg.norm(bb.ptp(axis=0))
+        vor = Voronoi(XY)
+        vp = list(voronoi_polygons(vor, diameter))
+        vp = [p.intersection(self.Geoms['BoundingBox']) for p in vp]
         
+        verts = list()
+        for i in range(len(vp)):
+            if isinstance(vp[i],MultiPolygon):
+                allparts = [p.buffer(0) for p in vp[i].geoms]
+                areas = np.array([p.area for p in vp[i].geoms])
+                vp[i] = allparts[np.argmax(areas)]
+        
+            xy = vp[i].exterior.xy
+            verts.append(np.array(xy).T)
+        
+        self.Geoms['poly'] = verts
+        
+        # Next section deals with edge line between any two voroni polygons. 
+        # The key actions are to 
+        mx = np.max(np.array(self.Geoms['BoundingBox'].exterior.xy).T,axis=0)
+        mn = np.min(np.array(self.Geoms['BoundingBox'].exterior.xy).T,axis=0)
+
+        mins = np.tile(mn, (vor.vertices.shape[0], 1))
+        bounded_vertices = np.max((vor.vertices, mins), axis=0)
+        maxs = np.tile(mx, (vor.vertices.shape[0], 1))
+        bounded_vertices = np.min((bounded_vertices, maxs), axis=0)
+
+        segs = list()
+        center = XY.mean(axis=0)
+        for i in range(len(vor.ridge_vertices)):
+            pointidx = vor.ridge_points[i,:]
+            simplex = np.asarray(vor.ridge_vertices[i])
+            if np.all(simplex >= 0):
+                line=[(bounded_vertices[simplex[0], 0], bounded_vertices[simplex[0], 1]),
+                      (bounded_vertices[simplex[1], 0], bounded_vertices[simplex[1], 1])]
+            else:
+                i = simplex[simplex >= 0][0] # finite end Voronoi vertex
+                t = XY[pointidx[1]] - XY[pointidx[0]]  # tangent
+                t = t / np.linalg.norm(t)
+                n = np.array([-t[1], t[0]]) # normal
+                midpoint = XY[pointidx].mean(axis=0)
+                far_point = vor.vertices[i] + np.sign(np.dot(midpoint - center, n)) * n * 100
+                line=[(vor.vertices[i,:]),(far_point)]
     
+            LS = LineString(line)
+            LS = LS.intersection(self.Geoms['BoundingBox'])
+            if isinstance(LS,MultiLineString):
+                allparts = list(LS.intersection(self.Geoms['BoundingBox']).geoms)
+                lengths = [l.length for l in allparts]
+                LS = allparts[np.argmax(lengths)]
+                
+            xy = np.asarray(LS.xy)
+            line=xy.T
+            segs.append(line)
+        
+        # make sure the keys for edges are always sorted, a convenstion that will make life easier. 
+        keys = list(vor.ridge_dict.keys())
+        for i in range(len(keys)):
+            if keys[i][0]<=keys[i][1]:
+                keys[i]=(keys[i][1],keys[i][0])
+
+        self.Geoms['line'] = dict(zip(keys, segs))
+        
+        # Points are easy, just use XY, the order is correct :)
+        self.Geoms['point'] = XY
+            
+    def add_view(self,view):
+        # add the view to the view dict
+        self.Views[view.name]=view
+    
+
 class TissueGraph:
     """TissueGraph - main class responsible for maximally informative biocartography.
-                     class 
-    
-            
     """
     def __init__(self):
-        self.LayerType = None
-        self.MaxEnvSize = 500
-        self.MinEnvSize = 10
         
-        self.EnvSize = None
+        self.LayerType = None
         
         self.nbrs = None
         self._G = None
         self.UpstreamMap = None
         self.TX = Taxonomy()
-        
-        self.BoundingBox = None 
-        self.Tri = None 
 
         return None
         
@@ -301,24 +407,24 @@ class TissueGraph:
         if self._G is not None:
             return len(self._G.vs)
         else: 
-            raise ValueError('Graph was not initalized, please build a graph first with BuildSpatialGraph')
+            raise ValueError('Graph was not initalized, please build a graph first with build_spatial_graph')
     
     @property
     def G(self):
         if self._G is not None:
             return self._G
         else: 
-            raise ValueError('Graph was not initalized, please build a graph first with BuildSpatialGraph')
+            raise ValueError('Graph was not initalized, please build a graph first with build_spatial_graph')
     
     @property
-    def NodeSize(self):
+    def node_size(self):
         if self._G is not None:
             return np.asarray(self._G.vs['Size'])
         else: 
-            raise ValueError('Graph was not initalized, please build a graph first with BuildSpatialGraph or ContractGraph methods')
+            raise ValueError('Graph was not initalized, please build a graph first with build_spatial_graph or contract_graph methods')
     
-    @NodeSize.setter
-    def NodeSize(self,Nsz):
+    @node_size.setter
+    def node_size(self,Nsz):
         self._G.vs["Size"]=Nsz
     
     @property
@@ -378,9 +484,9 @@ class TissueGraph:
             raise ValueError("Type not yet assigned, can't count how many")
         return(len(np.unique(self.Type)))
     
-    def BuildSpatialGraph(self,XY):
+    def build_spatial_graph(self,XY):
         """
-        BuildSpatialGraph will create an igrah using Delaunay triangulation
+        build_spatial_graph will create an igrah using Delaunay triangulation
 
         Params: 
             XY - centroid regions to build a graph around
@@ -411,171 +517,13 @@ class TissueGraph:
         self._G.vs["Y"]=XY[:,1]
         self._G.vs["Size"]=np.ones(len(XY[:,1]))
         
-        # initialize bounding box
-        _, bb = bounding_box_sc(XY)
-        self.BoundingBox = Polygon(bb)
-
-        diameter = np.linalg.norm(bb.ptp(axis=0))
-        vp = list(voronoi_polygons(Voronoi(XY), diameter))
-        vp = [p.intersection(self.BoundingBox) for p in vp]
-        self.Tri = {pdx: p for pdx, p in enumerate(vp)}
-        
         # set up names
         self._G.vs["name"]=list(range(self.N))
         return(self)
+
     
-    def plot(self, color_dict={}, cell_type=None, fpath=None, graph_params=None):
-        """
-        Plot cell type or zone as a Voronoi diagram
-
-        Input
-        -----
-        cell_type : list of cell labels 
-        color_dict : mapping of cell type to color space
-        graph_params : current matplotlib plot parameters passed via a dictionary
-            figsize
-            border_color, border_alpha, border_lw, border_ls
-            poly_alpha
-            inner, inner_alpha, inner_lw, inner_ls
-            scatter
-            scatter_color, scatter_alpha, scatter_size
-        fpath : file path for figure to be saved to 
-
-        Output
-        ------
-        fig : graphic for plotting if not provided with file path for saving plot 
-        """
-
-        # default graphing parameters 
-        if graph_params is None:
-            graph_params = {}
-
-        graph_param_defaults = {}
-        graph_param_defaults["figsize"] = (12,8)
-        graph_param_defaults["border_color"] = "black"
-        graph_param_defaults["border_alpha"] = 1
-        graph_param_defaults["border_lw"] = 1
-        graph_param_defaults["border_ls"] = "solid"
-        graph_param_defaults["poly_alpha"] = 0.5
-        graph_param_defaults["inner"] = False
-        graph_param_defaults["inner_alpha"] = 1
-        graph_param_defaults["inner_lw"] = 0.75
-        graph_param_defaults["inner_ls"] = "dotted"
-        graph_param_defaults["scatter"] = False
-        graph_param_defaults["scatter_color"] = "black"
-        graph_param_defaults["scatter_alpha"] = 0.05
-        graph_param_defaults["scatter_size"] = 3
-
-        for x in graph_param_defaults:
-            if x not in graph_params:
-                graph_params[x] = graph_param_defaults[x]
-
-        if cell_type is None:
-            cell_type = self.Type
-
-        faces = []
-        colors = []
-        color_segments = []
-        patches = []
-        segments = []
-
-        for k in self.Tri:
-            p = self.Tri[k]
-            
-            if p.area == 0:
-                continue
-            if hasattr(p, "geoms"):
-                for subp in p.geoms:
-                    coords = subp.exterior.coords
-                    faces += [coords]
-                    colors += [color_dict[cell_type[k]]]
-            else:
-                coords = p.exterior.coords
-                faces += [coords]
-                colors += [color_dict[cell_type[k]]]
-
-        # helper function to convert Polygon coordinates to segments 
-        get_segments = lambda x, y: [[[x[i], y[i]], [x[i + 1], y[i + 1]]] for i in range(len(x) - 1)]
-
-        for i in range(len(faces)):
-            patches.append(PolygonPatch(Polygon(faces[i]), fc=colors[i], ec=colors[i], lw=0.2, alpha=graph_params["poly_alpha"], zorder=1))
-            x, y = zip(*faces[i])
-            new_segments = get_segments(x, y)
-            segments += new_segments
-            color_segments += [colors[i] for idx in range(len(new_segments))]
-
-        bord_faces = []
-        bord_segments = []
-        if self.UpstreamMap is not None and graph_params["inner"]:
-
-            if self.UpstreamMap is None:
-                raise ValueError("Cannot plot inner-enviroments for base level")
-
-            for env in range(max(self.UpstreamMap) + 1):
-                polygon_idx = np.where(self.UpstreamMap == env)[0]
-
-                if len(polygon_idx) == 0:
-                    continue
-
-                aggr_p = self.Tri[polygon_idx[0]]
-                for k in polygon_idx:
-                    p = self.Tri[k]
-                    aggr_p = aggr_p.union(p)
-
-                if aggr_p.area == 0:
-                    continue
-
-                if hasattr(aggr_p, "geoms"):
-                    for subp in aggr_p.geoms:
-                        coords = subp.exterior.coords
-                        bord_faces += [coords]
-                else:
-                    coords = aggr_p.exterior.coords
-                    bord_faces += [coords]
-
-            for i in range(len(bord_faces)):
-                x, y = zip(*bord_faces[i])
-                bord_segments += get_segments(x, y)
-
-        if graph_params["scatter"]:
-            graph_params["scatter_alpha"] = 0
-
-        fig, ax = plt.subplots(figsize=graph_params["figsize"])
-        ax.add_collection(PatchCollection(patches, match_original=True))
-        ax.scatter(x=self.XY[:,0], y=self.XY[:,1],
-            c=graph_params["scatter_color"],
-            s=graph_params["scatter_size"],
-            alpha=graph_params["scatter_alpha"])
-
-        if graph_params["inner"]:
-            # outter lines 
-            ax.add_collection(LineCollection(bord_segments,
-                                colors=graph_params["border_color"],
-                                lw=graph_params["border_lw"],
-                                alpha=graph_params["border_alpha"],
-                                linestyle=graph_params["border_ls"]))
-            # inner lines
-            ax.add_collection(LineCollection(segments,
-                                colors=color_segments,
-                                lw=graph_params["inner_lw"],
-                                alpha=graph_params["inner_alpha"],
-                                linestyle=graph_params["inner_ls"])) 
-            
-        else:
-            # outer lines 
-            ax.add_collection(LineCollection(segments,
-                                            colors=graph_params["border_color"],
-                                            lw=graph_params["border_lw"],
-                                            alpha=graph_params["border_alpha"],
-                                            linestyle=graph_params["border_ls"]))
-
-        if fpath != None:
-            fig.savefig("fpath")
-        else:
-            return fig
-    
-    def ContractGraph(self,TypeVec = None):
-        """ContractGraph : reduce graph size by merging neighbors of same type. 
+    def contract_graph(self,TypeVec = None):
+        """contract_graph : reduce graph size by merging neighbors of same type. 
             Given a vector of types, will contract the graph to merge vertices that are 
             both next to each other and of the same type. 
         
@@ -611,7 +559,7 @@ class TissueGraph:
         ZoneName, ZoneSingleIx = np.unique(IxMapping, return_index=True)
         
         # zone size sums the current graph zone size per each aggregate (i.e. zone or microenv)
-        df = pd.DataFrame(data = self.NodeSize)
+        df = pd.DataFrame(data = self.node_size)
         df['type'] = IxMapping
         ZoneSize = df.groupby(['type']).sum()
         ZoneSize = np.array(ZoneSize).flatten()
@@ -620,8 +568,6 @@ class TissueGraph:
         # create a new Tissue graph by copying existing one, contracting, and updating XY
         ZoneGraph = TissueGraph()
         ZoneGraph._G = self._G.copy()
-        ZoneGraph.BoundingBox = copy(self.BoundingBox)
-        ZoneGraph.Tri = copy(self.Tri)
         
         comb = {"X" : "mean",
                "Y" : "mean",
@@ -639,26 +585,23 @@ class TissueGraph:
                              
 
                              
-    def TypeFreq(self): 
+    def type_freq(self): 
         """
-            TypeFreq: return the catogorical probability for each type
+            type_freq: return the catogorical probability for each type
         """
         if self.Type is None: 
             raise ValueError("Type not yet assigned, can't count frequencies")
         unqTypes = np.unique(self.Type)
-        Ptypes = CountValues(self.Type,unqTypes,self.NodeSize)
+        Ptypes = count_values(self.Type,unqTypes,self.node_size)
         
         return Ptypes,unqTypes
     
-    # TODO: this should use NodeSize in case we are calculating this on the contracted graph
-    
-                             
-    def CondEntropy(self):
+    def cond_entropy(self):
         """
-        CondEntropy: calculate conditional entropy of the tissue graph
+        cond_entropy: calculate conditional entropy of the tissue graph
                      cond entropy is the difference between graph entropy based on pagerank and type entropy
         """
-        Pzones = self.NodeSize
+        Pzones = self.node_size
         Pzones = Pzones/np.sum(Pzones)
         Entropy_Zone = -np.sum(Pzones*np.log2(Pzones))
         
@@ -666,13 +609,13 @@ class TissueGraph:
         if self.Type is None: 
             raise ValueError("Can't calculate cond-entropy without Types, please check")
             
-        Ptypes = self.TypeFreq()[0] 
+        Ptypes = self.type_freq()[0] 
         Entropy_Types=-np.sum(Ptypes*np.log2(Ptypes))
         
-        CondEntropy = Entropy_Zone-Entropy_Types
-        return(CondEntropy)
+        cond_entropy = Entropy_Zone-Entropy_Types
+        return(cond_entropy)
     
-    def extractEnvironments(self,ordr = 4):
+    def extract_environments(self,ordr = 4):
         """
             returns the categorical distribution of neighbors for each vertex in the graph 
             distance is determined by ordr parameters that is passed to igraph neighberhood method. 
@@ -683,7 +626,7 @@ class TissueGraph:
         unqlbl = np.unique(self.Type)
         Env = np.zeros((self.N,len(unqlbl)))
         for i in range(self.N):
-            Env[i,:]=CountValues(self.Type[ind[i]],unqlbl,norm_to_one = False)
+            Env[i,:]=count_values(self.Type[ind[i]],unqlbl,norm_to_one = False)
         
         return(Env)
     
@@ -705,7 +648,7 @@ class TissueGraph:
         HoodId = np.array(HoodId)
         return(HoodId)
         
-    def calcGraphEnvCoherenceUsingTreenomial(self,Env):
+    def calc_graph_env_coherence_using_treenomial(self,Env):
         # create the treenomial distribution for all envs
         (treemat,nrmtreemat) = self.TX.TreeAsMat(return_nrm = True)
         q_no = np.matmul(Env,treemat.T)
@@ -727,12 +670,180 @@ class TissueGraph:
         
         return (EdgeWeightTreenomial,NodeWeightTreenomial)
         
-    def calcEntAtDifferentLeidenRes(self,G): 
+    def calc_entropy_at_different_Leiden_resolutions(self,G): 
         Rvec = np.logspace(-1,3,250)
         Ent = np.zeros(Rvec.shape)
         for i in range(len(Rvec)):
             TypeVec = G.community_leiden(resolution_parameter=Rvec[i],objective_function='modularity').membership
             TypeVec = np.array(TypeVec).astype(np.int64)
-            Ent[i] = self.ContractGraph(TypeVec).CondEntropy()
+            Ent[i] = self.contract_graph(TypeVec).cond_entropy()
             
         return (Rvec,Ent)
+    
+class View:
+    def __init__(self,TMG,name=None):
+        # each view needs a unique name
+        self.name = name
+        self.TMG = TMG
+        
+        # Fundamentally, a view keeps tab of all the type for different geoms
+        # and a dictionary that maps these ids to color/shape etc. 
+        
+        # types, maps each points, line, or polygon to a specific type key. 
+        # in these dataframes, the index must match the TMG Geom and different columns store different attributes
+        self.line_style = pd.DataFrame()
+        self.point_style = pd.DataFrame()
+        self.polygon_style = pd.DataFrame()
+        self.boundingbox_style = pd.DataFrame()
+        
+        # colormap is avaliable in case some derived Views needs to use it (for coloring PolyCollection for example)
+        self.clrmp = None
+        
+    def is_empty(self):
+        return(self.line_style.empty and self.point_style.empty and self.polygon_style.empty)
+    
+    def set_view(self): 
+        """
+        Key abstract method - has to be implemented in the subclass
+        signature should always include the TMG (and other stuff if needed)
+        """
+        raise NotImplementedError()
+        
+    
+    def plot_boundingbox(self): 
+        xy=np.array(self.TMG.Geoms['BoundingBox'].exterior.xy).T
+        plt.plot(xy[:,0],xy[:,1],color=self.boundingbox_style['color'])
+    
+    
+    def plot_points(self): 
+        plt.scatter(x=self.Layers[0].X,
+                    y=self.Layers[0].Y,
+                    s=self.point_style['size'],
+                    c=self.point_style['color'])
+        
+    def plot_polys(self): 
+        p = PolyCollection(self.TMG.Geoms['poly'],cmap=self.clrmp)
+        p.set_array(self.polygon_style['scalar'])
+        ax = plt.gca()
+        ax.add_collection(p)
+        
+    def plot_lines(self): 
+        # get lines sorted by key (which is by convention internally sorted)
+        segs = [s[1] for s in sorted(self.TMG.Geoms['line'].items())]
+        line_segments = LineCollection(segs,
+                                       linewidths=self.line_style['width'],
+                                       colors=self.line_style['color'])
+        ax = plt.gca()
+        ax.add_collection(line_segments)
+    
+    def plot(self,return_fig = False):
+        """
+        plot the View. 
+
+        (optionally) return the generated fig. 
+        
+        This method will not be used directly by this View as 
+        Out: 
+        fig
+        """
+        
+        if self.is_empty():
+            raise TypeError('View was not initalized with set_view')
+        
+        # plotting of different geometries depending on styles that exist in the view
+        # current supported geoms are: BoundingBox, lines, poly, points 
+        # in each case, there are some assumption about the columns that exists in the view style. 
+        # these assumptions are no enforced, so take care! 
+
+        fig = plt.figure(figsize=(13, 13))
+        ax = fig.add_subplot(111)
+        
+        if not self.boundingbox_style.empty:
+            self.plot_boundingbox()
+        
+        if not self.point_style.empty: 
+            self.plot_points()
+            
+        if not self.polygon_style.empty:
+            self.plot_polys()
+            
+        if not self.line_style.empty:
+            self.plot_lines()
+        
+        # set up limits and remove frame
+        mx = np.max(np.array(self.TMG.Geoms['BoundingBox'].exterior.xy).T,axis=0)
+        mn = np.min(np.array(self.TMG.Geoms['BoundingBox'].exterior.xy).T,axis=0)
+        ax.set_xlim(mn[0],mx[0])
+        ax.set_ylim(mn[1],mx[1])
+        ax.axis('off')
+        
+        if return_fig:
+            return fig
+        else:
+            return None
+
+# for any new view, we derive the class so we have lots of views, each with it's own class so we can keep key attributes and 
+# rewrite the different routines for each type of views
+
+class RandomPolygonColorByType(View):
+    def __init__(self,TMG,name = "polygons / random colors",lvl = 0):
+        super().__init__(TMG,name = f"{name} / level-{lvl}")
+        self.lvl = lvl
+        
+    def set_view(self,TMG):
+        cell_types = TMG.map_to_cell_level(self.lvl)
+        # create scalar mapping by just using cell_type id
+        scalar_mapping = cell_types/np.max(cell_types)
+        self.polygon_style['scalar'] = scalar_mapping
+        
+        # create the colormap
+        self.clrmp = ListedColormap(np.random.rand(len(np.unique(cell_types)),3))
+        
+
+class RandomPolygonColorByTypeWithLines(RandomPolygonColorByType):
+    def __init__(self,TMG,name = "polygons and edges / random colors",lvl = 0):
+        super().__init__(TMG,name = name, lvl = lvl)
+
+    def set_view(self):
+        # start with polygons in random colors
+        super().set_view(TMG)
+        edge_lvls = TMG.find_max_edge_level()
+        edge_width = [e[1] for e in sorted(edge_lvls.items())]
+        self.line_style['width'] = edge_width
+        self.line_style['color'] = np.repeat('#48434299',len(edge_width))
+
+class OnlyLines(View):
+    def __init__(self,TMG,name = "only lines"):
+        super().__init__(TMG,name = name)
+        self.edge_width = None
+    
+    def set_view(self):
+        edge_lvls = self.TMG.find_max_edge_level()
+        ew = np.array([float(e[1]) for e in sorted(edge_lvls.items())],dtype = 'float')
+        self.edge_width = ew
+        self.line_style['width'] = self.edge_width
+        self.line_style['color'] = np.repeat('#48434299',len(self.edge_width))
+        
+class RandomPointColorByType(View):
+    def __init__(self,TMG,name = "points / random colors",lvl = 0):
+        super().__init__(TMG,name = f"{name} / level-{lvl}")
+        self.lvl = lvl
+        
+    def set_view(self):
+        
+        cell_types = self.TMG.map_to_cell_level(lvl)
+        
+        # in this simple view, the only thing we do colors points by type with random color
+        unqcelltypes = np.unique(cell_types)
+        
+        # create unique color per type, shuffle, and expand to color per cell
+        colors = cm.rainbow(np.linspace(0, 1, len(unqcelltypes)))
+        colors = colors[np.random.permutation(colors.shape[0]),:]
+        colors = colors[cell_types,:]
+        
+        # convert to hex and set style
+        f_rgb2hex = lambda rgb: '#%02x%02x%02x%02x' % (int(rgb[0]*255),int(rgb[1]*255),int(rgb[2]*255),int(rgb[3]*255))
+        hex_colors = [f_rgb2hex(colors[i,:]) for i in range(colors.shape[0])]
+        self.point_style['color'] = hex_colors
+        self.point_style['size'] = 2
+        self.point_style.index = np.arange(len(cell_types))
