@@ -123,9 +123,9 @@ class Taxonomy:
             newcls = currcls.copy()
             newcls[ix] = newcls[ix]+dash+TypeVec
             
-            CG = TG.ContractGraph(newcls)
+            CG = TG.contract_graph(newcls)
             
-            Entropy = CG.CondEntropy()
+            Entropy = CG.cond_entropy()
             return(-Entropy)
         
         # we start by performing first clustering

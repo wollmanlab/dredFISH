@@ -5,55 +5,18 @@ MIB includes the following key classes:
 
 TissueMultiGraph: the key organizing class used to create and manage graphs across layers (hence multi)
 
-main attributes: 
-    Layers = where we store specific spatial representation of cells, zones, microenvironments, and regions as graphs
-    Geoms = geometrical aspects of the TMG required for plotting. 
-    Views = data and methods for plotting maps. Views are defined with a detailed OOP class structure. 
+TissueGraph: Each layers (cells, zones, microenv, regions) is defined using a graph. 
 
-main methods:
+View (and derived subclasses): vizualization of the TMG
 
-Misc: 
-    * save (and load during __init__ if fullfilename is provided)
-    
-Create: 
-    * create_cell_and_zone_layers - creates the first pair of Cell and Zone layers of the TMG
-    * create_communities_and_region_layers - create the second pair of layers (3 and 4) of the TMG
-    * add_contracted_layer_using_type - the actual addition of layer after contraction, used in each pair of layers that are added. 
-    * add_geoms
-    * add_view
-    
-Query: 
-    * map_to_cell_level -
-    * find_max_edge_level - 
-    * N
-    * Ntypes
-
-
- 
-
-TissueGraph: the core class used to analyze tissues using Graph representation is TissueGraph 
-
-Tissue graphs can be created either using XY possition of centroids OR by contracting existing graph
-to create coarser zone. 
-
-main methods:
-
-    * build_spatial_graph - construct graph based on Delauny neighbors
-    * contract_graph - find zones, i.e. spatially continous areas in the graph the same type
-    * CondEntopy - calculates the conditional entropy of a graph given types (or uses defaults existing types)
-    * watershed - devide into regions based on watershed
-    * calc_graph_env_coherence_using_treenomial - estimate spatial local coherence. 
-    
-Many other accessory functions that are used to set/get TissueGraph information.
-
-
-    
 """
 
 # dependeices
 from igraph import *
 
 from scipy.spatial import Delaunay,Voronoi
+from scipy.spatial.distance import squareform
+
 from collections import Counter
 
 import numpy as np
@@ -63,24 +26,19 @@ import torch
 import itertools
 import dill as pickle
 
-from scipy.spatial.distance import squareform
 
 from matplotlib.collections import LineCollection, PolyCollection
-# from descartes import PolygonPatch
-from shapely.geometry import Polygon
-
 
 # for debuding mostly
 import warnings
 import time
 from IPython import embed
 
-# might move these to Viz, currently used in scatter
 import matplotlib.cm as cm
 from matplotlib.colors import ListedColormap
 import matplotlib.pyplot as plt
 
-from shapely.geometry import MultiPolygon, LineString, MultiLineString, Polygon
+from shapely.geometry import Polygon, MultiPolygon, LineString, MultiLineString
 
 from dredFISH.Analysis.Taxonomy import *
 
@@ -128,8 +86,30 @@ def treenomialJSD(Q1,Q2):
 
 class TissueMultiGraph: 
     """
-       TisseMultiGraph - responsible for storing multiple layers (each a TissueGraph) and 
-                         the relationships between them. 
+    TissueMultiGraph - Main class that manages the creation of multi-layer graph representation of tissues. 
+    
+    main attributes: 
+        Layers = where we store specific spatial representation of cells, zones, microenvironments, and regions as graphs
+        Geoms = geometrical aspects of the TMG required for plotting. 
+        Views = data and methods for plotting maps. Views are defined with a detailed OOP class structure. 
+
+    main methods:
+
+        Misc: 
+            * save (and load during __init__ if fullfilename is provided)
+
+        Create: 
+            * create_cell_and_zone_layers - creates the first pair of Cell and Zone layers of the TMG
+            * create_communities_and_region_layers - create the second pair of layers (3 and 4) of the TMG
+            * add_contracted_layer_using_type - the actual addition of layer after contraction (used for zones, microenv, and regions). 
+            * add_geoms
+            * add_view
+
+        Query: 
+            * map_to_cell_level -
+            * find_max_edge_level - 
+            * N
+            * Ntypes
     """
     def __init__(self,fullfilename = None):
         # init to empty
@@ -173,7 +153,7 @@ class TissueMultiGraph:
         TG.build_spatial_graph(XY)
         
         # cluster cell types optimally
-        celltypes = Taxonomy.RecursiveLeidenWithTissueGraphcond_entropy(PNMF,TG,metric = 'cosine',single_level=True)
+        celltypes = Taxonomy.RecursiveLeidenWithTissueGraphCondEntropy(PNMF,TG,metric = 'cosine',single_level=True)
         
         # add types and key data
         TG.Type = celltypes
@@ -224,7 +204,7 @@ class TissueMultiGraph:
         cmb = torch.from_numpy(cmb)
         D = treenomialJSD(WatershedEnvs[cmb[:,0],:],WatershedEnvs[cmb[:,1],:])
         Dsqr = squareform(D)
-        commtypes = Taxonomy.RecursiveLeidenWithTissueGraphcond_entropy(Dsqr,self.Layers[-1],metric = 'precomputed',single_level=True)
+        commtypes = Taxonomy.RecursiveLeidenWithTissueGraphCondEntropy(Dsqr,self.Layers[-1],metric = 'precomputed',single_level=True)
                 
         self.add_contracted_layer_using_type(WatershedEnvs,commtypes)
     
@@ -386,7 +366,23 @@ class TissueMultiGraph:
     
 
 class TissueGraph:
-    """TissueGraph - main class responsible for maximally informative biocartography.
+    """
+    TissueGraph: the core class used to analyze tissues using Graph representation is TissueGraph 
+
+    Tissue graphs can be created in three different ways; 
+        1) using XY possition of centroids (cell layer)
+        2) using local spatial coherence and watershed (microenv)
+        3) contracting existing graph based on taxonomy and maximial conditional entropy (zones and regions)
+        
+    main methods:
+        * build_spatial_graph - construct graph based on Delauny neighbors
+        * contract_graph - find zones/region, i.e. spatially continous areas in the graph the same (cell/microenvironment) type
+        * CondEntopy - calculates the conditional entropy of a graph given types (or uses defaults existing types)
+        * watershed - devide into regions based on watershed
+        * calc_graph_env_coherence_using_treenomial - estimate spatial local coherence. 
+
+    Many other accessory functions that are used to set/get TissueGraph information.
+
     """
     def __init__(self):
         
@@ -670,15 +666,18 @@ class TissueGraph:
         
         return (EdgeWeightTreenomial,NodeWeightTreenomial)
         
-    def calc_entropy_at_different_Leiden_resolutions(self,G): 
+    def calc_entropy_at_different_Leiden_resolutions(self,Gtotest): 
         Rvec = np.logspace(-1,3,250)
         Ent = np.zeros(Rvec.shape)
+        Ntypes = np.zeros(Rvec.shape)
         for i in range(len(Rvec)):
-            TypeVec = G.community_leiden(resolution_parameter=Rvec[i],objective_function='modularity').membership
+            TypeVec = Gtotest.community_leiden(resolution_parameter=Rvec[i],objective_function='modularity').membership
             TypeVec = np.array(TypeVec).astype(np.int64)
             Ent[i] = self.contract_graph(TypeVec).cond_entropy()
+            Ntypes[i] = len(np.unique(TypeVec))
             
-        return (Rvec,Ent)
+        df = pd.DataFrame(data = {'Entropy' : Ent, 'Ntypes' : Ntypes, 'Resolution' : Rvec})     
+        return df
     
 class View:
     def __init__(self,TMG,name=None):
