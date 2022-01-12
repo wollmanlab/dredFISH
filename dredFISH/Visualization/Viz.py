@@ -330,10 +330,11 @@ class RandomPolygonColorByTypeWithLines(RandomPolygonColorByType):
 
     def set_view(self):
         # start with polygons in random colors
-        super().set_view(TMG)
-        edge_lvls = TMG.find_max_edge_level()
+        super().set_view()
+        edge_lvls = self.TMG.find_max_edge_level()
         edge_width = [e[1] for e in sorted(edge_lvls.items())]
-        self.line_style['width'] = edge_width
+        # scale on edge width, so they aren't block-like 
+        self.line_style['width'] = list(np.array(edge_width)*0.25)
         self.line_style['color'] = np.repeat('#48434299',len(edge_width))
 
 class OnlyLines(View):
