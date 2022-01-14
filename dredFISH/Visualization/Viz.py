@@ -203,8 +203,8 @@ class View:
             line_segments = LineCollection(segs[ix],
                                            linewidths=unq_widths[i],
                                            colors=self.line_style['color'][ix])
-        ax = plt.gca()
-        ax.add_collection(line_segments)
+            ax = plt.gca()
+            ax.add_collection(line_segments)
     
     def plot(self,return_fig = False):
         """
@@ -333,8 +333,12 @@ class RandomPolygonColorByTypeWithLines(RandomPolygonColorByType):
         super().set_view()
         edge_lvls = self.TMG.find_max_edge_level()
         edge_width = [e[1] for e in sorted(edge_lvls.items())]
+
         # scale on edge width, so they aren't block-like 
-        self.line_style['width'] = list(np.array(edge_width)*0.25)
+        scale = 0.25 
+        base_width = 0.1 
+
+        self.line_style['width'] = list(np.array(edge_width) * scale + base_width)
         self.line_style['color'] = np.repeat('#48434299',len(edge_width))
 
 class OnlyLines(View):
