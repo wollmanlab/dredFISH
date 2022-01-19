@@ -21,7 +21,6 @@ import warnings
 import time
 from IPython import embed
 
-from dredFISH.Visualization.vor import bounding_box_sc, voronoi_polygons
 from dredFISH.Visualization.cell_colors import *
 from dredFISH.Visualization.vor import * 
 

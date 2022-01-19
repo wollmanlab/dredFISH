@@ -46,9 +46,8 @@ from IPython import embed
 # to create geomtries
 from shapely.geometry import Polygon, MultiPolygon, LineString, MultiLineString
 
-from dredFISH.Visualization.vor import bounding_box_sc, voronoi_polygons
 from dredFISH.Visualization.cell_colors import *
-from dredFISH.Visualization.vor import * 
+from dredFISH.Visualization.vor import voronoi_polygons, bounding_box
 
 ##### Some simple accessory funcitons
 def count_values(V,refvals,sz = None,norm_to_one = True):
@@ -439,14 +438,13 @@ class TissueMultiGraph:
         
         # Bounding box geometry 
         XY = self.Layers[0].XY
-        _, bb = bounding_box_sc(XY)
-        self.Geoms['BoundingBox'] = Polygon(bb)
+        diameter, bb = bounding_box(XY, fill_holes=False)
+        self.Geoms['BoundingBox'] = bb
 
         # Polygon geometry 
         # this geom is just the voronoi polygons
         # after intersection with the bounding box
         # if the intersection splits a polygon into two, take the one with largest area
-        diameter = np.linalg.norm(bb.ptp(axis=0))
         vor = Voronoi(XY)
         vp = list(voronoi_polygons(vor, diameter))
         vp = [p.intersection(self.Geoms['BoundingBox']) for p in vp]
