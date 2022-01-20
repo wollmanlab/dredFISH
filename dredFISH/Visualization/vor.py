@@ -11,6 +11,7 @@ from scipy.ndimage import binary_fill_holes, uniform_filter
 from shapely.geometry import Polygon
 from shapely.ops import unary_union
 
+import pdb
 
 def voronoi_polygons(voronoi, diameter):
     """
@@ -109,9 +110,13 @@ def find_order(xy_coords, path_steps):
     Output:
     order cycle through coordinates 
     """
+
     # arbitrary start that ideally avoids inner cycles on first iteration 
-    start=xy_coords[np.argmin(xy_coords)]
-    path_steps[tuple(start)]=[np.argmin(xy_coords)]
+    index = np.where(xy_coords[:, 0] == np.min(xy_coords, axis=0)[0])[0]
+    index = index[np.argmin(xy_coords[index, :], axis=0)[1]]
+
+    start = xy_coords[index]
+    path_steps[tuple(start)] = [index]
     pos = [start]
     idx = 0
     # once we have run out of candidates, we have covered all cells within a cycle 
@@ -139,9 +144,22 @@ def find_order(xy_coords, path_steps):
                 # if two paths are distinct, then the set of their combined elements will be relatively large 
                 path_dict[(idx, idy)] = len(set(path_steps[tuple(x)] + path_steps[tuple(y)]))
 
+    # empty cell
+    if len(path_dict) == 0:
+        return path_steps[keys[0]]
+
     # find longest path 
     max_x, max_y = max(path_dict, key = path_dict.get)
-    return path_steps[keys[max_x]] + path_steps[keys[max_y]][::-1][:-1]    
+
+    order = path_steps[keys[max_x]] + path_steps[keys[max_y]][::-1][:-1]  
+
+    # find longest substring with no duplicates 
+    if len(order) != len(set(order)):
+        val, ct = np.unique(order, return_counts=True)
+        dupl = np.where([True if x in val[ct > 1] else False for x in order])[0]
+        order = order[dupl[np.argmax(np.diff(dupl))]: dupl[np.argmax(np.diff(dupl)) + 1]]
+
+    return order 
 
 def find_hist_mapping(hist, padding):
     """
@@ -229,8 +247,9 @@ def bounding_box(XY, n_xbins=50, n_ybins=50, padding=10, size_thr=8, small=100, 
     # Otsu's method for thresholding bw 
     mask = np.array(hist[0] > 0)
     mask_rso = remove_small_objects(mask, small) * 1
-    otsu_threshold = threshold_otsu(1 - uniform_filter(mask_rso.astype(float), size=size_thr))
-    grid = 1 - uniform_filter(mask_rso.astype(float), size=size_thr) < otsu_threshold
+    grid = 1 - uniform_filter(mask_rso.astype(float), size=size_thr)
+    otsu_threshold = threshold_otsu(grid)
+    grid = grid < otsu_threshold
 
     if fill_holes:
         grid = binary_fill_holes(grid)
@@ -260,7 +279,7 @@ def bounding_box(XY, n_xbins=50, n_ybins=50, padding=10, size_thr=8, small=100, 
         order = find_order(xy_coords, path_steps)
         # add to cycle set and update coords to remove cells from cycle
         cycles += [(order, np.array([xy_coords[i] for i in order]))]
-        xy_coords = [xy for xy in xy_coords if tuple(xy) not in path_steps]
+        xy_coords = np.array([list(xy) for xy in xy_coords if tuple(xy) not in path_steps])
 
         if len(xy_coords) == 1:
             cycles += [([0], xy_coords)]
