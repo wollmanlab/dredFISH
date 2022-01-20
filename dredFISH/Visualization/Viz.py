@@ -21,7 +21,6 @@ import warnings
 import time
 from IPython import embed
 
-from dredFISH.Visualization.vor import bounding_box_sc, voronoi_polygons
 from dredFISH.Visualization.cell_colors import *
 from dredFISH.Visualization.vor import * 
 
@@ -205,8 +204,8 @@ class View:
             line_segments = LineCollection(segs[ix],
                                            linewidths=unq_widths[i],
                                            colors=self.line_style['color'][ix])
-        ax = plt.gca()
-        ax.add_collection(line_segments)
+            ax = plt.gca()
+            ax.add_collection(line_segments)
     
     def plot(self,return_fig = False):
         """
@@ -325,16 +324,20 @@ class CoherenceView(View):
             plt.scatter(x=x,y=y,s=5,c='w')
         
 
-class RandomPolygonColorByTypeWithLines(RandomPolygonColorByType):
+class RandomPolygonColorByTypeWithLines(RandomPolygonColor):
     def __init__(self,TMG,name = "polygons and edges / random colors",lvl = 0):
         super().__init__(TMG,name = name, lvl = lvl)
 
     def set_view(self):
         # start with polygons in random colors
-        super().set_view(TMG)
-        edge_lvls = TMG.find_max_edge_level()
+        super().set_view()
+        edge_lvls = self.TMG.find_max_edge_level()
         edge_width = [e[1] for e in sorted(edge_lvls.items())]
-        self.line_style['width'] = edge_width
+
+        scale = 0.25 
+        base_width = 0.1 
+
+        self.line_style['width'] = list(np.array(edge_width) * scale + base_width)
         self.line_style['color'] = np.repeat('#48434299',len(edge_width))
 
 class OnlyLines(View):
