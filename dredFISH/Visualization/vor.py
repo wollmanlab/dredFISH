@@ -1,273 +1,17 @@
 import numpy as np
 
-from shapely.geometry import Polygon
-
 from collections import defaultdict, Counter
 from copy import copy
 
-from scipy.spatial import Voronoi
-from scipy.ndimage import binary_fill_holes, gaussian_filter, binary_erosion, binary_dilation
 from skimage.morphology import remove_small_objects
+from skimage.filters import threshold_otsu 
 
-def voronoi_intersect_box(XY, bb_params=None):
-    """
-    Find Voronoi points within bounding box
+from scipy.ndimage import binary_fill_holes, uniform_filter
 
-    Input
-    -----
-    XY : XY coordinates
-    bb_params : bounding box params for bounding_box_grid
+from shapely.geometry import Polygon
+from shapely.ops import unary_union
 
-    Output
-    ------
-    list : set of polygons from Voronoi diagram intersecting bounding box
-
-    """
-    if bb_params is None:      
-        _, bb = bounding_box_sc(XY)
-    else:
-        bb_defaults["scale"] = 25
-        bb_defaults["padding"] = 10
-        bb_defaults["threshold"] = 50
-        bb_defaults["sd"] = 0.1
-        bb_defaults["fill"]=True
-        bb_defaults["small"] = 100
-        bb_defaults["xbins"] = 50
-        bb_defaults["ybins"] = 50
-
-
-        for x in bb_default:
-            if x not in bb_params:
-                bb_params[x]=bb_defaults[x]
-
-        _, bb = bounding_box_sc(XY,
-            bb_params["xbins"],
-            bb_params["ybins"],
-            bb_params["padding"],
-            bb_params["sd"],
-            bb_params["small"])
-
-
-    diameter = np.linalg.norm(bb.ptp(axis=0))
-    boundary_polygon = Polygon(bb)
-    
-    vp = list(voronoi_polygons(Voronoi(XY), diameter))
-    return [p.intersection(boundary_polygon) for p in vp]
-
-def bounding_box_sc(XY, n_xbins=50, n_ybins=50, padding=10, sd=0.1, small=100):
-    # construct grid using min and max values for X and Y values 
-    xmax = XY.max(0)[0]
-    xmin = XY.min(0)[0]
-    ymax = XY.max(0)[1]
-    ymin = XY.min(0)[1]
-
-    xbins = np.arange(xmin, xmax, n_xbins)
-    ybins = np.arange(ymin, ymax, n_ybins)
-
-    hist = np.histogram2d(XY[:, 0], XY[:, 1], bins=(xbins, ybins))
-
-    mask = np.array(hist[0] > 0) * 1
-    mask_filled = binary_fill_holes(mask)
-    mask_eroded = binary_erosion(mask_filled, iterations = 3)
-    mask_dilated = binary_dilation(mask_eroded, iterations = 3)
-    grid = remove_small_objects(mask_dilated, small)
-    grid = gaussian_filter(grid, sd)
-
-    grid_pad = np.zeros(grid.shape + np.array((padding * 2, padding * 2)))
-    grid_pad[padding: (grid_pad.shape[0] - padding), padding : (grid_pad.shape[1] - padding)] = grid
-    grid = grid_pad
-    border_grid = copy(grid)
-
-    for i in range(len(grid) - 1):
-        for j in range(len(grid[i]) - 1):
-            if grid[i, j] == 0 and sum([sum([grid[k + i, l + j] for k in range(-1, 2)]) for l in range(-1, 2)]):
-                border_grid[i, j] = 2
-    # coordinates 
-    x, y = np.where(border_grid == 2)
-    xy_coords = np.array(list(zip(x, y)))
-
-    # order coordinates 
-    order = find_order(xy_coords)
-    xy_coords = np.array([xy_coords[i] for i in order])
-
-    # construct mapping of grid with padding back to coordinates
-    hist2coord={}
-    for i in range(hist[0].shape[0]):
-        for j in range(hist[0].shape[1]):
-            hist2coord[(i+padding,j+padding)]=((hist[1][i]+hist[1][i+1])/2,(hist[2][j]+hist[2][j+1])/2)
-
-    for i in range(padding)[::-1]:
-        for j in range(hist[0].shape[1]):
-                a=hist2coord[(i+1,j+padding)]
-                b=hist2coord[(i+2,j+padding)]
-                hist2coord[(i,j+padding)]=np.array(a)+np.array(a)-np.array(b)
-
-    for i in range(hist[0].shape[0],hist[0].shape[0]+padding*2):
-        for j in range(hist[0].shape[1]):
-                a=hist2coord[(i-1,j+padding)]
-                b=hist2coord[(i-2,j+padding)]
-                hist2coord[(i,j+padding)]=np.array(a)+np.array(a)-np.array(b)
-
-    for i in range(hist[0].shape[0]+padding*2):
-        for j in range(padding)[::-1]:
-            a=hist2coord[(i,j+1)]
-            b=hist2coord[(i,j+2)]
-            hist2coord[(i,j)]=np.array(a)+np.array(a)-np.array(b)
-
-    for i in range(hist[0].shape[0]+padding*2):
-        for j in range(hist[0].shape[1],hist[0].shape[1]+padding*2):
-            a=hist2coord[(i,j-1)]
-            b=hist2coord[(i,j-2)]
-            hist2coord[(i,j)]=np.array(a)+np.array(a)-np.array(b)
-
-    # map grid to cell coordinates 
-    bb = np.array([hist2coord[tuple(x)] for x in xy_coords])
-
-    segments = []
-
-    for i in range(np.shape(bb)[0] - 1):
-        segments.append([list(bb[i, :]), list(bb[i + 1, :])])
-    segments.append([list(bb[i, :]), list(bb[0, :])])
-
-    return np.array(segments), bb
-
-def bounding_box_grid(XY, scale=25, padding=10, threshold=50, sd=0.1, small=100, nofill=False):
-    """
-    Find a bounding box over XY coordinates using a grid 
-    
-    Input
-    -----
-    XY : XY coordinates
-    scale : difference between max and min values used to determine grid shape 
-    padding : padding on sides of grid 
-    threshold : distance from observation where bounding box is valid
-    sd : standard deviation for Gaussian filter
-    nofill : whether empty space within the object should be filled 
-
-    Output
-    ------
-    segments : ordered line segments of bounding box
-    bb : ordered coordinates of bounding box 
-    """
-
-    # construct grid using min and max values for X and Y values 
-    xmax = XY.max(0)[0]
-    xmin = XY.min(0)[0]
-    ymax = XY.max(0)[1]
-    ymin = XY.min(0)[1]
-
-    grid = np.zeros([((xmax - xmin) / scale).astype(int) + padding,((ymax - ymin) / scale).astype(int) + padding]).astype(int)
-
-    # mappings for grid indices to the XY plane
-    i2x = lambda i : (i * scale + xmin - scale * padding / 2)
-    j2y = lambda j : (j * scale + ymin - scale * padding / 2)
-
-    # identify all grid elements where there is a cell within distance of grid mapping to XY 
-    for i in range(len(grid)):
-        for j in range(len(grid[i])):
-            x = i2x(i)
-            y = j2y(j)
-            if np.min(np.sum(np.abs(XY - (x, y)), 1)) > threshold:
-                grid[i, j] = 1
-    
-    grid = remove_small_objects(grid, small)
-
-    if not nofill:
-        grid = 1 - binary_fill_holes(grid == 0)
-    if sd != None:
-        grid = gaussian_filter(grid, sd)
-
-    # find all grid elements next to a grid element that contains a cell 
-    border_grid = copy(grid)
-    for i in range(len(grid) - 1):
-        for j in range(len(grid[i]) - 1):
-            if grid[i, j] == 0 and sum([sum([grid[k + i, l + j] for k in range(-1, 2)]) for l in range(-1, 2)]):
-                border_grid[i, j] = 2
-
-    # coordinates 
-    x, y = np.where(border_grid == 2)
-    xy_coords = np.array(list(zip(x, y)))
-
-    # order coordinates 
-    order = find_order(xy_coords)
-    xy_coords = np.array([xy_coords[i] for i in order])
-
-    bb = np.array([x for x in zip(list(map(i2x, xy_coords[:, 0])), list(map(j2y, xy_coords[:, 1])))])
-
-    segments = []
-
-    for i in range(np.shape(bb)[0] - 1):
-        segments.append([list(bb[i, :]), list(bb[i + 1, :])])
-    segments.append([list(bb[i, :]), list(bb[0, :])])
-
-    return np.array(segments), bb
-
-def find_order(xy_coords):
-    """
-    Use dynamic programming to find longest cycle in graph 
-    
-    Input
-    -----
-    xy_coords : XY coordinates 
-
-    Output
-    ------
-    order : order of XY coordinates such that they make a cycle 
-    """
-
-    # start site 
-    start = xy_coords[0]
-
-    # helper for finding neighbors in radius r of obs
-    def find_neigh(pos, xy_coords, redun, r=1):
-        """
-        Find neighbors within r radius excluding some set
-
-        Input
-        -----
-        pos : position 
-        xy_coords : XY coordinates
-        redun : redundant set for exclusion 
-        r : radius 
-
-        Output
-        ------
-        list : neighbors in radius 
-        """
-        cand = np.array([[(pos[0] + i, pos[1] + j) for i in range(0 - r, 1 + r)] for j in range(0 - r, 1 + r)])
-        cand=[x for y in cand for x in y]
-        return [x for x in cand if 2 in np.sum(xy_coords == x, 1) if tuple(x) not in redun]
-
-    # find path for each coordinate to start site 
-    path_steps = {tuple(start): [0]}
-    pos = [start]
-    idx = 0
-    while len(path_steps)!=len(xy_coords):
-        cand = find_neigh(pos[idx], xy_coords, path_steps)
-        for c in cand:
-            if tuple(c) not in path_steps:
-                idx_count = Counter(np.where(xy_coords == c)[0])
-                path_steps[tuple(c)] = path_steps[tuple(pos[idx])] + [x for x in idx_count if idx_count[x] == 2]
-                pos += [c]
-        idx += 1
-
-    # find longest path joining two neighbors 
-    path_dict = {}
-    keys = list(path_steps.keys())
-    key_dict = {x: idx for idx, x in enumerate(list(path_steps.keys()))}
-
-    for x in path_steps:
-        for y in find_neigh(x, xy_coords, {}):
-            y = tuple(y)
-            if not np.product(x == y):
-                idx = key_dict[x]
-                idy = key_dict[y]
-                path_dict[(idx, idy)] = len(set(path_steps[tuple(x)] + path_steps[tuple(y)]))
-
-    max_x, max_y = max(path_dict, key = path_dict.get)
-    order = path_steps[keys[max_x]] + path_steps[keys[max_y]][::-1][:-1]
-    return order
-
+import pdb
 
 def voronoi_polygons(voronoi, diameter):
     """
@@ -334,38 +78,218 @@ def voronoi_polygons(voronoi, diameter):
                       voronoi.vertices[k] + dir_k * length]
         yield Polygon(np.concatenate((finite_part, extra_edge)))
 
-def bounding_box(XY, bins=100):
+
+def find_neigh(pos, xy_coords, redun, r=1):
     """
-    Find bounding box from a set of XY coordinates using X values 
-    
+    Find neighbors within r radius excluding some set
+
     Input
     -----
-    XY : XY coodinates
-    bins : number of bins for X values 
+    pos : position 
+    xy_coords : XY coordinates
+    redun : redundant set for exclusion 
+    r : radius 
 
     Output
     ------
-    segments : ordered line segments of bounding box
-    bb : ordered coordinates of bounding box 
+    list : neighbors in radius 
     """
-    bb = np.zeros([2 * bins, 2])
+    cand = np.array([[(pos[0] + i, pos[1] + j) for i in range(0 - r, 1 + r)] for j in range(0 - r, 1 + r)])
+    cand=[x for y in cand for x in y]
+    return [x for x in cand if 2 in np.sum(xy_coords == x, 1) if tuple(x) not in redun]
 
-    xmax=XY.max(0)[0]
-    xmin=XY.min(0)[0]
+def find_order(xy_coords, path_steps):
+    """
+    Find order of coordinates given that some subset have been traversed already
 
-    # x values go from min to max to min
-    bb[:, 0] = list(np.arange(xmin, xmax, step = (xmax - xmin) / (bins))) + list(np.arange(xmax, xmin, step = (xmin-xmax) / (bins)))
+    Input
+    -----
+    xy_coords : XY coordinates
+    path_steps : tracking previous positions walk to some start
 
-    # find the indices within some x range and then find their min and max y values 
-    for i in range(bins):
-        ix = (XY[:, 0] > bb[i, 0]) & (XY[:, 0] <= bb[i + 1, 0])
-        bb[i, 1] = np.min(XY[ix, 1])
-        bb[2 * bins - i - 1, 1] = np.max(XY[ix, 1])
+    Output:
+    order cycle through coordinates 
+    """
 
-    segments = []
+    # arbitrary start that ideally avoids inner cycles on first iteration 
+    index = np.where(xy_coords[:, 0] == np.min(xy_coords, axis=0)[0])[0]
+    index = index[np.argmin(xy_coords[index, :], axis=0)[1]]
 
-    for i in range(np.shape(bb)[0] - 1):
-        segments.append([list(bb[i, :]), list(bb[i + 1, :])])
-    segments.append([list(bb[i, :]), list(bb[0, :])])
+    start = xy_coords[index]
+    path_steps[tuple(start)] = [index]
+    pos = [start]
+    idx = 0
+    # once we have run out of candidates, we have covered all cells within a cycle 
+    while len(pos) > idx:
+        cand = find_neigh(pos[idx], xy_coords, path_steps)
+        for c in cand:
+            if tuple(c) not in path_steps:
+                idx_count = Counter(np.where(xy_coords == c)[0])
+                path_steps[tuple(c)] = path_steps[tuple(pos[idx])] + [x for x in idx_count if idx_count[x] == 2]
+                pos += [c]
+        idx += 1
 
-    return np.array(segments), np.array(bb)  
+    # find set of cells connecting two neighbors to start
+    path_dict = {}
+    keys = [tuple(list(x)) for x in pos]
+    key_dict = {x: idx for idx, x in enumerate(keys)}
+
+    for x in pos:
+        x = tuple(list(x))
+        for y in find_neigh(x, xy_coords, {}):
+            y = tuple(y)
+            if not np.product(x == y):
+                idx = key_dict[x]
+                idy = key_dict[y]
+                # if two paths are distinct, then the set of their combined elements will be relatively large 
+                path_dict[(idx, idy)] = len(set(path_steps[tuple(x)] + path_steps[tuple(y)]))
+
+    # empty cell
+    if len(path_dict) == 0:
+        return path_steps[keys[0]]
+
+    # find longest path 
+    max_x, max_y = max(path_dict, key = path_dict.get)
+
+    order = path_steps[keys[max_x]] + path_steps[keys[max_y]][::-1][:-1]  
+
+    # find longest substring with no duplicates 
+    if len(order) != len(set(order)):
+        val, ct = np.unique(order, return_counts=True)
+        dupl = np.where([True if x in val[ct > 1] else False for x in order])[0]
+        order = order[dupl[np.argmax(np.diff(dupl))]: dupl[np.argmax(np.diff(dupl)) + 1]]
+
+    return order 
+
+def find_hist_mapping(hist, padding):
+    """
+    Adjust histogram for padding
+
+    Input
+    -----
+    hist : 2D histogram result
+    padding : padding quantity 
+
+    Output
+    ------
+    coordinates from bin indexes to space 
+    """
+    # construct mapping of grid with padding back to coordinates
+    # 2D hist contains three dimensions: 2D counts and x/y coords
+    hist2coord = {}
+
+    # inner points, average between bins 
+    for i in range(hist[0].shape[0]):
+        for j in range(hist[0].shape[1]):
+            hist2coord[(i + padding, j + padding)] = ((hist[1][i] + hist[1][i + 1]) / 2, (hist[2][j] + hist[2][j + 1]) / 2)
+
+    # [0, padding] x difference, inner y 
+    for i in range(padding)[::-1]:
+        for j in range(hist[0].shape[1]):
+                a = hist2coord[(i + 1, j + padding)]
+                b = hist2coord[(i + 2, j + padding)]
+                hist2coord[(i, j + padding)] = np.array(a) + np.array(a) - np.array(b)
+
+    # [xrange + padding, xrange + padding * 2] x difference, inner y 
+    for i in range(hist[0].shape[0], hist[0].shape[0] + padding * 2):
+        for j in range(hist[0].shape[1]):
+                a=hist2coord[(i - 1, j + padding)]
+                b=hist2coord[(i - 2, j + padding)]
+                hist2coord[(i, j + padding)] = np.array(a) + np.array(a) - np.array(b)
+
+    # all of x, [0, padding] y difference
+    for i in range(hist[0].shape[0] + padding * 2):
+        for j in range(padding)[::-1]:
+            a=hist2coord[(i, j + 1)]
+            b=hist2coord[(i, j + 2)]
+            hist2coord[(i, j)] = np.array(a) + np.array(a) - np.array(b)
+
+    # all of x, [yrange + padding, yrange + padding * 2] y difference
+    for i in range(hist[0].shape[0] + padding * 2):
+        for j in range(hist[0].shape[1], hist[0].shape[1] + padding * 2):
+            a = hist2coord[(i, j - 1)]
+            b = hist2coord[(i, j - 2)]
+            hist2coord[(i, j)] = np.array(a) + np.array(a) - np.array(b)
+    return hist2coord
+
+def bounding_box(XY, n_xbins=50, n_ybins=50, padding=10, size_thr=8, small=100, fill_holes=True, hole_thr=10):
+    """
+    Find bounding box with or without holes
+    Input
+    -----
+    XY : xy coordinates
+    n_xbins : number of X bins in histogram
+    n_ybins : number of Y bins in histogram
+    padding : padding to bounding box
+    size_thr : size of uniform convolution 
+    small : size of small objects to exclude
+    fill_holes : whether to fill holes
+    hole_thr : circumference threshold for holes 
+
+    Output
+    ------ 
+    diamter : diameter of bounding box
+    polygon : polygon bounding box
+    """
+
+    xmax = XY.max(0)[0]
+    xmin = XY.min(0)[0]
+    ymax = XY.max(0)[1]
+    ymin = XY.min(0)[1]
+
+    xbins = np.arange(xmin, xmax, n_xbins)
+    ybins = np.arange(ymin, ymax, n_ybins)
+
+    # 2D histogram
+    hist = np.histogram2d(XY[:, 0], XY[:, 1], bins=(xbins, ybins))
+
+    # moved to uniform filter to detect holes
+    # Otsu's method for thresholding bw 
+    mask = np.array(hist[0] > 0)
+    mask_rso = remove_small_objects(mask, small) * 1
+    grid = 1 - uniform_filter(mask_rso.astype(float), size=size_thr)
+    otsu_threshold = threshold_otsu(grid)
+    grid = grid < otsu_threshold
+
+    if fill_holes:
+        grid = binary_fill_holes(grid)
+
+    # pad the grid 
+    grid_pad = np.zeros(grid.shape + np.array((padding * 2, padding * 2)))
+    grid_pad[padding: (grid_pad.shape[0] - padding), padding : (grid_pad.shape[1] - padding)] = grid
+    grid = grid_pad
+
+    # detect boundary points 
+    border_grid = copy(grid)
+    for i in range(len(grid) - 1):
+        for j in range(len(grid[i]) - 1):
+            if grid[i, j] == 0 and sum([sum([grid[k + i, l + j] for k in range(-1, 2)]) for l in range(-1, 2)]):
+                border_grid[i, j] = 2
+    
+    # we need to sort all of the border points into cycles
+    # if fill_holes == True, then this is easy, there is just one cycle
+    # if otherwise, then we have to iteratively find cycles from the remaining cells
+    x, y = np.where(border_grid == 2)
+    xy_coords = np.array(list(zip(x, y)))
+    cycles=[]
+    path_steps={}
+
+    # global stopping condition is when we have covered distance from start(s) to every cell
+    while len(path_steps)!=len(xy_coords):
+        order = find_order(xy_coords, path_steps)
+        # add to cycle set and update coords to remove cells from cycle
+        cycles += [(order, np.array([xy_coords[i] for i in order]))]
+        xy_coords = np.array([list(xy) for xy in xy_coords if tuple(xy) not in path_steps])
+
+        if len(xy_coords) == 1:
+            cycles += [([0], xy_coords)]
+            break
+        if len(xy_coords) == 0:
+            break
+
+    hist2coord = find_hist_mapping(hist, padding)
+    bb = list(map(lambda xy_coords: np.array([hist2coord[tuple(x)] for x in xy_coords]), [x[1] for x in cycles]))
+    bb = [x for x in bb if len(x) >= hole_thr]
+    diameter = np.linalg.norm(bb[0].ptp(axis=0))
+
+    return diameter, Polygon(bb[0]) - unary_union([Polygon(bb[i]) for i in range(1, len(bb))])
