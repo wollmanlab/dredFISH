@@ -120,13 +120,21 @@ def dist_emd(E1,E2,Dsim):
     
     return D
 
+# def dist_nn(IX1,IX2 = None):
+#     # perform nn search (using accuracy x number of neighbors to improve accuracy)
+#     knn = pynndescent.NNDescent(X,n_neighbors = n_neighbors_with_extras ,metric=metric,diversify_prob=0.5,metric_kwds = metric_kwds)
+
+#     # get indices and remove self. 
+#     (indices,distances) = knn.neighbor_graph
+    
+
 def dist_jsd(M1,M2 = None):
-        if M2 is None: 
-            D = pdist(M1,metric = 'jensenshannon')
-        else: 
-            D = jensenshannon(M1,M2,base=2,axis=1)
+    if M2 is None: 
+        D = pdist(M1,metric = 'jensenshannon')
+    else: 
+        D = jensenshannon(M1,M2,base=2,axis=1)
         
-        return D
+    return D
 
 def buildgraph(X,n_neighbors = 15,metric = None,accuracy = 4,metric_kwds = {}):
     # different methods used to build nearest neighbor type graph. 
@@ -142,8 +150,7 @@ def buildgraph(X,n_neighbors = 15,metric = None,accuracy = 4,metric_kwds = {}):
     if metric is None:
         raise ValueError('metric was not specified')
     
-    # update number of neighbors (x accuracy) to increase accuracy
-    # at the same time checks if we have enough rows 
+    # checks if we have enough rows 
     n_neighbors = min(X.shape[0]-1,n_neighbors)
     
     if metric == 'jsd':
@@ -160,6 +167,7 @@ def buildgraph(X,n_neighbors = 15,metric = None,accuracy = 4,metric_kwds = {}):
             else:
                 indices[i,:]=ordr[:n_neighbors]
     else:
+        # update number of neighbors (x accuracy) to increase accuracy
         n_neighbors_with_extras = min(X.shape[0]-1,n_neighbors * accuracy)
 
         # perform nn search (using accuracy x number of neighbors to improve accuracy)
@@ -237,7 +245,7 @@ class TissueMultiGraph:
         """
         pickle.dump(self,open(fullfilename,'wb'),recurse=True)
         
-    def create_cell_and_zone_layers(self,XY,PNMF): 
+    def create_cell_and_zone_layers(self,XY,PNMF,celltypes = None): 
         """
         Creating cell and zone layers. 
         Cell layer is unique as it's the only one where spatial information is directly used with Voronoi
@@ -246,11 +254,14 @@ class TissueMultiGraph:
         # creating first layer - cell tissue graph
         TG = TissueGraph()
         TG.layer_type = "cells"
+        
+        # build two key graphs
         TG.build_spatial_graph(XY)
         TG.FG = buildgraph(PNMF,metric = 'cosine')
-        
-        # cluster cell types optimally
-        celltypes = TG.multilayer_Leiden_with_cond_entropy()
+
+        if celltypes is None:
+            # cluster cell types optimally
+            celltypes = TG.multilayer_Leiden_with_cond_entropy()
         
         # add types and key data
         TG.Type = celltypes

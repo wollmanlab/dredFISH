@@ -22,10 +22,6 @@ from IPython import embed
 from numpy.random import default_rng
 rng = default_rng()
 
-from matplotlib import cm
-import matplotlib.gridspec as gridspec
-import matplotlib.pyplot as plt
-
 from scipy.optimize import minimize_scalar
 from sklearn.neighbors import NearestNeighbors
 from scipy.spatial.distance import jensenshannon, pdist, squareform
@@ -33,53 +29,6 @@ from scipy.cluster.hierarchy import dendrogram, linkage, to_tree, fcluster, cut_
 import pynndescent 
 
 from igraph import *
-
-def buildgraph(X,n_neighbors = 15,metric = 'correlation',accuracy = 4):
-    # different methods used to build nearest neighbor type graph. 
-    # the algo changes with the metric. 
-    #     For JSD uses KD-tree
-    #     for  precomputed, assumes X is output of pdist in format and finds first n_neighbors directly
-    #     all other metrics, uses PyNNdescent for fast knn computation of large range of metrics. 
-    # 
-    # accuracy params is only used in cases where pynndescent is used and tries to increase accuracy by calculating 
-    # more neighbors than needed. 
-    
-    
-    # update number of neighbors (x accuracy) to increase accuracy
-    # at the same time checks if we have enough rows 
-    n_neighbors = min(X.shape[0]-1,n_neighbors)
-    
-    if metric == 'jsd':
-        knn = NearestNeighbors(n_neighbors = n_neighbors,metric = jensenshannon)
-        knn.fit(X)
-        (distances,indices) = knn.kneighbors(X, n_neighbors = n_neighbors)
-        
-    elif metric == 'precomputed':
-        indices = np.zeros((X.shape[0],n_neighbors))
-        for i in range(X.shape[0]):
-            ordr = np.argsort(X[i,:])
-            if np.any(ordr[:n_neighbors]==i):
-                indices[i,:]=np.setdiff1d(ordr[:n_neighbors+1],i)
-            else:
-                indices[i,:]=ordr[:n_neighbors]
-    else:
-        n_neighbors_with_extras = min(X.shape[0]-1,n_neighbors * accuracy)
-
-        # perform nn search (using accuracy x number of neighbors to improve accuracy)
-        knn = pynndescent.NNDescent(X,n_neighbors = n_neighbors_with_extras ,metric=metric,diversify_prob=0.5)
-
-        # get indices and remove self. 
-        (indices,distances) = knn.neighbor_graph
-       
-    indices=indices[:,1:n_neighbors+1]
-    
-    id_from = np.tile(np.arange(indices.shape[0]),indices.shape[1])
-    id_to = indices.flatten(order='F')
-    
-    # build graph
-    edgeList = np.vstack((id_from,id_to)).T
-    G = Graph(n=X.shape[0], edges=edgeList)
-    return G
 
 class Taxonomy: 
     
@@ -90,114 +39,17 @@ class Taxonomy:
         self.treeasmat = None
         self.nrmtreemat = None
         self.verbose = True
-        self.TMM = None
-        self.Xtra = None
         return None
  
-    @staticmethod
-    def RecursiveLeidenWithTissueGraphCondEntropy(X,TG,metric = 'cosine',single_level = False): 
-        """
-            Find optimial clusters (using recursive leiden)
-            optimization is done on resolution parameter and allows for recursive descent to 
-            further break clusters into subclusters as long as graph conditional entropy is increased. 
-            
-        """
-        
-        verbose = True
-        
-        # used for output if verbose = true
-        start = time.time()
-        
-        def OptLeiden(res,agraph,ix,currcls):
-            """
-            Basic optimization routine for Leiden resolution parameter. 
-            Implemented using igraph leiden community detection
-            """
-            # calculate leiden clustering
-            TypeVec = agraph.community_leiden(resolution_parameter=res,objective_function='modularity').membership
-            TypeVec = np.asarray(TypeVec).astype(str)
-            
-            # merge TypeVec with full cls vector
-            dash = np.array((1,),dtype='object')
-            dash[0]='_' 
-            newcls = currcls.copy()
-            newcls[ix] = newcls[ix]+dash+TypeVec
-            
-            CG = TG.contract_graph(newcls)
-            
-            Entropy = CG.cond_entropy()
-            return(-Entropy)
-        
-        # we start by performing first clustering
-        if verbose: 
-            print(f"Build similarity graph ")
-        
-        fullgraph = buildgraph(X,metric = metric)
-            
-        if verbose:
-            print(f"calculation took: {time.time()-start:.2f}")
-        
-        if verbose: 
-            print(f"Calling initial optimization")
-            
-        emptycls = np.asarray(['' for _ in range(TG.N)],dtype='object')
-        sol = minimize_scalar(OptLeiden, args = (fullgraph,np.arange(TG.N),emptycls),
-                                         bounds = (0.1,30), 
-                                         method='bounded',
-                                         options={'xatol': 1e-2, 'disp': 3})
-        initRes = sol['x']
-        ent_best = sol['fun']
-        if verbose: 
-            print(f"Initial entropy was: {-ent_best} number of evals: {sol['nfev']}")
-
-        if verbose:
-            print(f"calculation took: {time.time()-start:.2f}")
-        
-        cls = fullgraph.community_leiden(resolution_parameter=initRes,objective_function='modularity').membership
-        cls = np.asarray(cls).astype(str)
-
-        if verbose:
-            u=np.unique(cls)
-            print(f"Initial types found: {len(u)}")
-            
-        if single_level: 
-            return cls
-        
-        def DescentTree(cls,ix,ent_best):
-            
-            dash = np.array((1,),dtype='object')
-            dash[0]='_' 
-            unqcls = np.unique(cls[ix])
-            
-            if self.verbose: 
-                print(f"descending the tree")
-            for i in range(len(unqcls)):
-                newcls = cls.copy()
-                ix = np.flatnonzero(np.asarray(cls == unqcls[i]))
-                
-                subgraph = buildgraph(X[ix,:])
-                sol = minimize_scalar(OptLeiden, args = (subgraph,ix,newcls),
-                                                 bounds = (0.1,30), 
-                                                 method='bounded',
-                                                 options={'xatol': 1e-2, 'disp': 2})
-                ent = sol['fun']
-                if self.verbose: 
-                    print(f"split groun {i} into optimal parts, entropy {-ent}")
-                if ent < ent_best:
-                    if self.verbose: 
-                        print(f"split improves entropy - descending")
-                    ent_best=ent
-                    
-                    nxtlvl = fullgraph.community_leiden(resolution_parameter=initRes,objective_function='modularity').membership
-                    nxtlvl = np.asarray(nxtlvl).astype(str)
-                    newcls[cls==unqcls[i]] = cls[cls==unqcls[i]]+dash+nxtlvl
-                    cls = newcls.copy()
-                    cls = DescentTree(cls,ix,ent_best)
-                    
-            return(cls)
-        
-        cls = DescentTree(cls,np.arange(TG.N),ent_best) 
-        return cls
+    def convert_multinomial_to_treenomial(self,Env):
+         # create the treenomial distribution for all envs
+        (treemat,nrmtreemat) = self.TreeAsMat(return_nrm = True)
+        q_no = np.matmul(Env,treemat.T)
+        q_deno = np.matmul(Env,nrmtreemat.T)
+        q = q_no/q_deno
+        q[np.isnan(q)]=0
+        return(q)
+    
     
     def BuildTree(self,method='average'): 
         """ perform hierarchial clustering (wraps around scipy.cluster.hierarchy) 
