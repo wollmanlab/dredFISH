@@ -208,7 +208,7 @@ class View:
         ax = plt.gca()
         ax.add_collection(line_segments)
     
-    def plot(self):
+    def plot(self,return_fig = False):
         """
         plot the View. 
 
@@ -325,29 +325,29 @@ class CoherenceView(View):
             plt.scatter(x=x,y=y,s=5,c='w')
         
 
-# class RandomPolygonColorByTypeWithLines(RandomPolygonColorByType):
-#     def __init__(self,TMG,name = "polygons and edges / random colors",lvl = 0):
-#         super().__init__(TMG,name = name, lvl = lvl)
+class RandomPolygonColorByTypeWithLines(RandomPolygonColorByType):
+    def __init__(self,TMG,name = "polygons and edges / random colors",lvl = 0):
+        super().__init__(TMG,name = name, lvl = lvl)
 
-#     def set_view(self):
-#         # start with polygons in random colors
-#         super().set_view(TMG)
-#         edge_lvls = TMG.find_max_edge_level()
-#         edge_width = [e[1] for e in sorted(edge_lvls.items())]
-#         self.line_style['width'] = edge_width
-#         self.line_style['color'] = np.repeat('#48434299',len(edge_width))
+    def set_view(self):
+        # start with polygons in random colors
+        super().set_view(TMG)
+        edge_lvls = TMG.find_max_edge_level()
+        edge_width = [e[1] for e in sorted(edge_lvls.items())]
+        self.line_style['width'] = edge_width
+        self.line_style['color'] = np.repeat('#48434299',len(edge_width))
 
-# class OnlyLines(View):
-#     def __init__(self,TMG,name = "only lines"):
-#         super().__init__(TMG,name = name)
-#         self.edge_width = None
+class OnlyLines(View):
+    def __init__(self,TMG,name = "only lines"):
+        super().__init__(TMG,name = name)
+        self.edge_width = None
     
-#     def set_view(self):
-#         edge_lvls = self.TMG.find_max_edge_level()
-#         ew = np.array([float(e[1]) for e in sorted(edge_lvls.items())],dtype = 'float')
-#         self.edge_width = ew
-#         self.line_style['width'] = self.edge_width
-#         self.line_style['color'] = np.repeat('#48434299',len(self.edge_width))
+    def set_view(self):
+        edge_lvls = self.TMG.find_max_edge_level()
+        ew = np.array([float(e[1]) for e in sorted(edge_lvls.items())],dtype = 'float')
+        self.edge_width = ew
+        self.line_style['width'] = self.edge_width
+        self.line_style['color'] = np.repeat('#48434299',len(self.edge_width))
         
 class PolygonColorByType(View):
     """
