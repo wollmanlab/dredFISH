@@ -325,8 +325,8 @@ class CoherenceView(View):
         
 
 class RandomPolygonColorByTypeWithLines(RandomPolygonColor):
-    def __init__(self,TMG,name = "polygons and edges / random colors",lvl = 0):
-        super().__init__(TMG,name = name, lvl = lvl)
+    def __init__(self, TMG, name="polygons and edges / random colors", lvl=0):
+        super().__init__(TMG, name=name, lvl=lvl)
 
     def set_view(self):
         # start with polygons in random colors
@@ -334,11 +334,14 @@ class RandomPolygonColorByTypeWithLines(RandomPolygonColor):
         edge_lvls = self.TMG.find_max_edge_level()
         edge_width = [e[1] for e in sorted(edge_lvls.items())]
 
-        scale = 0.25 
-        base_width = 0.1 
+        # threshold to exclude edges below value
+        thr = self.lvl
+        base_width = 0.1
+        scaler = 0.25 
 
-        self.line_style['width'] = list(np.array(edge_width) * scale + base_width)
-        self.line_style['color'] = np.repeat('#48434299',len(edge_width))
+        # self.line_style['width'] = list((np.array(edge_width) >= thr).astype(float)*(1-base_width) + base_width)
+        self.line_style['width'] = list(np.array(edge_width) * scaler + base_width)
+        self.line_style['color'] = np.repeat('#48434299', len(edge_width))
 
 class OnlyLines(View):
     def __init__(self,TMG,name = "only lines"):
