@@ -21,7 +21,6 @@ import warnings
 import time
 from IPython import embed
 
-from dredFISH.Visualization.vor import bounding_box_sc, voronoi_polygons
 from dredFISH.Visualization.cell_colors import *
 from dredFISH.Visualization.vor import * 
 
@@ -341,17 +340,41 @@ class RandomPolygonColorByType(View):
         # create the colormap
         self.clrmp = ListedColormap(np.random.rand(len(np.unique(cell_types)),3))                
         
-class RandomPolygonColorByTypeWithLines(RandomPolygonColorByType):
-    def __init__(self,TMG,name = "polygons and edges / random colors",lvl = 0):
-        super().__init__(TMG,name = name, lvl = lvl)
+class RandomPolygonColorByTypeWithLines(RandomPolygonColor):
+    def __init__(self, TMG, name="polygons and edges / random colors", lvl=0):
+        super().__init__(TMG, name=name, lvl=lvl)
 
-    def set_view(self):
+    def set_view_weight(self):
         # start with polygons in random colors
-        super().set_view(TMG)
-        edge_lvls = TMG.find_max_edge_level()
+        super().set_view()
+        edge_lvls = self.TMG.find_max_edge_level()
         edge_width = [e[1] for e in sorted(edge_lvls.items())]
-        self.line_style['width'] = edge_width
-        self.line_style['color'] = np.repeat('#48434299',len(edge_width))
+
+        # threshold to exclude edges below value
+
+        base_width = 0.1
+        scaler = 0.25 
+
+        self.line_style['width'] = list(np.array(edge_width) * scaler + base_width)
+        self.line_style['color'] = np.repeat('#48434299', len(edge_width))
+
+    def set_view_line(self):
+        """
+        weights are flipped
+        """
+        # start with polygons in random colors
+        super().set_view()
+        edge_lvls = self.TMG.find_max_edge_level()
+        edge_width = [e[1] for e in sorted(edge_lvls.items())]
+        edge_width = list(max(edge_width)-np.array(edge_width))
+
+        # threshold to exclude edges below value
+        thr = self.lvl
+        base_width = 0.1
+
+        self.line_style['width'] = list((np.array(edge_width) >= thr).astype(float)*(1-base_width) + base_width)
+        self.line_style['color'] = np.repeat('#48434299', len(edge_width))
+
 
 class OnlyLines(View):
     def __init__(self,TMG,lvl,name = "only lines"):
