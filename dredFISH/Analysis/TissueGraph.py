@@ -516,10 +516,10 @@ class TissueMultiGraph:
             segs.append(line)
         
         # make sure the keys for edges are always sorted, a convenstion that will make life easier. 
-        keys = list(vor.ridge_dict.keys())
-        for i in range(len(keys)):
-            if keys[i][0]<=keys[i][1]:
-                keys[i]=(keys[i][1],keys[i][0])
+        ridge_points_sorted = np.sort(vor.ridge_points,axis=1)
+        keys=list()
+        for i in range(ridge_points_sorted.shape[0]):
+            keys.append(tuple(ridge_points_sorted[i,:]))
 
         self.Geoms['line'] = dict(zip(keys, segs))
         

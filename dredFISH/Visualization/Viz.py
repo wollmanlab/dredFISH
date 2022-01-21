@@ -21,7 +21,6 @@ import warnings
 import time
 from IPython import embed
 
-from dredFISH.Visualization.vor import bounding_box_sc, voronoi_polygons
 from dredFISH.Visualization.cell_colors import *
 from dredFISH.Visualization.vor import * 
 
@@ -272,8 +271,7 @@ class RandomPolygonColor(View):
         
         # create the colormap
         self.clrmp = ListedColormap(np.random.rand(self.TMG.N[self.lvl],3))
-
-
+        
 class PolygonShowCustomValues(View):
     """
     Show a user-provided vector color coded on whatever geo-units requested (cells, iso-zones, heterozones, neighborhoods) 
@@ -293,10 +291,11 @@ class PolygonShowCustomValues(View):
         self.polygon_style['scalar'] = scalar_mapping
         self.clrmp = 'hot'
         
+        
 class CoherenceView(View):
     def __init__(self,TMG,name = "Coherence"):
         super().__init__(TMG,name = name)
-        self.plot_points = True
+        self.plot_points_flag = True
     
     def set_view(self):
         
@@ -317,7 +316,7 @@ class CoherenceView(View):
         self.point_style['show'] = Peaks>-1 
         
     def plot_points(self):
-        if self.plot_points:
+        if self.plot_points_flag:
             x = np.array(self.TMG.Layers[0].X)
             x = x[self.point_style['show']]
             y = np.array(self.TMG.Layers[0].Y)
@@ -325,6 +324,22 @@ class CoherenceView(View):
             plt.scatter(x=x,y=y,s=5,c='w')
         
 
+        
+        
+class RandomPolygonColorByType(View):
+    def __init__(self,TMG,name = "polygons / random colors",lvl = 0):
+        super().__init__(TMG,name = f"{name} / level-{lvl}")
+        self.lvl = lvl
+
+    def set_view(self):
+        cell_types = self.TMG.map_to_cell_level(self.lvl)
+        # create scalar mapping by just using cell_type id
+        scalar_mapping = cell_types/np.max(cell_types)
+        self.polygon_style['scalar'] = scalar_mapping
+
+        # create the colormap
+        self.clrmp = ListedColormap(np.random.rand(len(np.unique(cell_types)),3))                
+        
 class RandomPolygonColorByTypeWithLines(RandomPolygonColorByType):
     def __init__(self,TMG,name = "polygons and edges / random colors",lvl = 0):
         super().__init__(TMG,name = name, lvl = lvl)
@@ -338,16 +353,37 @@ class RandomPolygonColorByTypeWithLines(RandomPolygonColorByType):
         self.line_style['color'] = np.repeat('#48434299',len(edge_width))
 
 class OnlyLines(View):
-    def __init__(self,TMG,name = "only lines"):
+    def __init__(self,TMG,lvl,name = "only lines"):
         super().__init__(TMG,name = name)
-        self.edge_width = None
+        self.edge_levels = None
+        self.edge_list = None
+        self.segs = list()
+        self.lvl = lvl
+        self.lvl_widths = np.array([0.25,0.5,1,2])
     
     def set_view(self):
-        edge_lvls = self.TMG.find_max_edge_level()
-        ew = np.array([float(e[1]) for e in sorted(edge_lvls.items())],dtype = 'float')
-        self.edge_width = ew
-        self.line_style['width'] = self.edge_width
-        self.line_style['color'] = np.repeat('#48434299',len(self.edge_width))
+        mx_edge_lvl_dict = self.TMG.find_max_edge_level()
+        geom_line_dict = self.TMG.Geoms['line']
+        self.edge_levels = np.zeros(len(TMG.Geoms['line']),dtype='int')
+        self.edge_list = np.zeros((len(self.TMG.Layers[0].SG.es),2))
+        for i in range(len(self.TMG.Layers[0].SG.es)): 
+            self.edge_list[i,:] = np.array(self.TMG.Layers[0].SG.es[i].tuple)
+            self.edge_levels[i] = int(mx_edge_lvl_dict[tuple(self.edge_list[i,:])])
+            self.segs.append(geom_line_dict[tuple(self.edge_list[i,:])])
+        
+        self.segs = np.array(self.segs)
+        self.line_style['width'] = self.lvl_widths[self.edge_levels]
+        self.line_style['color'] = np.repeat('#48434299',len(self.edge_levels))
+        
+    def plot_lines(self): 
+        # get lines sorted by key (which is by convention internally sorted)
+        wdth = self.lvl_widths[self.lvl]
+        ix = np.flatnonzero(self.line_style['width']==self.lvl_widths[self.lvl])
+            
+        line_segments = LineCollection(self.segs[ix],linewidths=wdth,
+                                           colors=self.line_style['color'])
+        ax = plt.gca()
+        ax.add_collection(line_segments)
         
 class PolygonColorByType(View):
     """
@@ -406,8 +442,7 @@ class PolygonColorByType(View):
             self.cmap_list = ['hsv']
             cmap = cm.get_cmap(self.cmap_list[0])
             clr = cmap(len(T2))
-        
-        
+
             
         # create scalar mapping by just using cell_type id
         self.polygon_style['scalar'] = cell_types
@@ -457,8 +492,8 @@ class PolygonColorByType(View):
             for i in range(feature_type_mat.shape[0]):
                 for j in range(feature_type_mat.shape[1]):
                     w = Wedge((xy[i,0],xy[i,1]), radi[i], cdf_in_angles[i,j], 
-                               cdf_in_angles[i,j+1],facecolor = V1.clr[ordr[j],:])
-                    c = Circle((xy[i,0],xy[i,1]),radi[i],edgecolor = self.clr[i,:],linewidth = 0.1*radi[i],fill = False)
+                               cdf_in_angles[i,j+1],width = 0.5*radi[i], facecolor = V1.clr[ordr[j],:])
+                    c = Circle((xy[i,0],xy[i,1]),0.5*radi[i],facecolor = self.clr[i,:],fill = True) # linewidth = 0.1*radi[i],
                     wedges.append(w)
                     wedges.append(c)
 
