@@ -21,6 +21,7 @@ import warnings
 import time
 from IPython import embed
 
+from dredFISH.Visualization.vor import bounding_box_sc, voronoi_polygons
 from dredFISH.Visualization.cell_colors import *
 from dredFISH.Visualization.vor import * 
 
@@ -204,8 +205,8 @@ class View:
             line_segments = LineCollection(segs[ix],
                                            linewidths=unq_widths[i],
                                            colors=self.line_style['color'][ix])
-        ax = plt.gca()
-        ax.add_collection(line_segments)
+            ax = plt.gca()
+            ax.add_collection(line_segments)
     
     def plot(self,return_fig = False):
         """
