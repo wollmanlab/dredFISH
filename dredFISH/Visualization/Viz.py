@@ -10,11 +10,13 @@ from matplotlib.colors import ListedColormap
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection, PolyCollection, PatchCollection
 from matplotlib.patches import Wedge, Circle
+import colorcet as cc
 
 from scipy.cluster.hierarchy import linkage, optimal_leaf_ordering
 from scipy.spatial.distance import jensenshannon, pdist, squareform
 
 from sklearn.manifold import MDS
+from rasterio.features import rasterize
 
 # for debuding mostly
 import warnings
@@ -322,9 +324,7 @@ class CoherenceView(View):
             y = np.array(self.TMG.Layers[0].Y)
             y = y[self.point_style['show']]
             plt.scatter(x=x,y=y,s=5,c='w')
-        
-
-        
+                
         
 class RandomPolygonColorByType(View):
     def __init__(self,TMG,name = "polygons / random colors",lvl = 0):
@@ -344,21 +344,7 @@ class RandomPolygonColorByTypeWithLines(RandomPolygonColor):
     def __init__(self, TMG, name="polygons and edges / random colors", lvl=0):
         super().__init__(TMG, name=name, lvl=lvl)
 
-    def set_view_weight(self):
-        # start with polygons in random colors
-        super().set_view()
-        edge_lvls = self.TMG.find_max_edge_level()
-        edge_width = [e[1] for e in sorted(edge_lvls.items())]
-
-        # threshold to exclude edges below value
-
-        base_width = 0.1
-        scaler = 0.25 
-
-        self.line_style['width'] = list(np.array(edge_width) * scaler + base_width)
-        self.line_style['color'] = np.repeat('#48434299', len(edge_width))
-
-    def set_view_line(self):
+    def set_view(self):
         """
         weights are flipped
         """
@@ -540,3 +526,39 @@ class PolygonColorByType(View):
             plt.xticks([], [])
             plt.yticks([], [])
             
+class RasterMap(View):
+
+    def __init__(self, TMG, name="Raster", lvl=0, color_map=cc.cm.rainbow):
+        super().__init__(TMG, name)
+
+        # label 
+        self.labels = self.TMG.map_to_cell_level(lvl) 
+
+        # coordinates of Polygons 
+        min_xy = self.TMG.Geoms["point"].min(0)
+        self.coords = [x - min_xy if len(x) > 0 else np.nan for x in self.TMG.Geoms["poly"]]
+
+        # init mask 
+        self.box_bounds = (self.TMG.Geoms["point"].max(0) - min_xy + 100).astype(int)[::-1]
+        self.mask = np.zeros(self.box_bounds)
+
+        # colormap
+        self.cm = color_map
+
+    def set_view(self):
+        """
+        Build Raster matrix from polygons using 256 - label value (assumes # labels < 256)
+        """
+        polys = [(Polygon(x), 256 - self.labels[idx]) for idx, x in enumerate(self.coords) if type(x)!= float]
+        self.mask = rasterize(polys, out_shape=self.box_bounds)
+        
+
+    def plot(self):
+        """
+        Plot Raster
+        """
+        plt.figure(figsize=self.figsize)
+        plt.imshow(self.mask, cmap=self.cm)
+        plt.xticks([], [])
+        plt.yticks([], [])
+
