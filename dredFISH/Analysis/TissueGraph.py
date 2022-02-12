@@ -23,15 +23,26 @@ from scipy.stats.contingency import crosstab
 from scipy.special import rel_entr
 from scipy.interpolate import interp2d, interp1d
 
+
+import sklearn
+import sklearn.decomposition
+from sklearn.decomposition import LatentDirichletAllocation
 from sklearn.neighbors import NearestNeighbors
 from sklearn.metrics import adjusted_rand_score,adjusted_mutual_info_score 
 
 from numpy.random import default_rng
 rng = default_rng()
 
+from sklearn.preprocessing import normalize
+from MERFISH_Objects.FISHData import *
+
+import functools
+import ipyparallel as ipp
+
 from collections import Counter
 
 import numpy as np
+import numpy
 import pandas as pd
 import torch
 
@@ -71,37 +82,6 @@ def count_values(V,refvals,sz = None,norm_to_one = True):
         Pv=Pv/np.sum(Pv)
     return(Pv)
 
-def treenomialJSD(Q1,Q2 = None):
-    """
-    calcualtes mean JSD of bernulli represenation of taxonomy tree. 
-    if Q2 is None, return pairwise distances fo all Q1 pairs
-    """
-    # in cases where Q2 is none, return pairwise distance of all Q1 elements.  
-    if Q2 is None:
-        print("calculating pairwise distances")
-        cmb = np.array(list(itertools.combinations(np.arange(Q1.shape[0]), r=2)))
-        D = treenomialJSD(Q1[cmb[:,0],:],Q1[cmb[:,1],:])
-        return D
-    
-    Q1 = torch.from_numpy(Q1)
-    Q2 = torch.from_numpy(Q2)
-
-    # calculate treenomialJSD between two matrices
-    M = (Q1+Q2)/2
-
-    # Q includes all the p and 1-p for each tree branch, so already doing "double" 
-    KL1 = Q1*(torch.log2(Q1/M))
-    KL1[Q1==0]=0
-    KL2 = Q2*(torch.log2(Q2/M))
-    KL2[Q2==0]=0
-    JSD = (KL1+KL2)
-    
-    JSDavg = torch.mean(JSD,axis=1)
-    # we get some numerical issues with values being -eps, so zero them out
-    JSDavg[JSDavg<0] = 0    
-    return(JSDavg.cpu().detach().numpy())
-
-
 def dist_emd(E1,E2,Dsim):
     
     if E2 is None: 
@@ -123,23 +103,12 @@ def dist_emd(E1,E2,Dsim):
     
     return D
 
-# def dist_nn(IX1,IX2 = None):
-#     # perform nn search (using accuracy x number of neighbors to improve accuracy)
-#     knn = pynndescent.NNDescent(X,n_neighbors = n_neighbors_with_extras ,metric=metric,diversify_prob=0.5,metric_kwds = metric_kwds)
-
-#     # get indices and remove self. 
-#     (indices,distances) = knn.neighbor_graph
-    
-
 def dist_jsd(M1,M2 = None):
     if M2 is None: 
         D = pdist(M1,metric = 'jensenshannon')
     else: 
         D = jensenshannon(M1,M2,base=2,axis=1)
-        
     return D
-
-
 
 
 def buildgraph(X,n_neighbors = 15,metric = None,accuracy = 4,metric_kwds = {}):
@@ -193,6 +162,11 @@ def buildgraph(X,n_neighbors = 15,metric = None,accuracy = 4,metric_kwds = {}):
     G.simplify()
     return G
 
+def lda_fit(n_topics,Env = None):
+    lda = sklearn.decomposition.LatentDirichletAllocation(n_components=n_topics)
+    B = lda.fit_transform(Env)
+    return B
+
 ###### Main TissueGraph classes
 
 class TissueMultiGraph: 
@@ -224,10 +198,10 @@ class TissueMultiGraph:
     def __init__(self,fullfilename = None):
         # init to empty
         self.Layers = list()
+        self.layers_graph = list() # a list of tuples that keep track of the relationship between different layers 
         self.Geoms = {}
         self.Views = {}
         self.cell_attributes = pd.DataFrame()
-        self.jsd_rnd_mat = None
         
         if fullfilename is not None:
             
@@ -247,110 +221,33 @@ class TissueMultiGraph:
                 
             if hasattr(TMGload,'cell_attributes'):
                 self.cell_attributes = TMGload.cell_attributes
-            
 
         return None
     
     def save(self,fullfilename):
         """ pickle and save
         """
+        self.dview=None
         pickle.dump(self,open(fullfilename,'wb'),recurse=True)
-    
-    @property    
-    def jsd_rnd_effect(self):
-        if self.jsd_rnd_mat is None:
-            T = self.Layers[0].Type.copy()
-            unqlbl = np.unique(self.Layers[0].Type)
-            env_n = 100
-            env_sz = np.arange(1,5000,100)
-            jsd_sz_depened = np.zeros((env_sz.shape[0],env_sz.shape[0]));
-            for j in range(len(env_sz)):
-                for k in range(len(env_sz)):
-                    RandomEnvs1 = np.zeros((env_n,len(unqlbl)))
-                    RandomTypes1 = np.random.choice(T,(env_n,env_sz[j]))
-                    RandomEnvs2 = np.zeros((env_n,len(unqlbl)))
-                    RandomTypes2 = np.random.choice(T,(env_n,env_sz[k]))
-                    for i in range(env_n):
-                        RandomEnvs1[i,:]=np.bincount(RandomTypes1[i,:],minlength=len(unqlbl))
-                        RandomEnvs2[i,:]=np.bincount(RandomTypes2[i,:],minlength=len(unqlbl))
-                    d_rnd = jensenshannon(RandomEnvs1,RandomEnvs2,axis=1,base=2)
-                    jsd_sz_depened[j,k] = d_rnd.mean()
-            jsd_rnd_lookup = jsd_sz_depened
-            f_jsd_rnd = interp2d(env_sz,env_sz,jsd_rnd_lookup)
-            self.jsd_rnd_mat = f_jsd_rnd(np.arange(5001),np.arange(5001))
-        return self.jsd_rnd_mat
-    
-    def edge_KL_score(self):
-        T = self.Layers[1].Type
-        EL = self.Layers[1].SG.get_edgelist()
-        EL = np.array(EL).astype("int")
-        (avals, xvals), xtab = crosstab(T[EL[:,0]], T[EL[:,1]])
-        xtab=xtab/xtab.sum()
 
-        _,Ptypes = np.unique(T,return_counts=True)
-        Ptypes = Ptypes/Ptypes.sum()
-        Ptypes = Ptypes[:,None]
-        rndtab = np.matmul(Ptypes,Ptypes.T)
+    def load_and_normalize_data(self,base_path,dataset):
 
-        KL = rel_entr(xtab,rndtab)
-        KL[KL<0]=0
-        KL = KL/KL.max()
-        return(KL)
-    
-    def dist_KLpairing(self,M1,M2):
-    
-        KL = self.edge_KL_score()
+        fishdata = FISHData(os.path.join(base_path,'fishdata'))
+        data = fishdata.load_data('h5ad',dataset=dataset)
+        data.obs_names_make_unique()
 
-        sz1 = M1.sum(axis=1)
-        sz2 = M2.sum(axis=1)
-        ix_ignore = np.logical_or(sz1==0, sz2==0)
-        sz1[ix_ignore]=1
-        sz2[ix_ignore]=1
+        data.X = data.layers['total_vectors']
+        data = data[np.isnan(data.X.max(1))==False]
 
-        M1cmsm = np.cumsum(M1,axis=1)
-        M2cmsm = np.cumsum(M2,axis=1)
+        data.X = data.X/data.obs['total_signal'][:,None]
+        data.X = data.X - np.array([np.percentile(data.X[:,i],25) for i in range(data.X.shape[1])])
+        data.X = data.X / np.array([np.percentile(data.X[:,i],75) for i in range(data.X.shape[1])])
+        data.X = normalize(data.X)
 
-        pairs_to_samples = 50
-        n_types = self.Ntypes[0]
-        rints1 = rng.integers(low=0, high=sz1, size=(pairs_to_samples,len(sz1))).T
-        rints2 = rng.integers(low=0, high=sz2, size=(pairs_to_samples,len(sz2))).T
-        Ppairs = np.zeros(M1.shape[0])
+        XY = np.asarray([data.obs['stage_y'], data.obs['stage_x']])
+        XY = np.transpose(XY)
+        return (XY,data.X)
 
-        for i in range(pairs_to_samples):
-            rints1_mat = rints1[:,i]
-            rints1_mat = rints1_mat[:,None]
-            Trnd1 = np.argmax(M1cmsm>rints1_mat,axis=1)
-            rints2_mat = rints2[:,i]
-            rints2_mat = rints2_mat[:,None]
-            Trnd2 = np.argmax(M2cmsm>rints2_mat,axis=1)
-            Ppairs += KL[Trnd1,Trnd2]
-
-        Ppairs=Ppairs/pairs_to_samples
-        Ppairs = Ppairs/KL.max()
-        Ppairs[ix_ignore]=1
-        return(Ppairs)
-
-    def dist_mix_envprob_and_jsd(self,E1,E2 = None):
-
-        jsd_rnd_mat = self.jsd_rnd_effect
-        env_sz_mx = jsd_rnd_mat.shape[0]
-        if E2 is None: 
-            cmb = np.array(list(itertools.combinations(np.arange(E1.shape[0]), r=2)))
-            scr = self.dist_mix_envprob_and_jsd(E1[cmb[:,0],:],E1[cmb[:,1],:])
-        else:
-            sz1 = E1.sum(axis=1).astype('int')
-            sz2 = E2.sum(axis=1).astype('int')
-            sz1[sz1>env_sz_mx]=env_sz_mx
-            sz2[sz2>env_sz_mx]=env_sz_mx
-
-            small_sample_weights = jsd_rnd_mat[sz1,sz2]
-
-            scr1_KLpair = dist_KLpairing(E1,E2)
-            scr2_JSD = jensenshannon(E1,E2,base=2,axis=1)
-
-            scr = small_sample_weights * scr1_KLpair + (1-small_sample_weights) * scr2_JSD
-
-        return(scr)
         
     def create_cell_and_zone_layers(self,XY,PNMF,celltypes = None): 
         """
@@ -381,6 +278,8 @@ class TissueMultiGraph:
         NewLayer = self.Layers[0].contract_graph(celltypes)
         self.Layers.append(NewLayer)
         
+        self.layers_graph.append((0,1))
+        
         # add feature graph - for zones, this graph will have one node per type. 
         self.Layers[1].FG = self.Layers[-2].FG.copy()
         self.Layers[1].FG.contract_vertices(celltypes)
@@ -399,281 +298,78 @@ class TissueMultiGraph:
         
         return None
     
-    def find_heterozones_based_on_coherence(self, ordr = 1,f_dist = dist_jsd,
-                                                  f_transform = lambda x: -x,
-                                                  smooth_ordr = 3,smooth_kernel=np.array([0.4,0.3,0.2,0.1]),
-                                                  median_suppress_ordr = 5 ): 
-        """
-        Creating heterozones and neighborhood layers based on local coherence. 
-        Initial guess of heterozone locaiton
-        """
-        # first create the landscape - calc coherence and do local averaging (and nan removal)
-        EdgeWeight,NodeWeight = self.Layers[1].calc_graph_env_coherence(ordr,f_dist)
-        NodeWeight = f_transform(NodeWeight)
+    def find_topics(self,ordr=4,max_num_of_topics = 120,use_parallel = True):
+        # get local environments per cell and calculate local environment cell type frequencies 
+        Env = self.Layers[0].extract_environments(ordr=ordr)
+        row_sums = Env.sum(axis=1)
+        row_sums = row_sums[:,None]
+        Env = Env/row_sums
+        Ntopics = np.arange(2,max_num_of_topics)  
         
-        NodeWeight = self.Layers[1].graph_local_avg(NodeWeight,ordr = smooth_ordr,kernel = smooth_kernel)
-        
-        cell_lvl_coherence = self.map_to_cell_level(1,NodeWeight)
-        self.cell_attributes['coherence'] = cell_lvl_coherence
-        
-        NodeWeight_med_filt = self.Layers[0].graph_local_median(cell_lvl_coherence,ordr = median_suppress_ordr)
-        
-        HoodId,DistToPeak = self.Layers[0].watershed(NodeWeight_med_filt)
-        self.cell_attributes['watersheds'] = DistToPeak
-        hz_id = np.zeros(self.Layers[1].N)
-        iz_ix = self.Layers[1].UpstreamMap
-        for i in range(self.Layers[1].N):
-            hz_id[i] = np.array(mode(HoodId[iz_ix==i])[0])
-        
-        # make sure all hz_id are continous and if they are not, break them using graph contraction
-        CG = self.Layers[1].contract_graph(hz_id)
-        Id = np.arange(CG.N)
-        hz_id = Id[CG.UpstreamMap]
-        
-        return hz_id
-    
-    def create_heterozone_and_neighborood_layers(self,hz_id,min_neigh_size = 10,ordr = 3,opt_params = {'iters' : 25, 'n_consensus' : 100},f_dist = dist_jsd):
-        """
-        Function gets vector of heterozones id (size of self.N[1]) and uses it 
-        to add heterozones and neighborhoods to the TMG
-        """
-    
-        # add heterozone layer: 
-        HZlayer = self.Layers[1].contract_graph(hz_id)
-        if len(self.Layers)==2:
-            self.Layers.append(HZlayer)
-        else: 
-            self.Layers[2] = HZlayer
-        self.Layers[2].layer_type = 'heterozones'
-        #self.fill_holes(2,min_neigh_size)
-        
-        # calculate true environments vector for all communities: 
-        hz_env = self.Layers[1].extract_environments(typevec = hz_id)
-        
-        # save hz enz as feature mat data
-        self.Layers[2].feature_mat = hz_env
-                     
-        # calcualte pairwise distances between environments using treenomial_dist and build feature graph
-        D = f_dist(hz_env)
-        Dsqr = squareform(D)
-        self.Layers[2].FG = buildgraph(Dsqr,metric = 'precomputed')
-
-        # cluster and give each heterozone it's type
-        self.Layers[2].Type = self.Layers[2].multilayer_Leiden_with_cond_entropy(opt_params = opt_params)
-        
-        # create neighborhood layers through graph contraction
-        NeihLayers = self.Layers[2].contract_graph()
-        if len(self.Layers)==3:
-            self.Layers.append(NeihLayers)
-        else: 
-            self.Layers[3] = NeihLayers
-            
-        regions_mapped_to_cells = self.map_to_cell_level(3,VecToMap = np.arange(self.Layers[3].N))
-        feature_mat = self.Layers[0].extract_environments(typevec = regions_mapped_to_cells)
-        self.Layers[3].feature_mat = feature_mat    
-        
-        # replace type of heterozones that are very small with local neighborhood type (labelprop) 
-        self.fill_holes(3,min_neigh_size)
-
-        # fix heterozone type vector as types might have changed after removing small gaps
-        self.Layers[2].Type = self.Layers[3].Type[self.Layers[3].UpstreamMap]
-        
-        # create the feature_mat and feature_type_mat 
-        regions_types_mapped_to_cells = self.map_to_cell_level(3)
-        feature_type_mat = self.Layers[0].extract_environments(typevec = regions_types_mapped_to_cells)
-        # sum_of_rows = feature_type_mat.sum(axis=1)
-        # feature_type_mat = feature_type_mat / sum_of_rows[:, None]
-        self.Layers[3].feature_type_mat = feature_type_mat
-        
-    def refine_heterozone_and_neighborood_layers(self,min_hz_diff = 0, min_hz_size = 2,f_dist = dist_jsd):
-
-        # only keep edges that are of across two neighborhood types
-        Env_hz = self.Layers[2].feature_mat.copy()
-
-        # test for each one of them if flipping it increases the JSD distance 
-        # between the heterozone it used to belond to and the neighborhood type. 
-
-        flipped = list();
-        n_flipped = np.zeros(15);
-        start=time.time()
-        
-        org_type = self.Layers[2].Type.copy()
-        self.Layers[2].Type = np.arange(self.N[2])
-        self.fill_holes(2,min_hz_size)
-        self.Layers[2].Type = org_type
-        
-        for j in range(len(n_flipped)):
-            ix = self.Layers[3].UpstreamMap
-            ix = ix[self.Layers[2].UpstreamMap]
-            isozone_neigh_types = self.Layers[3].Type[ix]
-            # find iso-zones that are on the border between neighborhoods 
-            EL = self.Layers[1].SG.get_edgelist()
-            EL = np.array(EL).astype("int")
-            EL = EL[isozone_neigh_types[EL[:,0]] != isozone_neigh_types[EL[:,1]],:]
-            
-             # remove from EL isozones that only have 1 neighbor across types
-            iz_ids,cnt = np.unique(np.hstack((EL[:,0],EL[:,1])),return_counts=True)
-            iz_ids = iz_ids[cnt>2]
-            # remove iz that were already flipped
-            iz_ids = np.setdiff1d(iz_ids,flipped)
-            to_keep = np.logical_or(np.isin(EL[:,0],iz_ids),np.isin(EL[:,1],iz_ids))
-            EL = EL[to_keep,:]
-
-            Env_neigh = self.Layers[3].feature_type_mat[self.Layers[2].Type,:]
-            Dhz_ne = f_dist(Env_hz,Env_neigh)
-
-            for i in range(EL.shape[0]): 
-                if not np.isin(EL[i,0],iz_ids) and not np.isin(EL[i,1],iz_ids):
-                    continue
-                elif np.isin(EL[i,0],iz_ids) and not np.isin(EL[i,1],iz_ids): 
-                    lr = np.array([0,1])
-                elif np.isin(EL[i,1],iz_ids) and not np.isin(EL[i,0],iz_ids):
-                    lr = np.array([1,0])
-                else:        
-                    # permute edge order (it's undirected and who is 0 and who is 1 is arbitrary)
-                    lr = np.random.permutation(2)
-
-                # keep all indexes for the pair in lr
-                iz = EL[i,lr]
-                iz_types = self.Layers[1].Type[EL[i,lr]]
-
-                # get the two env for lr heterozones
-                hz = self.Layers[2].UpstreamMap[iz]
-                hz_types = self.Layers[2].Type[hz]
-                dz_env = Env_hz[hz,:]
-
-                # flip (move from a type from 0 to 1 (of lr))
-                dz_env[0,iz_types[0]] -= 1
-                dz_env[1,iz_types[0]] += 1
-
-                # calculate JSD for both environments
-                newJSD = cdist(dz_env,self.Layers[3].feature_type_mat[hz_types,:],metric= 'jensenshannon')
-                JSDsum = newJSD.flatten()[[0,3]].sum()
-
-                # update neighborhoods
-                if JSDsum - Dhz_ne[hz].sum() < min_hz_diff:
-                    # update heterozone composition by changing mapping between isozones and heterozones
-                    self.Layers[2].UpstreamMap[iz[0]] = self.Layers[2].UpstreamMap[iz[1]]
-                    Env_hz[hz,:]=dz_env
-                    flipped.append(iz[0])
-                    
-                # remove the iz from further considerations
-                iz_ids = np.setdiff1d(iz_ids,iz[0])
-
-            print(f"{j}: {time.time()-start:.2f} flipped: {len(flipped)}")
-            n_flipped[j] = len(flipped)
-            if j>0 and n_flipped[j]- n_flipped[j-1] < 1: 
-                break
-            
-        # bookeeping on hz ids: 
-        CG = self.Layers[1].contract_graph(self.Layers[2].UpstreamMap)
-        Id = np.arange(CG.N)
-        hz_id = Id[CG.UpstreamMap]
-
-        return(hz_id)
-
-        
-    def finalize_heterozone_and_neighborhood_layers(self):
-        """
-        Adds a few more attributes to neighnborhood layer: type2
-        """
-        # add feature graph - for regions this graph will have one node per type. 
-        D = dist_emd(self.Layers[3].feature_type_mat,None,self.Layers[1].Dtype)
-        self.Layers[3].Dtype = squareform(D)
-        self.Layers[3].FG = buildgraph(self.Layers[3].Dtype,metric = 'precomputed',n_neighbors = 5)
-        
-        self.Layers[3].calc_type2()
-        self.Layers[3].layer_type = 'neighborhood'
-    
-#     def create_communities_and_region_layers(self,min_neigh_size = 10,ordr = 3,metric_kwds = {}):
-#         """
-#         Creating heterozones and neighborhood layers. 
-#         heterozone layer is created based on watershed using local env coherence. 
-#         Region layer is calculated based on optimization of cond entropy betweens community and regions. 
-#         """
-#         # find existing environment 
-#         Env = self.Layers[1].extract_environments(ordr=ordr)
-        
-#         # add entropy attribute to all cells
-#         self.cell_attributes['local_entropy'] = self.map_to_cell_level(1,entropy(Env,axis=1))
-        
-#         # perform watershed with seeds as "peaks" in NodeWeight graph
-        
-#         # first create the landscape - calc coherence and do local averaging (and nan removal)
-#         EdgeWeight,NodeWeight = self.Layers[1].calc_graph_env_coherence(Env,dist_jsd)
-#         smooth_ordr = 3
-#         smooth_kernel=np.array([0.4,0.3,0.2,0.1])
-#         NodeWeight = self.Layers[1].graph_local_avg(NodeWeight,ordr = smooth_ordr,kernel = smooth_kernel)
-        
-#         self.cell_attributes['coherence'] = self.map_to_cell_level(1,NodeWeight)
-        
-#         HoodId,DistToPeak = self.Layers[1].watershed(NodeWeight)
-#         self.cell_attributes['watersheds'] = self.map_to_cell_level(1,DistToPeak)
+        if use_parallel: 
+            # start parallel engine
+            rc = ipp.Client()
+            self.dview = rc[:]
+            self.dview.push({'Env': Env})
+            with self.dview.sync_imports():
+                import sklearn.decomposition
                 
-#         # add heterozone layer: 
-#         NewLayer = self.Layers[1].contract_graph(HoodId)
-#         self.Layers.append(NewLayer)
-#         self.Layers[2].layer_type = 'heterozones'
-        
-#         # calculate true environments vector for all communities: 
-#         WatershedEnvs = self.Layers[1].extract_environments(typevec = HoodId)
-        
-#         # save in taxonomy data
-#         self.Layers[2].feature_mat = WatershedEnvs
-                     
-#         # calcualte pairwise distances between environments using treenomial_dist and build feature graph
-#         D = dist_jsd(WatershedEnvs)
-#         Dsqr = squareform(D)
-#         self.Layers[2].FG = buildgraph(Dsqr,metric = 'precomputed')
+            g = functools.partial(lda_fit, Env=Env)
+            result = self.dview.map_sync(g,Ntopics)
+        else: 
+            result = list()
+            for i in range(len(Ntopics)):
+                lda = LatentDirichletAllocation(n_components=Ntopics[i])
+                B = lda.fit_transform(Env)
+                result.append(B)
+                
+        IDs = np.zeros((self.N[0],len(result)))
+        for i in range(len(result)):
+            IDs[:,i] = np.argmax(result[i],axis=1)
+        ID_entropy=np.zeros(IDs.shape[1])
+        Type_entropy = np.zeros(IDs.shape[1])
+        for i in range(IDs.shape[1]):
+            _,cnt = np.unique(IDs[:,i],return_counts=True)
+            cnt=cnt/cnt.sum()
+            Type_entropy[i] = entropy(cnt,base=2) 
+            
+        topics = IDs[:,np.argmax(Type_entropy)]
+        unq,ix = np.unique(topics,return_inverse=True)
+        id = np.arange(len(unq))
+        topics = id[ix]
+        return topics
 
-#         # TODO - check alternatives
-#         # D = self.Layers[-2].TX.treenomial_dist(WatershedEnvs)
-#         # OR 
-#         # self.Layers[-1].FG = buildgraph(Dsqr,metric = 'kantorovich',metric_kwds = metric_kwds)
+    
+    def create_region_layer(self,topics,min_neigh_size = 10):
+        """
+        Function gets vector of topicid (one per cell) and uses it 
+        to add regions to the TMG
+        """
+    
+        # create region layers through graph contraction
+        NeihLayers = self.Layers[0].contract_graph(topics)
+        self.Layers.append(NeihLayers)
+        current_layer_id = len(self.Layers)-1
+        self.layers_graph.append((0,current_layer_id))
         
-#         # cluster and create regions graph
-#         commtypes = self.Layers[2].multilayer_Leiden_with_cond_entropy()
-        
-#         # add types to comm/microenv layer and than contract to get regions
-#         self.Layers[2].Type = commtypes
-        
-#         NewLayer = self.Layers[2].contract_graph(commtypes)
-#         self.Layers.append(NewLayer)
-        
-#         # replace type of heterozones that are very small with local type (labelprop) 
-#         self.fill_holes(3,min_neigh_size)
+        # replace type of heterozones that are very small with local region type (labelprop) 
+        # self.fill_holes(current_layer_id,min_neigh_size)
 
-#         # fix heterozone type vector as types might have changed after removing small gaps
-#         self.Layers[2].Type = self.Layers[3].Type[self.Layers[3].UpstreamMap]
+        # create the feature_mat and feature_type_mat 
+        regions_mapped_to_cells = self.map_to_cell_level(current_layer_id,self.Layers[current_layer_id].Type)
+        feature_type_mat = self.Layers[0].extract_environments(typevec = regions_mapped_to_cells)
+        self.Layers[current_layer_id].feature_type_mat = feature_type_mat
         
-#         # create the feature_mat and feature_type_mat 
-#         regions_types_mapped_to_cells = self.map_to_cell_level(3)
-#         feature_type_mat = self.Layers[0].extract_environments(typevec = regions_types_mapped_to_cells)
-#         sum_of_rows = feature_type_mat.sum(axis=1)
-#         feature_type_mat = feature_type_mat / sum_of_rows[:, None]
-#         self.Layers[3].feature_type_mat = feature_type_mat
+        row_sums = feature_type_mat.sum(axis=1)
+        row_sums=row_sums[:,None]
+        feature_type_mat=feature_type_mat/row_sums
         
-#         regions_mapped_to_cells = self.map_to_cell_level(3,VecToMap = np.arange(self.Layers[3].N))
-#         feature_mat = self.Layers[0].extract_environments(typevec = regions_mapped_to_cells)
-#         sum_of_rows = feature_mat.sum(axis=1)
-#         feature_mat = feature_mat / sum_of_rows[:, None]
-#         self.Layers[3].feature_mat = feature_mat
+        D = dist_emd(feature_type_mat,None,self.Layers[1].Dtype)
+        self.Layers[current_layer_id].Dtype = squareform(D)
+        self.Layers[current_layer_id].FG = buildgraph(self.Layers[current_layer_id].Dtype,metric = 'precomputed',n_neighbors = 5)
         
-#         # add feature graph - for regions this graph will have one node per type. 
-#         D = dist_emd(self.Layers[3].feature_type_mat,None,self.Layers[1].Dtype)
-#         self.Layers[3].Dtype = squareform(D)
-#         self.Layers[3].FG = buildgraph(self.Layers[3].Dtype,metric = 'precomputed',n_neighbors = 5)
-        
-#         # PyNNDescent implementation of EMD (kantorovich) is slower than pyemd 
-#         # might be worth going back to if for the approximate neighbor aspect, but for ~100 types it's x3 slower and doesn't give distance
-#         # matrix. 
-#         # self.Layers[-1].FG = buildgraph(self.Layers[3].feature_type_mat,
-#         #                                 n_neighbors = 5, 
-#         #                                 metric = 'kantorovich',
-#         #                                 metric_kwds={'cost' : self.Layers[1].Dtype})
-
-#         self.Layers[3].calc_type2()
-#         self.Layers[3].layer_type = 'neighborhood'
+        self.Layers[current_layer_id].calc_type2()
+        self.Layers[current_layer_id].layer_type = 'region'
 
         
     def fill_holes(self,lvl_to_fill,min_node_size):
@@ -708,12 +404,16 @@ class TissueMultiGraph:
         new_type = region_type_filled[ix_zero_to_two]
 
         # recreate the layer
+        upstream_layer_ix = self.find_upstream_layer(lvl_to_fill)
         NewLayer = self.Layers[lvl_to_fill-1].contract_graph(new_type)
         self.Layers[lvl_to_fill] = NewLayer
         if update_feature_mat_flag:
             self.Layers[lvl_to_fill].feature_mat = feature_mat[fixed,:]
 
-                    
+    def find_upstream_layer(self,layer_id):
+        upstream_layer_id=0
+        return upstream_layer_id
+    
     def map_to_cell_level(self,lvl,VecToMap = None,return_ix = False):
         """
         Maps values to first layer of the graph, mostly used for plotting. 
@@ -725,21 +425,22 @@ class TissueMultiGraph:
         elif len(VecToMap) != self.Layers[lvl].N:
             raise ValueError("Number of elements in VecToMap doesn't match requested Layer size")
             
-        # if needed (i.e. not already at cell level) expand indexing backwards in layers    
-        if lvl>0:
-            ix=self.Layers[lvl].UpstreamMap
-            for i in np.arange(lvl-1,0,-1):
-                ix=ix[self.Layers[i].UpstreamMap]
-            VecToMap = VecToMap[ix]
+        # if needed (i.e. not already at cell level) expand indexing backwards in layers following layers_graph
+        ix=self.Layers[lvl].UpstreamMap
+        while lvl>0:
+            lvl = self.find_upstream_layer(lvl)
+            ix=ix[self.Layers[lvl].UpstreamMap]
+        
+        VecToMap = VecToMap[ix].flatten()
         
         if return_ix: 
             return (VecToMap,ix)
         else: 
             return VecToMap
     
-    def find_max_edge_level(self):
+    def find_regions_edge_level(self):
         """
-        determine the maximal level that an edges between two cell still exists in, i.e. it was not contracted
+        determine whch cell edges (layer 0) are also edges between regions (layer 2) 
         returns a dict with sorted edge tuples as keys and max level is values.   
         """
         
@@ -752,12 +453,10 @@ class TissueMultiGraph:
             edge_list.append(t)
         
         np_edge_list = np.asarray(edge_list)
-        max_edge_levels = np.zeros(len(edge_list))
-        for lvl in range(1,len(self.Layers)):
-            Vs = self.map_to_cell_level(lvl,np.arange(self.N[lvl]))
-            max_edge_levels += Vs[np_edge_list[:,0]] == Vs[np_edge_list[:,1]]
-            
-        return dict(zip(edge_list,max_edge_levels))
+        region_id = self.map_to_cell_level(2,np.arange(self.N[2]))
+        np_edge_list = np_edge_list[region_id[np_edge_list[:,0]] != region_id[np_edge_list[:,1]],:]
+        region_edge_list = [(np_edge_list[i,0],np_edge_list[i,1]) for i in range(np_edge_list.shape[0])]            
+        return region_edge_list
     
     @property
     def N(self):
@@ -859,30 +558,7 @@ class TissueMultiGraph:
         # add the view to the view dict
         self.Views[view.name]=view
         
-    def plot_cond_entropy_at_different_resolutions(self,lvl,pth = None):
-        
-        EntropyCalcsL1 = self.Layers[lvl].calc_entropy_at_different_Leiden_resolutions()
-        fig= plt.figure(figsize = (8,8))
-        ax1 = plt.gca()
-        yopt = self.cond_entropy[1]
-        xopt = self.Ntypes[1]
-        ax1.plot(EntropyCalcsL1['Ntypes'],EntropyCalcsL1['Entropy'])
-        ylm = ax1.get_ylim()
-        ax1.plot([xopt,xopt],[ylm[0], yopt],'r--',linewidth=1)
-        ax1.set_xlabel('# of types',fontsize=18)
-        ax1.set_ylabel('H (Map | Type)',fontsize=18)
-        fig = plt.gcf()
-        left, bottom, width, height = [0.6, 0.55, 0.25, 0.25]
-        ax2 = fig.add_axes([left, bottom, width, height])
-        ax2.semilogx(EntropyCalcsL1['Ntypes'],EntropyCalcsL1['Entropy'])
-        ylm = ax2.get_ylim()
-        ax2.plot([xopt,xopt],[ylm[0], yopt],'r--',linewidth=1)
-
-        if pth is not None: 
-            lvl=lvl+1
-            fig.savefig(pth + "CondEntL" + lvl +".png")
-        
-        return(fig)
+    
         
 
 class TissueGraph:
@@ -918,15 +594,17 @@ class TissueGraph:
         self.layer_type = None # label layers by their type
         self.Type = None # Type vector
         
+        self.SG = None # spatial graph
         self.feature_mat = None # feature - one per vertex in SG
         
         # only avaliable for even layers (i.e. iso-zones & regions)
         self.feature_type_mat = None # features - one per type (i.e. vertex in FG)
         self.Dtype = None # pairwise distace vector storing type similarities (used for Viz)
         self.Type2 = None # classification of the unique types into coarse level types (used for Viz)
-            
-        self.SG = None # spatial graph
         self.FG = None # Feature graph (that was used to create types)
+        
+        
+        
 
         
         self.UpstreamMap = None
@@ -1156,9 +834,10 @@ class TissueGraph:
             raise ValueError('either order or typevec must be provided, not both (or none)')
         
         unqlbl = np.unique(self.Type)
-        Env = np.zeros((len(ind),len(unqlbl)))
+        Env = np.zeros((len(ind),len(unqlbl)),dtype=np.int64)
         ndsz = self.node_size.copy().astype(np.int64)
-        AllTypes = [self.Type[ix] for ix in ind]
+        int_types = self.Type.astype(np.int64)
+        AllTypes = [int_types[ix] for ix in ind]
         AllSizes = [ndsz[ix] for ix in ind]
         for i in range(Env.shape[0]):
             Env[i,:]=np.bincount(AllTypes[i],weights = AllSizes[i],minlength=len(unqlbl))
@@ -1191,38 +870,6 @@ class TissueGraph:
 
     
     def watershed(self,CellCoherence):
-        
-#         # create two directed graphs based on Zone graph
-#         # first is directed version of the zone graph with edge weights
-#         # based on local gradient of coherence score
-#         # second is a copy of the first but keeping only increasing edges
-#         min_edge_weight = 0
-#         EL = np.asarray(self.SG.get_edgelist()).astype("int")
-#         G = Graph(n=self.N,edges = EL,directed = False)
-#         G = G.as_directed()
-#         EL = np.asarray(G.get_edgelist()).astype("int")
-#         grad = CellCoherence[EL[:,0]]-CellCoherence[EL[:,1]]
-#         ix = np.flatnonzero(grad<min_edge_weight)
-#         edge_tuples = list(map(tuple, EL[ix,:]))
-#         G2 = G.copy()
-#         G2.delete_edges(edge_tuples) 
-#         G2.es['weights']=grad[grad>min_edge_weight]-min_edge_weight
-#         outdeg = np.array(G2.outdegree(),dtype='int')
-#         peaks = np.flatnonzero(outdeg==0)
-        
-#         # find peaks and remove small regions with only one cell
-#         Init = -np.ones(self.N)
-#         Fixed = np.zeros(self.N)
-#         Fixed[peaks]=1
-#         Fixed = Fixed.astype('bool').flatten()
-#         Init[peaks]=np.arange(len(peaks))
-#         Init[~Fixed]=-1
-#         grad = grad-min(grad)
-#         HoodId = G.community_label_propagation(weights=grad, initial=Init, fixed=Fixed).membership
-#         HoodId = np.array(HoodId,dtype='int')
-#         unq,cnt = np.unique(HoodId,return_counts = True)
-#         peaks = peaks[cnt>1]
-
         is_peak = np.zeros(CellCoherence.shape).astype('bool')
         ind = self.SG.neighborhood(order = 1,mindist=1)
         for i in range(len(ind)):
@@ -1236,9 +883,6 @@ class TissueGraph:
                                                           unweighted=False, 
                                                           limit=np.inf, 
                                                           min_only=True)
-        # Dij_all = G.shortest_paths(target=peaks,weights = grad)
-        # ClosestPeak = np.argmin(Dij_all,axis=1)
-        # Dij_min = np.min(Dij_all,axis=1)
         
         # renumber all closest peak continously
         u,ix_rev = np.unique(ClosestPeak, return_inverse=True)
@@ -1253,93 +897,8 @@ class TissueGraph:
         
         return (ClosestPeak,Dij_min)
         
-#         # find fixed points, i.e. local minima (lower scores are higher 
-#         hood = self.SG.neighborhood(order=hood_size,mindist=1)
-#         Init = -np.ones(len(hood))
-#         Fixed = np.zeros(len(hood))
 
-#         for i in range(len(hood)):
-#             if np.all(NodeWeight[i] <= NodeWeight[hood[i]]):
-#                 Init[i] = i
-#                 Fixed[i] = 1
-
-#         Fixed = Fixed.astype('bool').flatten()
-#         u,ix_rev = np.unique(Init, return_inverse=True)
-#         Init=u[ix_rev]
-#         Init[~Fixed]=-1
-        
-#         if only_find_peaks: 
-#             return Init
-#         else:
-#             # label_prop is stochastic and does not guarantee continuous communities. 
-#             # so after label props break any split community into parts. Using similar logic as in contract_graph() method
-#             HoodId = self.SG.community_label_propagation(weights=None, initial=Init, fixed=Fixed).membership
-#             EL = np.asarray(self.SG.get_edgelist()).astype("int")
-#             EL = EL[np.take(HoodId,EL[:,0]) == np.take(HoodId,EL[:,1]),:]
-#             hoodG = Graph(n=self.N, edges=EL)
-#             hoodG = hoodG.as_undirected().simplify()
-#             cmp = hoodG.components()
-#             HoodId = np.array(cmp.membership)
-
-#             return HoodId
-                           
-#     def calc_graph_env_coherence(self,Env,f_dist,*args):
-#         # find for each edges the two environments that it connects
-#         EL = np.asarray(self.SG.get_edgelist()).astype("int")
-        
-#         Env1 = Env[EL[:,0],:]
-#         Env2 = Env[EL[:,1],:]
-        
-#         EdgeWeight = f_dist(Env1,Env2,*args)
-        
-#         # create node weights: 
-#         df = pd.DataFrame(np.hstack((EdgeWeight,EdgeWeight)))
-#         df['type']=np.hstack((EL[:,0],EL[:,1]))
-#         avg = df.groupby(['type']).mean()
-#         NodeWeight = np.array(avg).flatten()
-        
-#         return (EdgeWeight,NodeWeight)
-
-    def calc_graph_env_coherence(self,ordr,f_dist,*args):
-    
-        ind = np.array(self.SG.neighborhood(order = ordr),dtype='object')
-
-        # find for each edges the two environments that it connects
-        EL = np.asarray(self.SG.get_edgelist()).astype("int")
-
-        EnvIx1 = ind[EL[:,0]]
-        EnvIx2 = ind[EL[:,1]]
-
-        for i in range(EnvIx1.shape[0]):
-            shared = np.intersect1d(EnvIx1[i],EnvIx2[i])
-            EnvIx1[i] = np.setdiff1d(EnvIx1[i],shared)
-            EnvIx2[i] = np.setdiff1d(EnvIx2[i],shared)
-
-        unqlbl = np.unique(self.Type)
-        Env1 = np.zeros((EnvIx1.shape[0],len(unqlbl)))
-        Env2 = np.zeros((EnvIx2.shape[0],len(unqlbl)))
-        ndsz = self.node_size.copy().astype(np.int64)
-        AllTypes1 = [self.Type[ix] for ix in EnvIx1]
-        AllSizes1 = [ndsz[ix] for ix in EnvIx1]
-        AllTypes2 = [self.Type[ix] for ix in EnvIx2]
-        AllSizes2 = [ndsz[ix] for ix in EnvIx2]
-        for i in range(Env1.shape[0]):
-            Env1[i,:]=np.bincount(AllTypes1[i],weights = AllSizes1[i],minlength=len(unqlbl))
-            Env2[i,:]=np.bincount(AllTypes2[i],weights = AllSizes2[i],minlength=len(unqlbl))
-
-        EdgeWeight = f_dist(Env1,Env2,*args)
-
-        # create node weights: 
-        df = pd.DataFrame(np.hstack((EdgeWeight,EdgeWeight)))
-        df['type']=np.hstack((EL[:,0],EL[:,1]))
-        avg = df.groupby(['type']).mean()
-        NodeWeight = np.array(avg).flatten()
-
-        return (EdgeWeight,NodeWeight)
-    
-       
-    def calc_entropy_at_different_Leiden_resolutions(self): 
-        Rvec = np.logspace(-1,2.5,100)
+    def calc_entropy_at_different_Leiden_resolutions(self,Rvec = np.logspace(-1,2.5,100)): 
         Ent = np.zeros(Rvec.shape)
         Ntypes = np.zeros(Rvec.shape)
         for i in range(len(Rvec)):
@@ -1348,10 +907,9 @@ class TissueGraph:
             Ent[i] = self.contract_graph(TypeVec).cond_entropy()
             Ntypes[i] = len(np.unique(TypeVec))
             
-        df = pd.DataFrame(data = {'Entropy' : Ent, 'Ntypes' : Ntypes, 'Resolution' : Rvec})     
-        return df
+        self.cond_entropy_df = pd.DataFrame(data = {'Entropy' : Ent, 'Ntypes' : Ntypes, 'Resolution' : Rvec})     
     
-    def multilayer_Leiden_with_cond_entropy(self,opt_params = {'iters' : 25, 'n_consensus' : 100}): 
+    def multilayer_Leiden_with_cond_entropy(self,opt_params = {'iters' : 10, 'n_consensus' : 50}): 
         """
             Find optimial clusters by peforming clustering on two-layer graph. 
             

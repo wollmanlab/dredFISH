@@ -10,8 +10,15 @@ from matplotlib.colors import ListedColormap
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection, PolyCollection, PatchCollection
 from matplotlib.patches import Wedge, Circle
+from matplotlib.patches import Rectangle as pRectangle
 import colorcet as cc
 
+import pickle
+import io
+
+import seaborn as sns
+
+from scipy import optimize
 from scipy.cluster.hierarchy import linkage, optimal_leaf_ordering
 from scipy.spatial.distance import jensenshannon, pdist, squareform
 
@@ -128,13 +135,21 @@ def color_from_dist(D,lum = None):
     return rgb
 
 
-class View:
+class MapView:
     def __init__(self,TMG,name=None,**kwargs):
         # each view needs a unique name
         self.name = name
+        
+        # link to the TMG used to create the view
         self.TMG = TMG
+        
+        # a view is single layeout, so multiple axes on one figure
+        self.axes = list()
+        self.plotting_tasks = list()
         self.figs = list()
         self.figsize = (11,11)
+        
+        # self.zoom_border_colors=["y","w","c"]
         
         # Fundamentally, a view keeps tab of all the type for different geoms
         # and a dictionary that maps these ids to color/shape etc. 
@@ -179,32 +194,21 @@ class View:
         ax.add_collection(p)
         
     def plot_lines(self): 
-        # get lines sorted by key (which is by convention internally sorted)
-        segs = [s[1] for s in sorted(self.TMG.Geoms['line'].items())]
+        # get regions lines (subset of line geom)
+        region_edge = self.TMG.find_regions_edge_level()
+        segs = [self.TMG.Geoms['line'][edges] for edges in region_edge]
         segs = np.array(segs)
-        unq_widths = np.unique(self.line_style['width'])
-        for i in range(len(unq_widths)):
-            ix = np.flatnonzero(self.line_style['width']==unq_widths[i])
-            line_segments = LineCollection(segs[ix],
-                                           linewidths=unq_widths[i],
-                                           colors=self.line_style['color'][ix])
-            ax = plt.gca()
-            ax.add_collection(line_segments)
-            
-    def add_zoomed_panel(self,coords,fig_to_zoom = 0):
-        fig = plt.figure(figsize=self.figsize)
-        self.figs.append(fig)
         
-    
-    def plot(self,return_fig = False,**kwargs):
+        line_segments = LineCollection(segs,
+                                       linewidths=self.line_style['width'],
+                                        colors=self.line_style['color'])
+        ax = plt.gca()
+        ax.add_collection(line_segments)
+            
+   
+    def plot(self,**kwargs):
         """
         plot the View. 
-
-        (optionally) return the generated fig. 
-        
-        This method will not be used directly by this View as 
-        Out: 
-        fig
         """
         
         if self.is_empty():
@@ -237,12 +241,40 @@ class View:
         ax.set_xlim(mn[0],mx[0])
         ax.set_ylim(mn[1],mx[1])
         ax.axis('off')
+                  
+        zoom_coords = kwargs.get('zoom_coords',None)
+        if zoom_coords is not None:
+            # if len(zoom_coords.shape)==1:
+            #     zoom_coords=zoom_coords[None,:]
+            # for i in range(zoom_coords.shape[0])
+            
+            ax.add_patch(pRectangle((zoom_coords[0], zoom_coords[1]),
+                                    zoom_coords[2], zoom_coords[3],
+                                    fc ='none', 
+                                    ec ="w",
+                                    lw = 3))
+                
+            # copy the figure to a new figure and zoom
+            buf = io.BytesIO()
+            pickle.dump(fig, buf)
+            buf.seek(0)
+            fig_zoomed = pickle.load(buf) 
+            ax_list = fig_zoomed.axes
+            ax_list[0].set_xlim(zoom_coords[0],zoom_coords[0]+zoom_coords[2])
+            ax_list[0].set_ylim(zoom_coords[1],zoom_coords[1]+zoom_coords[3])
+            # # ax_list[0].spines["top"].set_color(self.zoom_border_colors[0])
+            # # ax_list[0].spines["bottom"].set_color(self.zoom_border_colors[0])
+            # # ax_list[0].spines["left"].set_color(self.zoom_border_colors[0])
+            # # ax_list[0].spines["right"].set_color(self.zoom_border_colors[0])
+            fig_zoomed
+            self.figs.append(fig_zoomed)
+                  
         
 # for any new view, we derive the class so we have lots of views, each with it's own class so we can keep key attributes and 
 # rewrite the different routines for each type of views
 
       
-class Colorpleth(View):
+class Colorpleth(MapView):
     """
     Show a user-provided vector color coded on whatever geo-units requested (cells, iso-zones, heterozones, neighborhoods) 
     It will guess which level is needed from the size of the use provided values_to_map vector. 
@@ -279,132 +311,7 @@ class RandomColorpleth(Colorpleth):
         self.clrmp = ListedColormap(np.random.rand(len(self.values_to_map),3))        
         
         
-class CoherenceView(View):
-    def __init__(self,TMG,name = "Coherence"):
-        super().__init__(TMG,name = name)
-        self.plot_points_flag = True
-    
-    def set_view(self):
-        
-        # set polygon colors (scalars style + colormsp)
-        Env = self.TMG.Layers[1].extract_environments(ordr = 3)
-        (EdgeWeight,NodeWeight) = self.TMG.Layers[1].calc_graph_env_coherence(Env,dist_jsd)
-        scalar_mapping = self.TMG.map_to_cell_level(1,VecToMap = -np.log10(NodeWeight))
-        scalar_mapping = scalar_mapping/np.max(scalar_mapping)
-        
-        self.polygon_style['scalar'] = scalar_mapping
-        
-         # create the colormap
-        self.clrmp = 'plasma'
-        
-        # set points
-        Peaks = self.TMG.Layers[1].watershed(Env,only_find_peaks = True)
-        Peaks = self.TMG.map_to_cell_level(1,Peaks)
-        self.point_style['show'] = Peaks>-1 
-        
-    def plot_points(self):
-        if self.plot_points_flag:
-            x = np.array(self.TMG.Layers[0].X)
-            x = x[self.point_style['show']]
-            y = np.array(self.TMG.Layers[0].Y)
-            y = y[self.point_style['show']]
-            plt.scatter(x=x,y=y,s=5,c='w')
-        
-
-        
-        
-class RandomPolygonColorByType(View):
-    def __init__(self,TMG,name = "polygons / random colors",lvl = 0):
-        super().__init__(TMG,name = f"{name} / level-{lvl}")
-        self.lvl = lvl
-
-    def set_view(self):
-        cell_types = self.TMG.map_to_cell_level(self.lvl)
-        # create scalar mapping by just using cell_type id
-        scalar_mapping = cell_types/np.max(cell_types)
-        self.polygon_style['scalar'] = scalar_mapping
-
-        # create the colormap
-        self.clrmp = ListedColormap(np.random.rand(len(np.unique(cell_types)),3))                
-        
-class RandomPolygonColorByTypeWithLines(RandomColorpleth):
-    def __init__(self, TMG, name="polygons and edges / random colors", lvl=0):
-        super().__init__(TMG, name=name, lvl=lvl)
-
-    def set_view_weight(self):
-        # start with polygons in random colors
-        super().set_view()
-        edge_lvls = self.TMG.find_max_edge_level()
-        edge_width = [e[1] for e in sorted(edge_lvls.items())]
-
-        # threshold to exclude edges below value
-
-        base_width = 0.1
-        scaler = 0.25 
-
-        self.line_style['width'] = list(np.array(edge_width) * scaler + base_width)
-        self.line_style['color'] = np.repeat('#48434299', len(edge_width))
-
-    def set_view_line(self):
-        """
-        weights are flipped
-        """
-        # start with polygons in random colors
-        super().set_view()
-        edge_lvls = self.TMG.find_max_edge_level()
-        edge_width = [e[1] for e in sorted(edge_lvls.items())]
-        edge_width = list(max(edge_width)-np.array(edge_width))
-
-        # threshold to exclude edges below value
-        thr = self.lvl
-        base_width = 0.1
-
-        self.line_style['width'] = list((np.array(edge_width) >= thr).astype(float)*(1-base_width) + base_width)
-        self.line_style['color'] = np.repeat('#48434299', len(edge_width))
-
-
-class OnlyLines(View):
-    def __init__(self,TMG,lvl = 1,name = "only lines"):
-        super().__init__(TMG,name = name)
-        self.edge_levels = None
-        self.edge_list = None
-        self.segs = list()
-        self.lvl = lvl
-        self.lvl_widths = np.array([2,1,0.5,0.25])
-        self.line_clr = '#7d7d7d88'
-    
-    def set_view(self):
-        super().set_view()
-        mx_edge_lvl_dict = self.TMG.find_max_edge_level()
-        geom_line_dict = self.TMG.Geoms['line']
-        self.edge_levels = np.zeros(len(self.TMG.Geoms['line']),dtype='int')
-        self.edge_list = np.zeros((len(self.TMG.Layers[0].SG.es),2))
-        for i in range(len(self.TMG.Layers[0].SG.es)): 
-            self.edge_list[i,:] = np.array(self.TMG.Layers[0].SG.es[i].tuple)
-            self.edge_levels[i] = int(mx_edge_lvl_dict[tuple(self.edge_list[i,:])])
-            self.segs.append(geom_line_dict[tuple(self.edge_list[i,:])])
-        
-        self.segs = np.array(self.segs,dtype='object')
-        self.line_style['width'] = self.lvl_widths[self.edge_levels]
-        self.line_style['color'] = np.repeat(self.line_clr,len(self.edge_levels))
-    
-    def plot(self):
-        super().plot()
-    
-    def plot_lines(self): 
-        # get lines sorted by key (which is by convention internally sorted)
-        wdth = self.lvl_widths[3-self.lvl]
-        ix = np.flatnonzero(self.line_style['width']==self.lvl_widths[3-self.lvl])
-            
-        line_segments = LineCollection(self.segs[ix],linewidths=wdth,
-                                           colors=self.line_style['color'])
-        ax = plt.gca()
-        ax.add_collection(line_segments)
-
-        
-
-        
-class CellMap(View):
+class CellMap(MapView):
     def __init__(self,TMG,lvl = 1,name = "cell map"):
         super().__init__(TMG,name = name)
         self.lvl = lvl
@@ -456,16 +363,46 @@ class CellMap(View):
         
     def plot(self,**kwargs):
         super().plot(**kwargs)
+        
+        # add a panel showing type as large points
         fig = plt.figure(figsize = self.figsize)
         self.figs.append(fig)
         plt.scatter(x = self.xy[:,0],y = self.xy[:,1],c=self.clr,s = self.sz)
         plt.xticks([], [])
         plt.yticks([], [])
+        
+        # add a panel with conditional entropy
+        if hasattr(self.TMG.Layers[0], 'cond_entropy_df') and self.lvl==1:
+            EntropyCalcsL1 = self.TMG.Layers[0].cond_entropy_df
+            fig = plt.figure()
+         
+            ax1 = plt.gca()
+            yopt = self.TMG.cond_entropy[1]
+            xopt = self.TMG.Ntypes[1]
+            ax1.plot(EntropyCalcsL1['Ntypes'],EntropyCalcsL1['Entropy'])
+            ylm = ax1.get_ylim()
+            ax1.plot([xopt,xopt],[ylm[0], yopt],'r--',linewidth=1)
+            ax1.set_xlabel('# of types',fontsize=18)
+            ax1.set_ylabel('H (Map | Type)',fontsize=18)
+            fig = plt.gcf()
+            left, bottom, width, height = [0.6, 0.55, 0.25, 0.25]
+            ax2 = fig.add_axes([left, bottom, width, height])
+            ax2.semilogx(EntropyCalcsL1['Ntypes'],EntropyCalcsL1['Entropy'])
+            ylm = ax2.get_ylim()
+            ax2.plot([xopt,xopt],[ylm[0], yopt],'r--',linewidth=1)
+            
+            fig = plt.figure()
+            unq,cnt = np.unique(self.TMG.Layers[0].Type,return_counts=True)
+            plt.hist(cnt,bins=15);
+            plt.title("Cells per type")
+            plt.xlabel("# Cells in a type")
+            plt.ylabel("# of Types")
+
 
 class NeighborhoodMap(CellMap): 
     def __init__(self,TMG,name = "neighborhood map"):
         super().__init__(TMG,name = name)
-        self.lvl = 3
+        self.lvl = 2
     
     def set_view(self):
         super().set_view()
@@ -513,157 +450,85 @@ class NeighborhoodMap(CellMap):
         ax.set_ylim(-margins*scale_factor,(1+margins)*scale_factor)
         ax.set_xticks([])
         ax.set_yticks([])
+        
+        fig = plt.figure(figsize=(10,10))
+        self.figs.append(fig)
+        region_cell_types = self.TMG.Layers[2].feature_type_mat
+        row_sums = region_cell_types.sum(axis=1)
+        row_sums = row_sums[:,None]
+        region_cell_types_nrm=region_cell_types/row_sums
+        g = sns.clustermap(region_cell_types_nrm,method="ward", cmap="mako",col_colors=V1.clr,row_colors = self.clr)
+        g.ax_heatmap.set_xticks(list())
+        g.ax_heatmap.set_yticks(list())
+        self.figs.append(fig)
 
-class NeighborhoodMapWithLines(NeighborhoodMap,OnlyLines):
+
+class NeighborhoodMapWithLines(NeighborhoodMap):
     def __init__(self,TMG,name = "neighborhood map"):
         super(NeighborhoodMap,self).__init__(TMG,name = name)
-        self.lvl=3
+        self.lvl=2
         
     def set_view(self):
-        super(NeighborhoodMapWithLines,self).set_view()
+        super().set_view()
+        region_edge = self.TMG.find_regions_edge_level()
+        self.line_style['width'] = np.ones(len(region_edge))
+        self.line_style['color'] = "#6e736f"
         
     def plot(self,Vcellmap = None):
-        super(NeighborhoodMapWithLines,self).plot(Vcellmap)
+        super().plot(Vcellmap)
         
-                
-        
-class PolygonColorByType(View):
-    """
-    Create type map where colors are optimized to match types. 
-    it will also show the legend as bubble plot 
-    to break down the bubble plot by composition, pass in the PolygonColorByType instance for level 1 (iso-zones)
-    """
-    def __init__(self,TMG,name = "polygons colors by type",lvl = 0,metric = 'cosine'):
-        super().__init__(TMG,name = f"{name} / level-{lvl}")
-        self.lvl = lvl
-        self.clr = None
-        self.metric = metric
-        #self.cmap_list = ['YlOrBr','RdPu','YlGn','PuBu','cividis']
-        self.cmap_list = ['Purples','Oranges','Blues','Greens','Reds','cividis']
-        # self.cmap_list = ['summer','spring','cool','Wistia']
-        
-    def calc_type_similarity(self): 
-        # build distance matrix
-        D = pdist(self.TMG.Layers[self.lvl].feature_type_mat,self.metric)
-        Dsquare = squareform(D)
-        return(Dsquare)
-       
-    
-    def set_view(self):
-        cell_types = self.TMG.map_to_cell_level(self.lvl)
-        Dsqr = self.calc_type_similarity()
-                
-        # Breat type graph into 5 color groups
-        res = 0.01
-        nt2=0; 
-        it_cnt = 0
-        G = buildgraph(Dsqr,metric = 'precomputed',n_neighbors = 10)
-        if Dsqr.shape[0]>len(self.cmap_list):
-            while nt2<len(self.cmap_list) and it_cnt < 1000: 
-                res = res+0.1
-                T2 = np.array(G.community_leiden(objective_function='modularity',resolution_parameter = res).membership).astype(np.int64)
-                nt2 = len(np.unique(T2))
-                it_cnt+=1
-                
-            if it_cnt>=1000:
-                raise RuntimeError('Infinite loop adjusting Leiden resolution')
-                
-            # subset each group into most distinct colors
-            clr = np.zeros((len(T2),4))
-            for i in range(len(self.cmap_list)):
-                ix = np.flatnonzero(T2==i)
-                d = Dsqr[np.ix_(ix,ix)]
-                dvec = squareform(d)
-                z = linkage(dvec,method='average')
-                ordr = optimal_leaf_ordering(z,dvec)
-                cmap = cm.get_cmap(self.cmap_list[i])
-                n=len(ix)
-                shift = np.ceil(0.2*n)
-                value = (np.arange(len(ix))+shift+1)/(len(ix)+shift)
-                clr[ix,:] = cmap(value)
-                
-        else:
-            nt2 = 1
-            T2 = np.ones(Dsqr.shape[0])
-            self.cmap_list = ['hsv']
-            cmap = cm.get_cmap(self.cmap_list[0])
-            clr = cmap(len(T2))
 
-            
-        # create scalar mapping by just using cell_type id
-        self.polygon_style['scalar'] = cell_types
-        self.clr = clr
-        self.type2 = T2
+class IsoZones(Colorpleth):
+    def __init__(self,TMG):
+        super().__init__(TMG,name="isozones",values_to_map = np.log10(TMG.Layers[1].node_size))
+        self.n_bins = 50
         
-        unq,cnt = np.unique(cell_types,return_counts = True)
-        self.sz = cnt.astype('float')
-        self.sz = self.sz/self.sz.mean()*500
-        layout = G.layout_fruchterman_reingold()
-        xy = np.array(layout.coords)
-        xy[:,0] = xy[:,0]-xy[:,0].min()
-        xy[:,1] = xy[:,1]-xy[:,1].min()
-        xy[:,0] = xy[:,0]/xy[:,0].max()
-        xy[:,1] = xy[:,1]/xy[:,1].max()
+    def set_view(self):
+        super().set_view()
         
-        self.xy = xy
-        self.clrmp = ListedColormap(clr)
+        mx_sz = self.TMG.Layers[1].node_size.max()
+        bins = np.logspace(0, np.ceil(np.log10(mx_sz)), self.n_bins+1)
+
+        # Calculate histogram
+        hist = np.histogram(self.TMG.Layers[1].node_size, bins=bins)
+        # normalize by bin width
+        hist_norm = hist[0]/hist[0].sum()
+
+        ix = hist_norm>0
+        x=(bins[0:-1]+bins[1:])/2
+        self.log_size=np.log10(x[ix])
+        self.log_freq = np.log10(hist_norm[ix])
+
+        def piecewise_linear(x, x0, y0, k1, k2):
+            return np.piecewise(x, [x < x0], [lambda x:k1*x + y0-k1*x0, lambda x:k2*x + y0-k2*x0])
+
+        self.p , e = optimize.curve_fit(piecewise_linear, self.log_size, self.log_freq)
+        self.exponents = self.p[2:4]
         
-    def plot(self,V1 = None):
+    def plot(self):
         super().plot()
+
+        def piecewise_linear(x, x0, y0, k1, k2):
+            return np.piecewise(x, [x < x0], [lambda x:k1*x + y0-k1*x0, lambda x:k2*x + y0-k2*x0])
+        
         fig = plt.figure(figsize = self.figsize)
         self.figs.append(fig)
-        plt.scatter(x = self.xy[:,0],y = self.xy[:,1],c=self.clr,s = self.sz)
-        plt.xticks([], [])
-        plt.yticks([], [])
+
+        # plot it!
+        plt.plot(10**self.log_size, 10**self.log_freq,'.')
+        plt.xscale('log')
+        plt.yscale('log')
+
+        plt.plot(10**self.log_size, 10**piecewise_linear(self.log_size, *self.p),'r-')
+
+        plt.xlabel('Zone size',fontsize=18)
+        plt.ylabel('Freq',fontsize=18)
+        plt.title(f"Exponents: {self.exponents[0]:.2f} {self.exponents[1]:.2f}")
+
+    
+    
         
-        if self.lvl==3 and V1 is not None:
-            # start new figure (to calc size factor)
-            fig = plt.figure(figsize = self.figsize)
-            self.figs.append(fig)
-            ax = plt.gca()
-            
-            # get fractions and sort by type2
-            feature_type_mat = self.TMG.Layers[self.lvl].feature_type_mat
-            ordr = np.argsort(V1.type2)
-            feature_type_mat = feature_type_mat[:,ordr]
-            
-            # scale between radi in points to xy that was normed to 0-1
-            scale_factor = fig.dpi * self.figsize[0]
-            
-            xy = self.xy*scale_factor
-            radi = np.sqrt(self.sz/np.pi)
-            cdf_in_angles = np.cumsum(np.hstack((np.zeros((feature_type_mat.shape[0],1)),feature_type_mat)),axis=1)*360
-
-            wedges = list()
-            wedge_width = 0.66
-            for i in range(feature_type_mat.shape[0]):
-                for j in range(feature_type_mat.shape[1]):
-                    w = Wedge((xy[i,0],xy[i,1]), radi[i], cdf_in_angles[i,j], 
-                               cdf_in_angles[i,j+1],width = wedge_width*radi[i], facecolor = V1.clr[ordr[j],:])
-                    c = Circle((xy[i,0],xy[i,1]),wedge_width*radi[i],facecolor = self.clr[i,:],fill = True) 
-                    wedges.append(w)
-                    wedges.append(c)
-
-
-            p = PatchCollection(wedges,match_original=True)
-            ax.add_collection(p)
-
-            margins = 0.05
-            ax.set_xlim(-margins*scale_factor,(1+margins)*scale_factor)
-            ax.set_ylim(-margins*scale_factor,(1+margins)*scale_factor)
-            ax.set_xticks([])
-            ax.set_yticks([])
-            
-            fig = plt.figure(figsize = self.figsize)
-            regiontypes = self.TMG.Layers[self.lvl].Type
-            _,cnt = np.unique(regiontypes,return_counts = True)
-            cnt = cnt/max(cnt)*200
-            self.figs.append(fig)
-            plt.scatter(x = self.xy[:,0],y = self.xy[:,1],c=self.clr,s = cnt)
-            plt.xticks([], [])
-            plt.yticks([], [])
-            
-class RasterMap(View):
+class RasterMap(MapView):
 
     def __init__(self, TMG, name="Raster", lvl=0, color_map=cc.cm.rainbow):
         super().__init__(TMG, name)
