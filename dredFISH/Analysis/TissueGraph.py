@@ -231,7 +231,7 @@ class TissueMultiGraph:
         self.dview=None
         pickle.dump(self,open(fullfilename,'wb'),recurse=True)
 
-    def load_and_normalize_data(self,base_path,dataset):
+    def load_and_normalize_data(self,base_path,dataset,norm_flag = True):
 
         fishdata = FISHData(os.path.join(base_path,'fishdata'))
         data = fishdata.load_data('h5ad',dataset=dataset)
@@ -239,16 +239,16 @@ class TissueMultiGraph:
 
         data.X = data.layers['total_vectors']
         data = data[np.isnan(data.X.max(1))==False]
-
-        data.X = data.X/data.obs['total_signal'][:,None]
-        data.X = data.X - np.array([np.percentile(data.X[:,i],25) for i in range(data.X.shape[1])])
-        data.X = data.X / np.array([np.percentile(data.X[:,i],75) for i in range(data.X.shape[1])])
-        data.X = normalize(data.X)
+        
+        if norm_flag:
+            data.X = data.X/data.obs['total_signal'][:,None]
+            data.X = data.X - np.array([np.percentile(data.X[:,i],25) for i in range(data.X.shape[1])])
+            data.X = data.X / np.array([np.percentile(data.X[:,i],75) for i in range(data.X.shape[1])])
+            data.X = normalize(data.X)
 
         XY = np.asarray([data.obs['stage_y'], data.obs['stage_x']])
         XY = np.transpose(XY)
         return (XY,data.X)
-
         
     def create_cell_and_zone_layers(self,XY,PNMF,celltypes = None): 
         """
