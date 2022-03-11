@@ -29,6 +29,7 @@ import sklearn.decomposition
 from sklearn.decomposition import LatentDirichletAllocation
 from sklearn.neighbors import NearestNeighbors
 from sklearn.metrics import adjusted_rand_score,adjusted_mutual_info_score 
+from rasterio.features import rasterize
 
 from numpy.random import default_rng
 rng = default_rng()
@@ -230,7 +231,7 @@ class TissueMultiGraph:
         self.dview=None
         pickle.dump(self,open(fullfilename,'wb'),recurse=True)
 
-    def load_and_normalize_data(self,base_path,dataset):
+    def load_and_normalize_data(self,base_path,dataset,norm_flag = True):
 
         fishdata = FISHData(os.path.join(base_path,'fishdata'))
         data = fishdata.load_data('h5ad',dataset=dataset)
@@ -238,16 +239,16 @@ class TissueMultiGraph:
 
         data.X = data.layers['total_vectors']
         data = data[np.isnan(data.X.max(1))==False]
-
-        data.X = data.X/data.obs['total_signal'][:,None]
-        data.X = data.X - np.array([np.percentile(data.X[:,i],25) for i in range(data.X.shape[1])])
-        data.X = data.X / np.array([np.percentile(data.X[:,i],75) for i in range(data.X.shape[1])])
-        data.X = normalize(data.X)
+        
+        if norm_flag:
+            data.X = data.X/data.obs['total_signal'][:,None]
+            data.X = data.X - np.array([np.percentile(data.X[:,i],25) for i in range(data.X.shape[1])])
+            data.X = data.X / np.array([np.percentile(data.X[:,i],75) for i in range(data.X.shape[1])])
+            data.X = normalize(data.X)
 
         XY = np.asarray([data.obs['stage_y'], data.obs['stage_x']])
         XY = np.transpose(XY)
         return (XY,data.X)
-
         
     def create_cell_and_zone_layers(self,XY,PNMF,celltypes = None): 
         """
@@ -557,6 +558,45 @@ class TissueMultiGraph:
     def add_view(self,view):
         # add the view to the view dict
         self.Views[view.name]=view
+
+    def get_raster(self, lvl=0, max_label=256, padding=100):
+        """
+        Rasterize polygons into matrix. Requires polygons to be computed again on a relative plane.
+
+        Input
+        -----
+        lvl : level of TMG to call
+        max_label : maximum label of cell types in matrix
+        padding : padding on matrix
+
+        Output
+        ------
+        mask : rasterized matrix with cell type
+        label_dict : dictionary mapping matrix IDs back to cell type IDs 
+
+        """
+
+        if lvl > len(self.Ntypes):
+            raise ValueError('Invalid level specified! The lvl param is bounded by number of levels in TMG.')
+
+        labels = self.map_to_cell_level(lvl)
+
+        if max(labels) > max_label:
+            raise UserWarning('The max_label param is less than some labels, so labels will be hard to distinguish from background.')
+
+        # adjust coordinates to relative space with padding 
+        min_xy = self.Geoms["point"].min(0)
+        rel_coords = [(x - min_xy) + padding if len(x) > 0 else np.nan for x in self.Geoms["poly"]]
+        rel_bb = (self.Geoms["point"].max(0) - min_xy + padding * 2).astype(int)[::-1]
+
+        # reconstruct polygons 
+        polys = [(Polygon(x), max_label - labels[idx]) for idx, x in enumerate(rel_coords) if type(x)!= float]
+        mask = rasterize(polys, out_shape=rel_bb)
+
+        label_dict = {i:max_label-i for i in labels}
+
+        return mask, label_dict
+
         
     
         
