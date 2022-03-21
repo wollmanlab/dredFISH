@@ -231,7 +231,7 @@ class TissueMultiGraph:
         self.dview=None
         pickle.dump(self,open(fullfilename,'wb'),recurse=True)
 
-    def load_and_normalize_data(self,base_path,dataset,norm_bit = 'robust Zach score', norm_cell = 'polyA'):
+    def load_and_normalize_data(self,base_path,dataset,norm_bit = 'robustZ-iqr', norm_cell = 'polyA'):
 
         fishdata = FISHData(os.path.join(base_path,'fishdata'))
         data = fishdata.load_data('h5ad',dataset=dataset)
