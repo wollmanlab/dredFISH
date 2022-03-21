@@ -241,7 +241,7 @@ class TissueMultiGraph:
         data = data[np.isnan(data.X.max(1))==False]
         
         # clip at 0
-        data.X[data.X<0]=0
+        data.X = np.clip(data.X,0,None)
 
         if norm_cell == 'polyA':
             cell_level_norm = data.obs['total_signal'][:,None]
@@ -257,12 +257,21 @@ class TissueMultiGraph:
 
 
         if norm_bit == 'robustZ-iqr': 
-            data.X = data.X-np.median(data.X,axis=1)[:,None]
-            scl = np.array([np.percentile(data.X[:,i],75) for i in range(data.X.shape[1])]) - np.array([np.percentile(data.X[:,i],25) for i in range(data.X.shape[1])])  
+            data.X = data.X-np.median(data.X,axis=0)[None,:]
+            q75 = np.array([np.percentile(data.X[data.X[:,i]>0,i],75) for i in range(data.X.shape[1])])
+            q25 = np.array([np.percentile(data.X[data.X[:,i]>0,i],25) for i in range(data.X.shape[1])])
+            scl =  q75 - q25
+            scl = scl[None,:]
             data.X = data.X / scl
         elif norm_bit == 'robustZ-mad':
-            data.X = data.X-np.median(data.X,axis=1)[:,None]
-            scl = median_abs_deviation(data.X, axis=1)[:,None]
+            data.X = data.X-np.median(data.X,axis=0)[None,:]
+            scl = np.array([median_abs_deviation(data.X[data.X[:,i]>0,i]) for i in range(data.X.shape[1])])
+            scl = scl[None,:]
+            data.X = data.X / scl
+        elif norm_bit == 'z-score':
+            data.X = data.X - data.X.mean(axis=0)[None,:]
+            scl = data.X.std(axis=0)
+            scl = scl[None,:]
             data.X = data.X / scl
         elif norm_bit == None or norm_bit == 'none': 
             data.X = data.X * 1
