@@ -18,7 +18,7 @@ from scipy.optimize import minimize_scalar
 from scipy.spatial.distance import jensenshannon, pdist, squareform
 from scipy.cluster.hierarchy import dendrogram, linkage, to_tree, fcluster, cut_tree
 from scipy.sparse.csgraph import dijkstra
-from scipy.stats import entropy, mode
+from scipy.stats import entropy, mode,median_abs_deviation
 from scipy.stats.contingency import crosstab
 from scipy.special import rel_entr
 from scipy.interpolate import interp2d, interp1d
@@ -231,7 +231,7 @@ class TissueMultiGraph:
         self.dview=None
         pickle.dump(self,open(fullfilename,'wb'),recurse=True)
 
-    def load_and_normalize_data(self,base_path,dataset,norm_flag = True):
+    def load_and_normalize_data(self,base_path,dataset,norm_bit = 'robust Zach score', norm_cell = 'polyA'):
 
         fishdata = FISHData(os.path.join(base_path,'fishdata'))
         data = fishdata.load_data('h5ad',dataset=dataset)
@@ -240,11 +240,34 @@ class TissueMultiGraph:
         data.X = data.layers['total_vectors']
         data = data[np.isnan(data.X.max(1))==False]
         
-        if norm_flag:
-            data.X = data.X/data.obs['total_signal'][:,None]
-            data.X = data.X - np.array([np.percentile(data.X[:,i],25) for i in range(data.X.shape[1])])
-            data.X = data.X / np.array([np.percentile(data.X[:,i],75) for i in range(data.X.shape[1])])
-            data.X = normalize(data.X)
+        # clip at 0
+        data.X[data.X<0]=0
+
+        if norm_cell == 'polyA':
+            cell_level_norm = data.obs['total_signal'][:,None]
+            data.X = data.X/cell_level_norm
+        elif norm_cell == 'L1' or norm_cell == 'l1': 
+            data.X = normalize(data.X,norm = 'l1')
+        elif norm_cell == 'L2' or norm_cell == 'l2': 
+            data.X = normalize(data.X,norm = 'l2')
+        elif norm_cell == None or norm_cell == 'none': 
+            data.X = data.X
+        else: 
+            raise NotImplementedError(f"requested cell level normalization: {norm_cell} is not implemented")
+
+
+        if norm_bit == 'robustZ-iqr': 
+            data.X = data.X-np.median(data.X,axis=1)[:,None]
+            scl = np.array([np.percentile(data.X[:,i],75) for i in range(data.X.shape[1])]) - np.array([np.percentile(data.X[:,i],25) for i in range(data.X.shape[1])])  
+            data.X = data.X / scl
+        elif norm_bit == 'robustZ-mad':
+            data.X = data.X-np.median(data.X,axis=1)[:,None]
+            scl = median_abs_deviation(data.X, axis=1)[:,None]
+            data.X = data.X / scl
+        elif norm_bit == None or norm_bit == 'none': 
+            data.X = data.X * 1
+        else: 
+            raise NotImplementedError(f"requested bit level normalization: {norm_bit} is not implemented")
 
         XY = np.asarray([data.obs['stage_y'], data.obs['stage_x']])
         XY = np.transpose(XY)
@@ -597,7 +620,8 @@ class TissueMultiGraph:
 
         return mask, label_dict
 
-        
+    # def get_cells_in_polygon(self,path):
+    #     TMG.XY
     
         
 
