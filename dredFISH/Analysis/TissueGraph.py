@@ -51,6 +51,7 @@ from pyemd import emd
 
 from PySpots.MERFISH_Objects.FISHData import *
 from dredFISH.Analysis import basicu
+from dredFISH.Analysis import regu
 from dredFISH.Visualization.cell_colors import *
 from dredFISH.Visualization.vor import voronoi_polygons, bounding_box
 
@@ -190,8 +191,9 @@ class TissueMultiGraph:
             * N
             * Ntypes
     """
-    def __init__(self,fullfilename = None):
+    def __init__(self,fullfilename = None, name=''):
         # init to empty
+        self.name = name
         self.Layers = list()
         self.layers_graph = list() # a list of tuples that keep track of the relationship between different layers 
         self.Geoms = {}
@@ -217,6 +219,9 @@ class TissueMultiGraph:
             if hasattr(TMGload,'cell_attributes'):
                 self.cell_attributes = TMGload.cell_attributes
 
+            if hasattr(TMGload,'data'):
+                self.data = TMGload.data
+
         return None
     
     def save(self,fullfilename):
@@ -224,11 +229,18 @@ class TissueMultiGraph:
         """
         self.dview=None
         pickle.dump(self,open(fullfilename,'wb'),recurse=True)
+        logging.info(f"saved to {fullfilename}")
+
+    def save_anndata(self,fullfilename):
+        """ save the anndata object
+        """
+        self.data.write(fullfilename)
+        logging.info(f"saved to {fullfilename}")
 
     def load_from_fishdata(self, fishdata_path, dataset, 
         output_path='',
         ):
-        """Fangming -- temporary so we can compare...
+        """
         remove `obs_names_make_unique` which could cause long term issue. instead check if they are already unique or not
         """
         # load data
@@ -248,6 +260,7 @@ class TissueMultiGraph:
                 data.write(output_path)
             else:
                 raise ValueError(f"{output_path} already exists...")
+        self.XY = self.data.obs[['stage_x', 'stage_y']].values
         return data
     
     def load_from_anndata(self, anndata_path, **kwargs):
@@ -255,6 +268,7 @@ class TissueMultiGraph:
         """
         data = anndata.read(anndata_path, **kwargs) 
         self.data = data
+        self.XY = self.data.obs[['stage_x', 'stage_y']].values
         return data
 
     def normalize_data(self, norm_cell=True, norm_bit=True):
@@ -331,7 +345,54 @@ class TissueMultiGraph:
 
         XY = np.asarray([data.obs['stage_y'], data.obs['stage_x']])
         XY = np.transpose(XY)
+        self.XY = XY
         return (XY,data.X)
+    
+    def spatial_registration_preview(self, 
+        allen_template, allen_annot, allen_maps,
+        idx_ccf, 
+        flip=False,
+        ):
+        """
+        Check if the selected allen section make sense at all, and if we need to flip the orientation.
+        Nothing is saved and this runs fast.
+        """
+        spatial_data = regu.check_run(self.XY, 
+                                allen_template, 
+                                allen_annot, 
+                                allen_maps,
+                                idx_ccf, 
+                                flip=flip)
+
+        return spatial_data 
+
+    def spatial_registration(self, 
+        allen_template, allen_annot, allen_maps,
+        idx_ccf, 
+        flip=False,
+        outprefix='',
+        force=False,
+        ):
+        """
+        """
+        spatial_data = regu.real_run(self.XY, 
+                        allen_template,
+                        allen_annot,
+                        allen_maps,
+                        idx_ccf, 
+                        flip=flip, 
+                        dataset=self.name, # a name
+                        outprefix=outprefix, 
+                        force=force,
+                        )
+
+        # update results to anndata (cell level atrributes)
+        self.data.obs['coord_x'] = spatial_data.points_rot[:,0]
+        self.data.obs['coord_y'] = spatial_data.points_rot[:,1]
+        self.data.obs['region_id'] = spatial_data.region_id
+        self.data.obs['region_color'] = spatial_data.region_color 
+        self.data.obs['region_acronym'] = spatial_data.region_acronym 
+        return spatial_data
         
     def create_cell_and_zone_layers(self,XY,PNMF,celltypes = None): 
         """

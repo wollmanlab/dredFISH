@@ -532,3 +532,23 @@ def hex_to_rgb(hex_string):
     g_hex = hex_string[3:5]
     b_hex = hex_string[5:7]
     return int(r_hex, 16), int(g_hex, 16), int(b_hex, 16)
+
+def plot_hybrid_mat_mask(_mat, _mask, axs):
+    """show matrix and masks in left and right halves
+    """
+    m, n = _mat.shape
+
+    ax = axs[0]
+    ax.imshow(_mat[:,:int(n/2)])
+    # ax.axis('off')
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+    ax = axs[1]
+    ax.imshow(_mask[:,:int(n/2)][:,::-1])
+    # ax.imshow(_mask[:,int(n/2):])
+    ax.set_xticks([])
+    ax.set_yticks([])
+    # ax.axis('off')
+    
+    return

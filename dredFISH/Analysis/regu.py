@@ -2,6 +2,8 @@
 """
 
 import numpy as np
+import pandas as pd
+import nrrd
 import ants
 import nibabel as nib
 import os
@@ -13,6 +15,8 @@ import logging
 from .__init__plots import *
 sns.set_style('white')
 from . import imageu
+from . import basicu
+from . import powerplots
 
 class Data():
     """
@@ -30,7 +34,9 @@ class Data():
         self.img_rot_coords
 
         
-        self.ccfidx -- matched CCF coordinates
+        self.ccfidx -- matched CCF plate index
+        self.img_ccf_template -- matched CCF template
+        self.img_ccf_annot -- matched CCF annotation (sid)
     """
     def __init__(self, name, points_raw):
         self.name = name 
@@ -38,9 +44,12 @@ class Data():
         # self.pca_rotate()
         return
     
-    def add_matched_ccf(self, idx_ccf, img_ccf):
+    def add_matched_ccf(self, idx_ccf, img_ccf_template, img_ccf_annot):
         self.idx_ccf = idx_ccf 
-        self.img_ccf = img_ccf
+        self.img_ccf_template = img_ccf_template
+        self.img_ccf_annot = img_ccf_annot
+        assert self.img_ccf_annot.dtype == 'uint32' # has to be this to avoid error
+        assert self.img_ccf_template.shape == self.img_ccf_annot.shape
         return 
     
     def pca_rotate(self):
@@ -59,7 +68,7 @@ class Data():
     
     def pad(self, fixed_shape=(0,0)):
         if fixed_shape == (0,0):
-            fixed_shape = self.img_ccf.shape
+            fixed_shape = self.img_ccf_template.shape
         self.img_rotpad, self.trans_pad = imageu.broad_padding(self.img_rot, fixed_shape)
         return 
     
@@ -102,7 +111,7 @@ class Data():
                   **kwargs,
                   ):
         # data 
-        fixed = self.img_ccf
+        fixed = self.img_ccf_template
         moving = self.img_rotpad
 
         # downsample
@@ -154,7 +163,7 @@ class Data():
                 **kwargs,
                 ):
         # data 
-        fixed = self.img_ccf
+        fixed = self.img_ccf_template
         moving = self.img_affine
 
         # downsample
@@ -194,7 +203,7 @@ class Data():
         elif mode == 'rot':
             img_plot = self.img_rot
         elif mode == 'ccf':
-            img_plot = self.img_ccf
+            img_plot = self.img_ccf_template
         elif mode == 'rotpad':
             img_plot = self.img_rotpad
         elif mode == 'affine':
@@ -341,7 +350,8 @@ class Data():
          'name',
 
          'idx_ccf',
-         'img_ccf',
+         'img_ccf_template',
+         'img_ccf_annot',
 
          'points_raw',
 
@@ -366,6 +376,11 @@ class Data():
          'img_syn_inv',
          'trans_syn',
          'trans_syn_inv',
+
+         # results
+         'region_id',
+         'region_acronym',
+         'region_color',
         ]
         assert file.endswith('.hdf5')
         if not force:
@@ -398,7 +413,7 @@ class Data():
             return img
         else:
             ## prepare 
-            fixed = ants.from_numpy(self.img_ccf.astype(np.float32))
+            fixed = ants.from_numpy(self.img_ccf_template.astype(np.float32))
             moving = ants.from_numpy(img.astype(np.float32))
             
             # apply affine
@@ -477,34 +492,54 @@ def read_registered_data(file):
             setattr(obj, key, mat) 
         
         # special treatment
-        for key in ['trans_affine', 'trans_affine_inv']:
+        for key in ['trans_affine', 'trans_affine_inv',]:
             setattr(obj, key, getattr(obj, key).decode())
-        for key in ['trans_syn', 'trans_syn_inv']:
+        for key in ['trans_syn', 'trans_syn_inv', 'region_acronym', 'region_color',]:
             setattr(obj, key, 
-                [item.decode() for item in getattr(obj, key)]
+                np.array([item.decode() for item in getattr(obj, key)])
                 )
 
     return obj
 
-def check_run(XY, ccf, idx_ccf, flip=False):
+def check_run(XY, 
+    ccf_template, 
+    ccf_annot, 
+    ccf_maps,
+    idx_ccf, 
+    dataset="",
+    flip=False, 
+    plot=True,
+    ):
     """A n by 2 matrix of cell locations
+    ccf_template and ccf_annot are 3-dimensional matrices of the same shape
     """
     # initiation
-    data = Data("", XY)
+    data = Data(dataset, XY)
     # rotate
     data.pca_rotate()
     if flip:
         data.flip_rotated()
     # add CCF
-    data.add_matched_ccf(idx_ccf, ccf[idx_ccf,:,:])
+    ccf_template_2d = ccf_template[idx_ccf,:,:]
+    ccf_annot_2d = basicu.encode_mat(ccf_annot[idx_ccf,:,:], ccf_maps['encode']).astype('uint32')
+    data.add_matched_ccf(
+        idx_ccf, 
+        ccf_template_2d, 
+        ccf_annot_2d, 
+        )
     # pad to ccf
     data.pad()
 
-    data.render_sanity_check()
+    if plot:
+        data.render_sanity_check()
     
-    return
+    return data
 
-def real_run(XY, ccf, idx_ccf, 
+def real_run(XY, 
+    ccf_template, 
+    ccf_annot, 
+    ccf_maps,
+    idx_ccf, 
     flip=False, # depending on the check run -- do you need to flip it?
     dataset='FISHdata', # a name
     outprefix='', # output
@@ -536,16 +571,16 @@ def real_run(XY, ccf, idx_ccf,
     output = outprefix + 'registered.hdf5'
     logging.info(f"To generate: {outprefix_affine}\n {outprefix_syn}\n {output}")
 
-    # initiation
-    data = Data(dataset, XY)
-    # rotate
-    data.pca_rotate()
-    if flip:
-        data.flip_rotated()
-    # add CCF
-    data.add_matched_ccf(idx_ccf, ccf[idx_ccf,:,:])
-    # pad to ccf
-    data.pad()
+    # preproc
+    data = check_run(XY, 
+        ccf_template, 
+        ccf_annot, 
+        ccf_maps,
+        idx_ccf, 
+        dataset=dataset,
+        flip=flip, 
+        plot=False,
+    )
 
     # affine
     data.run_affine(outprefix_affine)
@@ -562,8 +597,85 @@ def real_run(XY, ccf, idx_ccf,
         reg_iterations=reg_iterations, 
         # **kwargs,
         )
-    # save
-    data.save(output, force=force)
-
     # check results
     data.render_all_comparison()
+
+    # add region ids to cells
+    mask = data.img_ccf_annot
+    region_ids = data.assign_region_ids(mask, mode='moved') # inv transform mask back to image (rotated and padded)
+    region_colors = basicu.encode_mat(region_ids, ccf_maps['colorhex'])
+    region_acronyms = basicu.encode_mat(region_ids, ccf_maps['acronym'])
+
+    # change from "U"type strings to object so it is supported by h5py
+    data.region_id = region_ids
+    data.region_color = region_colors.astype(object)
+    data.region_acronym = region_acronyms.astype(object)
+
+    # # record and save
+    data.save(output, force=force)
+    return data
+
+
+def load_allen_template(
+    allen_template_path
+    ):
+    allen_template = np.load(allen_template_path)
+    return allen_template
+    
+
+def load_allen_tree(
+    allen_tree_path
+    ):
+    """
+    Need to encode Allen regions to smaller integers so it does not get lost in float32 transformation and back during ANTs registration.
+    - `uint32` is the native dtype of Allen, and is supported as an input to ANTs
+    """
+    # tree table
+    allen_tree = pd.read_json(allen_tree_path)
+    allen_tree['sid'] = allen_tree.index+1
+
+    # maps
+    encode_map = allen_tree.set_index('id')['sid'].to_dict()
+    encode_map[0] = 0
+    
+    decode_map = allen_tree.set_index('sid')['id'].to_dict()
+    decode_map[0] = 0
+    
+    color_map = allen_tree.set_index('sid')['rgb_triplet'].to_dict() # integers 0~255
+    color_map[0] = [0,0,0]
+
+    colorhex_map = {sid: powerplots.rgb_to_hex(*color) for sid, color in color_map.items()}
+
+    acronym_map = allen_tree.set_index('sid')['acronym'].to_dict()
+    acronym_map[0] = '' 
+    
+    allen_maps = {
+        'encode': encode_map, # id to sid
+        'decode': decode_map, # id to sid
+        'color': color_map, # sid to color (integers [0~255, 0~255, 0~255])
+        'colorhex': colorhex_map, # sid to color (#xxxxxx)
+        'acronym': acronym_map, # sid to acronym
+    }
+
+    return allen_tree, allen_maps
+
+def load_allen_annot(
+    allen_annot_path, 
+    # encode=False,
+    # allen_tree_path='',
+    ):
+    """
+    Need to encode Allen regions to smaller integers so it does not get lost in float32 transformation and back during ANTs registration.
+    - `uint32` is the native dtype of Allen, and is supported as an input to ANTs
+    """
+    # takes ~10 seconds
+    allen_annot, meta = nrrd.read(allen_annot_path)
+    allen_annot = allen_annot.astype('uint32')
+    
+    # encode the 3D matrix takes too long (depreciated)
+    # if encode:
+    #     allen_tree, allen_maps = load_allen_tree(allen_tree_path=allen_tree_path)
+    #     encode_map = allen_maps['encode']
+    #     allen_annot = basicu.encode_mat(allen_annot, encode_map).astype('uint32')
+        
+    return allen_annot
