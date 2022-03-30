@@ -1,10 +1,10 @@
 """
 Module Viz deals with all TissueMultiGraph vizualization needs. 
 
-Module has few accessory function and the View class hierarchy. V
+Module has few accessory function and the View class hierarchy. 
 
 """
-
+from matplotlib.gridspec import GridSpec, SubplotSpec
 import matplotlib.cm as cm
 from matplotlib.colors import ListedColormap
 import matplotlib.pyplot as plt
@@ -70,7 +70,10 @@ class View:
         self.fig = plt.figure(figsize = self.figsize)
         for i in range(len(self.Panels)): 
             # add an axes
-            ax = self.fig.add_axes(self.Panels[i].pos)
+            if isinstance(self.Panels[i].pos,SubplotSpec):
+                ax = self.fig.add_subplot(self.Panels[i].pos)
+            else: 
+                ax = self.fig.add_axes(self.Panels[i].pos)
             self.Panels[i].ax = ax
             plt.sca(ax)
             self.Panels[i].plot()
@@ -211,27 +214,12 @@ class Zoom(Panel):
         self.ZP.plot()
         self.ax.set_xlim(self.zoom_coords[0],self.zoom_coords[0]+self.zoom_coords[2])
         self.ax.set_ylim(self.zoom_coords[1],self.zoom_coords[1]+self.zoom_coords[3])
+        
+    # def plot(self):
+    #     super().plot()
+    #     if self.colorbar:
+    #         plt.colorbar(ax=self.ax)
 
- 
-        
-            
-#         def set_view(self):
-#             super().set_view()
-            
-#         def plot_map_zoom(self,**kwargs): 
-#             ix_axes_to_zoom = kwargs.get('ax_to_zooom',0)
-#             zoom_coords = kwargs.get('zoom_coords',None)
-#             # add the boundary on the map axes
-#             ax_zoom = plt.gca()
-#             ax = self.Axes[ix_axes_to_zoom]
-#             ax.add_patch(pRectangle((zoom_coords[0], zoom_coords[1]),
-#                                      zoom_coords[2], zoom_coords[3],
-#                                      fc ='none', 
-#                                      ec ="w",
-#                                      lw = 3))
-        
-#         plt.sca(ax_zoom)
-#         self.plot_map(**kwargs)
 
         
 class Colorpleth(Map):
@@ -242,6 +230,8 @@ class Colorpleth(Map):
     def __init__(self,values_to_map,name=None,pos = (0,0,1,1),**kwargs):
         super().__init__(name=name,pos = pos,**kwargs)
         self.Data['values_to_map'] = values_to_map
+        self.clrmp = kwargs.get('colormap',"hot")
+        self.colorbar = kwargs.get('colorbar',False)
         
     def set_view(self):
         # check that number of items in values to map make sense valu
@@ -254,7 +244,7 @@ class Colorpleth(Map):
         scalar_mapping = scalar_mapping-scalar_mapping.min()
         scalar_mapping = scalar_mapping/scalar_mapping.max()
         self.Styles['polygon']['scalar'] = scalar_mapping
-        self.clrmp = 'hot'
+
         
 
 class RandomColorpleth(Colorpleth):

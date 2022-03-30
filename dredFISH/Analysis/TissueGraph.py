@@ -298,7 +298,7 @@ class TissueMultiGraph:
 
         if celltypes is None:
             # cluster cell types optimally
-            celltypes = TG.multilayer_Leiden_with_cond_entropy()
+            celltypes,optres = TG.multilayer_Leiden_with_cond_entropy(return_res = True)
         
         # add types and key data
         TG.Type = celltypes
@@ -329,7 +329,7 @@ class TissueMultiGraph:
         self.Layers[1].Dtype = squareform(pdist(self.Layers[1].feature_type_mat,metric = 'cosine'))
         self.Layers[1].calc_type2()
         
-        return None
+        return optres
     
     def find_topics(self,ordr=4,max_num_of_topics = 120,use_parallel = True):
         # get local environments per cell and calculate local environment cell type frequencies 
@@ -982,7 +982,7 @@ class TissueGraph:
             
         self.cond_entropy_df = pd.DataFrame(data = {'Entropy' : Ent, 'Ntypes' : Ntypes, 'Resolution' : Rvec})     
     
-    def multilayer_Leiden_with_cond_entropy(self,opt_params = {'iters' : 10, 'n_consensus' : 50}): 
+    def multilayer_Leiden_with_cond_entropy(self,opt_params = {'iters' : 10, 'n_consensus' : 50},return_res = False): 
         """
             Find optimial clusters by peforming clustering on two-layer graph. 
             
@@ -1029,7 +1029,10 @@ class TissueGraph:
                                                   
 
         print(f"Number of types: {len(np.unique(TypeVec))} initial entropy: {-sol['fun']} number of evals: {sol['nfev']}")
-        return TypeVec
+        if return_res: 
+            return TypeVec,initRes
+        else: 
+            return TypeVec
     
     def gradient_magnitude(self,V):
         EL = self.SG.get_edgelist()
