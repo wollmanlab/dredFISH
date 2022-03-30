@@ -9,61 +9,56 @@ TissueGraph: Each layers (cells, zones, microenv, regions) is defined using a gr
 
 """
 
-# dependeices
-from igraph import *
+# dependencies
+import functools
+import ipyparallel as ipp
+from collections import Counter
+import numpy as np
+import pandas as pd
+import itertools
+import logging
 
+from igraph import *
 import pynndescent 
 from scipy.spatial import Delaunay,Voronoi
 from scipy.optimize import minimize_scalar
 from scipy.spatial.distance import jensenshannon, pdist, squareform
-from scipy.cluster.hierarchy import dendrogram, linkage, to_tree, fcluster, cut_tree
+# from scipy.spatial.distance import jensenshannon, cdist, pdist, squareform
+# from scipy.cluster.hierarchy import dendrogram, linkage, to_tree, fcluster, cut_tree
 from scipy.sparse.csgraph import dijkstra
 from scipy.stats import entropy, mode,median_abs_deviation
-from scipy.stats.contingency import crosstab
-from scipy.special import rel_entr
-from scipy.interpolate import interp2d, interp1d
-
+# from scipy.stats.contingency import crosstab
+# from scipy.special import rel_entr
+# from scipy.interpolate import interp2d, interp1d
 
 import sklearn
+from sklearn.preprocessing import normalize
 import sklearn.decomposition
 from sklearn.decomposition import LatentDirichletAllocation
 from sklearn.neighbors import NearestNeighbors
-from sklearn.metrics import adjusted_rand_score,adjusted_mutual_info_score 
-from rasterio.features import rasterize
+from sklearn.metrics import adjusted_rand_score, adjusted_mutual_info_score 
 
+import anndata
+from rasterio.features import rasterize
 from numpy.random import default_rng
 rng = default_rng()
+# to create geomtries
+from shapely.geometry import Polygon, MultiPolygon, LineString, MultiLineString
+# import torch
 
-from sklearn.preprocessing import normalize
-from MERFISH_Objects.FISHData import *
-
-import functools
-import ipyparallel as ipp
-
-from collections import Counter
-
-import numpy as np
-import numpy
-import pandas as pd
-import torch
-
-import itertools
 import dill as pickle
-
-from scipy.spatial.distance import jensenshannon, cdist, pdist, squareform
-
 from pyemd import emd
+
+from PySpots.MERFISH_Objects.FISHData import *
+from dredFISH.Analysis import basicu
+from dredFISH.Analysis import regu
+from dredFISH.Visualization.cell_colors import *
+from dredFISH.Visualization.vor import voronoi_polygons, bounding_box
 
 # for debuding mostly
 import warnings
 import time
 from IPython import embed
-
-# to create geomtries
-from shapely.geometry import Polygon, MultiPolygon, LineString, MultiLineString
-
-from dredFISH.Visualization.cell_colors import *
-from dredFISH.Visualization.vor import voronoi_polygons, bounding_box
 
 ##### Some simple accessory funcitons
 def count_values(V,refvals,sz = None,norm_to_one = True):
@@ -196,8 +191,9 @@ class TissueMultiGraph:
             * N
             * Ntypes
     """
-    def __init__(self,fullfilename = None):
+    def __init__(self,fullfilename = None, name=''):
         # init to empty
+        self.name = name
         self.Layers = list()
         self.layers_graph = list() # a list of tuples that keep track of the relationship between different layers 
         self.Geoms = {}
@@ -223,6 +219,9 @@ class TissueMultiGraph:
             if hasattr(TMGload,'cell_attributes'):
                 self.cell_attributes = TMGload.cell_attributes
 
+            if hasattr(TMGload,'data'):
+                self.data = TMGload.data
+
         return None
     
     def save(self,fullfilename):
@@ -230,6 +229,72 @@ class TissueMultiGraph:
         """
         self.dview=None
         pickle.dump(self,open(fullfilename,'wb'),recurse=True)
+        logging.info(f"saved to {fullfilename}")
+
+    def save_anndata(self,fullfilename):
+        """ save the anndata object
+        """
+        self.data.write(fullfilename)
+        logging.info(f"saved to {fullfilename}")
+
+    def load_from_fishdata(self, fishdata_path, dataset, 
+        output_path='',
+        ):
+        """
+        remove `obs_names_make_unique` which could cause long term issue. instead check if they are already unique or not
+        """
+        # load data
+        fishdata = FISHData(fishdata_path)
+        data = fishdata.load_data('h5ad',dataset=dataset) # an AnnData object
+        if not data.obs.index.is_unique:
+            raise ValueError('Cell index (name) is not unique!')
+
+        # features to use, and remove nan 
+        data.X = data.layers['total_vectors']
+        data = data[np.isnan(data.X.max(1))==False]
+
+        # store in object, and save as file (h5ad), and return
+        self.data = data
+        if output_path:
+            if not os.path.isfile(output_path):
+                data.write(output_path)
+            else:
+                raise ValueError(f"{output_path} already exists...")
+        self.XY = self.data.obs[['stage_x', 'stage_y']].values
+        return data
+    
+    def load_from_anndata(self, anndata_path, **kwargs):
+        """
+        """
+        data = anndata.read(anndata_path, **kwargs) 
+        self.data = data
+        self.XY = self.data.obs[['stage_x', 'stage_y']].values
+        return data
+
+    def normalize_data(self, norm_cell=True, norm_bit=True):
+        """Fangming -- temporary so we can compare...
+        remove `obs_names_make_unique` which could cause long term issue. instead check if they are already unique or not
+        """
+        # data = self.data
+        X = self.data.X.copy()
+
+        # clip at 0
+        X = np.clip(X, 0, None)
+        # total counts per cell
+        bitssum = X.sum(axis=1)
+        logging.info(f"{bitssum.shape[0]} cells, minimum counts = {bitssum.min()}")
+
+        # normalize by cell 
+        if norm_cell:
+            X = X/bitssum.reshape(-1,1)
+            self.data.layers['norm_cell'] = X.copy() # save
+
+        # normalize by bit
+        if norm_bit:
+            X = basicu.zscore(X, axis=0) # 0 - across rows (cells) for each col (bit) 
+            self.data.layers['norm_bit'] = X.copy() # save
+
+        return X # finalized
 
     def load_and_normalize_data(self,base_path,dataset,norm_bit = 'robustZ-iqr', norm_cell = 'polyA'):
 
@@ -280,7 +345,54 @@ class TissueMultiGraph:
 
         XY = np.asarray([data.obs['stage_y'], data.obs['stage_x']])
         XY = np.transpose(XY)
+        self.XY = XY
         return (XY,data.X)
+    
+    def spatial_registration_preview(self, 
+        allen_template, allen_annot, allen_maps,
+        idx_ccf, 
+        flip=False,
+        ):
+        """
+        Check if the selected allen section make sense at all, and if we need to flip the orientation.
+        Nothing is saved and this runs fast.
+        """
+        spatial_data = regu.check_run(self.XY, 
+                                allen_template, 
+                                allen_annot, 
+                                allen_maps,
+                                idx_ccf, 
+                                flip=flip)
+
+        return spatial_data 
+
+    def spatial_registration(self, 
+        allen_template, allen_annot, allen_maps,
+        idx_ccf, 
+        flip=False,
+        outprefix='',
+        force=False,
+        ):
+        """
+        """
+        spatial_data = regu.real_run(self.XY, 
+                        allen_template,
+                        allen_annot,
+                        allen_maps,
+                        idx_ccf, 
+                        flip=flip, 
+                        dataset=self.name, # a name
+                        outprefix=outprefix, 
+                        force=force,
+                        )
+
+        # update results to anndata (cell level atrributes)
+        self.data.obs['coord_x'] = spatial_data.points_rot[:,0]
+        self.data.obs['coord_y'] = spatial_data.points_rot[:,1]
+        self.data.obs['region_id'] = spatial_data.region_id
+        self.data.obs['region_color'] = spatial_data.region_color 
+        self.data.obs['region_acronym'] = spatial_data.region_acronym 
+        return spatial_data
         
     def create_cell_and_zone_layers(self,XY,PNMF,celltypes = None): 
         """
