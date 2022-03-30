@@ -679,3 +679,19 @@ def load_allen_annot(
     #     allen_annot = basicu.encode_mat(allen_annot, encode_map).astype('uint32')
         
     return allen_annot
+
+def expand_regions(allen_tree, regions, by='acronym'):
+    """get all regions (their sid) belong to the specified regions.
+    """
+    # assert by == 'acronym' # others are not implemented
+    stree = allen_tree[allen_tree[by].isin(regions)].copy()
+    stree_ids = stree['id'].values
+    
+    # check which regions has their ids in their structure_id_path
+    conds = [0]*len(allen_tree)
+    for _id in stree_ids:
+        cond = allen_tree['structure_id_path'].apply(lambda x: _id in x)
+        conds += cond # or
+    conds = conds > 0
+                       
+    return allen_tree[conds]['sid'].values
