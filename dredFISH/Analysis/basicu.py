@@ -262,3 +262,10 @@ def zscore(v, **kwargs):
     axis=1 # zscore across cols for each row  (if v is 2-dimensional)
     """
     return (v-np.mean(v, **kwargs))/(np.std(v, **kwargs))
+
+def stratified_sample(df, col, n, group_keys=False, sort=False, **kwargs):
+    """
+    n represents number per group
+    """
+    dfsub = df.groupby(col, group_keys=group_keys, sort=sort, **kwargs).apply(lambda x: x.sample(n=min(len(x), n), random_state=0))
+    return dfsub
