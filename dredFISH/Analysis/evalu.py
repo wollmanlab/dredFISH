@@ -12,8 +12,9 @@ class Level3Res:
     def __init__(self, meta, levels, 
                  refdata_anndata, data_anndata,  
                  refdata_name='scRNA-seq', data_name='dredFISH',
+                 data_layer='norm_cell',
                  embed=False, df_embed='',
-                ):
+                ):        
         """
         """
         self.meta = meta
@@ -22,7 +23,10 @@ class Level3Res:
         self.levels = levels
         
         self.X = self.refdata.X
-        self.Y = self.data.layers['norm_cell']
+        if data_layer == 'norm_cell':
+            self.Y = self.data.layers['norm_cell']
+        else:
+            self.Y = self.data.X
         
         self.Xobs = self.refdata.obs
         self.Yobs = self.data.obs
@@ -46,7 +50,7 @@ class Level3Res:
             self.X, 
             self.Xobs[level].values, 
             row_order)
-        Xclst = basicu.zscore(Xclst, axis=0)
+        Xclst = basicu.zscore(Xclst, allow_nan=True, axis=0)
         Xclst = Xclst[:,col_order]
         Xclst = pd.DataFrame(Xclst, index=row_order, columns=col_order)
 
@@ -55,13 +59,13 @@ class Level3Res:
             self.Y,
             self.Yobs[level].values,
             row_order)
-        Yclst = basicu.zscore(Yclst, axis=0)
+        Yclst = basicu.zscore(Yclst, allow_nan=True, axis=0)
         Yclst = Yclst[:,col_order]
         Yclst = pd.DataFrame(Yclst, index=row_order, columns=col_order)
         
         return Xclst, Yclst
     
-    def get_cell_level(self, nsample=0, mode='Y'):
+    def get_cell_level(self, nsample=0, mode='Y', norm_bits=True, reorder_bits=True):
         """
         """
         # random samples of cells
@@ -78,12 +82,28 @@ class Level3Res:
             cellids = dfsub.index.get_level_values(1)
             cellintids = basicu.get_index_from_array(obs.index.values, cellids)
             clst_sizes = dfsub[level].value_counts().reindex(row_order)
-            mat_cell = basicu.zscore(mat, axis=0)[cellintids][:,col_order]
-            
+
+            if norm_bits:
+                mat_cell = basicu.zscore(mat, allow_nan=True, axis=0)
+            else:
+                mat_cell = mat
+
+            # sample
+            mat_cell = mat_cell[cellintids]
+
+            if reorder_bits:
+                mat_cell = mat_cell[:,col_order]
+
             return mat_cell, clst_sizes, dfsub
         
         else:
-            mat_cell = basicu.zscore(mat, axis=0)[:,col_order]
+            if norm_bits:
+                mat_cell = basicu.zscore(mat, allow_nan=True, axis=0)
+            else:
+                mat_cell = mat
+
+            if reorder_bits:
+                mat_cell = mat_cell[:,col_order]
             return mat_cell, '', ''
             
     def get_umap(self, **kwargs):
@@ -124,10 +144,12 @@ class Level3Res:
         """
         Xclst, Yclst = self.get_cluster_level()
         
-        plot_validation_genes_level3(Xclst, Yclst, self.meta['l3_hlines'], self.meta['l3_vlines'])
+        plot_validation_genes_level3(Xclst, Yclst, self.meta['l3_hlines'], self.meta['l3_vlines'], 
+                                    xtitle=self.Xname, ytitle=self.Yname,
+                                    )
         
         Ycell, clst_sizes, dfsub = self.get_cell_level(nsample=nsample, mode='Y')
-        plot_validation_genes_level3_expand(Ycell, clst_sizes, self.meta['l3_vlines'])
+        plot_validation_genes_level3_expand(Ycell, clst_sizes, self.meta['l3_vlines'], ylabel=self.Yname)
         
     def plot_embeds(self, hues=[]):
         """
@@ -143,16 +165,70 @@ class Level3Res:
         fig.subplots_adjust(wspace=0)
         plt.show()
 
+def variance_explained(Xmat, Ymat):
+    """
+    """
+    # var explained
+    cond = ~np.any(Ymat.isnull(), axis=1) #.sum(axis=1) == 0 # not null
+    Xmatval = Xmat[cond] 
+    Ymatval = Ymat[cond]
+    if (np.abs(np.power(Xmatval, 2).mean().mean() - 1) < 1e-2
+    ):
+        varexp = 1-np.power(Ymatval-Xmatval, 2).mean().mean()
+    else:
+        varexp = 1-np.power(Ymatval-Xmatval, 2).mean().mean()/np.power(Xmatval, 2).mean().mean() # not calculate
+    return varexp 
 
-def plot_validation_genes_level3(Xmat, Ymat, splitat, splitat_v):
+def compare_cluster_pearsonr(Xmat, Ymat):
+    """matched rows
+    """
+    # var explained
+    cond = ~np.any(Ymat.isnull(), axis=1) #.sum(axis=1) == 0 # not null
+    Xmatval = Xmat[cond].values
+    Ymatval = Ymat[cond].values
+    celltypes = Xmat[cond].index.values
+
+    rs = basicu.corr_paired_rows_fast(Xmatval, Ymatval, offset=0, mode='pearsonr')
+
+    return rs, celltypes
+
+def plot_validation_genes_cluster_r(ax, Xmat, Ymat, xlabel='scRNA-seq', ylabel='dredFIS'):
     """
     """
-    assert np.abs(np.power(Xmat, 2).mean().mean() - 1) < 1e-2
-    assert np.abs(np.power(Ymat, 2).mean().mean() - 1) < 1e-2
-    varexp = 1-np.power(Ymat-Xmat, 2).mean().mean()
-    
+    rs, types = compare_cluster_pearsonr(Xmat, Ymat)
+    dfr = pd.DataFrame()
+    dfr['r'] = rs
+    dfr['type'] = types
+    dfr['condition'] = f'{xlabel} vs {ylabel}'
+
+    # rs, types
+    sns.boxplot(data=dfr, x='condition', y='r', color='white', showfliers=False, 
+                ax=ax,
+            )
+    sns.swarmplot(data=dfr, x='condition', y='r', color='black', s=5, ax=ax)
+    ax.set_ylim([0,1])
+    sns.despine(ax=ax)
+    ax.set_ylabel('Pearson r')
+    ax.set_xlabel('')
+
+    meanr = np.mean(rs)
+    ax.set_title(f'Mean r = {meanr:.2g}')
+    return ax
+
+def plot_validation_genes_level3(Xmat, Ymat, splitat, splitat_v, xtitle='scRNA-seq', ytitle='dredFISH'):
+    """
+    """
+    # var explained
+    varexp = variance_explained(Xmat, Ymat) 
+
+    # plot 
     fig, axs = plt.subplots(1, 2, figsize=(12, 10))
     cbar_ax = fig.add_axes([.97, .4, .01, .2])
+    boxplot_ax = fig.add_axes([1.15, .3, .1, .4])
+    plot_validation_genes_cluster_r(boxplot_ax, Xmat, Ymat, xlabel=xtitle, ylabel=ytitle)
+    
+    # Xmat = Xmat.fillna(0)
+    Ymat = Ymat.fillna(0)
     ax = axs[0]
     sns.heatmap(Xmat, 
                 yticklabels=True, xticklabels=True, 
@@ -160,7 +236,7 @@ def plot_validation_genes_level3(Xmat, Ymat, splitat, splitat_v):
                 cbar_ax=cbar_ax,
                 cbar_kws=dict(label='normed features'),
                 ax=ax)
-    ax.set_title('scRNA-seq')
+    ax.set_title(f'{xtitle}')
     ax.set_xticklabels(ax.get_xticklabels(), fontsize=10)
     ax.set_yticklabels(ax.get_yticklabels(), fontsize=10, rotation=0)
     # lines
@@ -175,7 +251,7 @@ def plot_validation_genes_level3(Xmat, Ymat, splitat, splitat_v):
                 vmax=3, vmin=-3, cmap='coolwarm', 
                 cbar=False,
                 ax=ax)
-    ax.set_title(f'dredFISH (var explained = {varexp:.2f})')
+    ax.set_title(f'{ytitle} (var explained = {varexp:.2f})')
     ax.set_xticklabels(ax.get_xticklabels(), fontsize=10)
     # ylabels
     ylabels = Ymat.index.values
@@ -189,7 +265,7 @@ def plot_validation_genes_level3(Xmat, Ymat, splitat, splitat_v):
     plt.show()
 
 
-def plot_validation_genes_level3_expand(Ymat, clst_sizes, splitat_v):
+def plot_validation_genes_level3_expand(Ymat, clst_sizes, splitat_v, ylabel='dredFISH'):
     """
     """
     fig, ax = plt.subplots(figsize=(8,15))
@@ -205,7 +281,7 @@ def plot_validation_genes_level3_expand(Ymat, clst_sizes, splitat_v):
         ax.text(0, y, clst, ha='right', fontsize=10)
         ax.axhline(y, color='white', linewidth=1)
     ax.vlines(1+np.array(splitat_v), 0, Ymat.shape[0], linewidth=0.5, color='white')
-    ax.set_title(f"dredFISH cells\n(n={clst_sizes.iloc[0]} cells per cell type)")
+    ax.set_title(f"{ylabel} cells\n(n={clst_sizes.iloc[0]} cells per cell type)")
     
     plt.show()
 

@@ -1,5 +1,6 @@
 """
 """
+from typing import Union
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -240,6 +241,16 @@ def group_mean(mat, groups, group_order=[]):
     
     return groupmat.dot(mat), group_order
 
+def libsize_norm(mat):
+    """cell by gene matrix, norm to median library size
+    assume the matrix is in sparse format, the output will keep sparse
+    """
+    lib_size = mat.sum(axis=1)
+    lib_size_median = np.median(lib_size)
+
+    matnorm = (mat/lib_size.reshape(-1,1))*lib_size_median
+    return matnorm
+
 def sparse_libsize_norm(mat):
     """cell by gene matrix, norm to median library size
     assume the matrix is in sparse format, the output will keep sparse
@@ -251,7 +262,7 @@ def sparse_libsize_norm(mat):
     matnorm = lib_size_inv.dot(mat)
     return matnorm
 
-def zscore(v, **kwargs):
+def zscore(v, allow_nan=False, **kwargs):
     """
     v is an numpy array (any dimensional)
 
@@ -261,15 +272,36 @@ def zscore(v, **kwargs):
     axis=0 # zscore across rows for each column (if v is 2-dimensional)
     axis=1 # zscore across cols for each row  (if v is 2-dimensional)
     """
-    return (v-np.mean(v, **kwargs))/(np.std(v, **kwargs))
+    if allow_nan:
+        return (v-np.nanmean(v, **kwargs))/(np.nanstd(v, **kwargs))
+    else:
+        return (v-np.mean(v, **kwargs))/(np.std(v, **kwargs))
 
-def stratified_sample(df, col, n, return_idx=False, group_keys=False, sort=False, **kwargs):
+def stratified_sample(df, col, n: Union[int, dict], return_idx=False, group_keys=False, sort=False, **kwargs):
     """
-    n represents number per group
+    n (int) represents the number for each group
+    n (dict) can be used to sample different numbers for each group
     """
-    dfsub = df.groupby(col, group_keys=group_keys, sort=sort, **kwargs).apply(lambda x: x.sample(n=min(len(x), n), random_state=0))
+    if isinstance(n, int):
+        dfsub = df.groupby(col, group_keys=group_keys, sort=sort, **kwargs).apply(
+            lambda x: x.sample(n=min(len(x), n), random_state=0)
+            )
+    elif isinstance(n, dict):
+        dfsub = df.groupby(col, group_keys=group_keys, sort=sort, **kwargs).apply(
+            lambda x: x.sample(n=min(len(x), n[x[col].iloc[0]]), random_state=0)
+            )
+
     if not return_idx:
         return dfsub
     else:
         idx = get_index_from_array(df.index.values, dfsub.index.values)
         return dfsub, idx
+
+
+def clip_by_percentile(vector, low_p=5, high_p=95):
+    """
+    """
+    low_val = np.percentile(vector, low_p)
+    high_val = np.percentile(vector, high_p)
+    vector_clip = np.clip(vector, low_val, high_val)
+    return vector_clip

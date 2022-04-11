@@ -32,9 +32,9 @@ class CellTypeClassify(object):
         # # got at the end of the run
         # self.y_data
 
-    def run(self):
+    def run(self, n_cells=100):
         self.normalizeData()
-        self.classBalance()
+        self.classBalance(n_cells=n_cells)
         self.buildModel()
         
         self.trainModel()
@@ -57,11 +57,15 @@ class CellTypeClassify(object):
         if n_cells > cluster size, it selects **all** cells 
         """
         # sample
-        _df = pd.Series(self.y_refdata).to_frame('label')
-        idx = basicu.stratified_sample(_df, 'label', n_cells).sort_index().index.values
-        
-        self.Xbalanced_refdata = self.Xnorm_refdata[idx,:]
-        self.ybalanced_refdata = self.y_refdata[idx]
+        if n_cells > 0:
+            _df = pd.Series(self.y_refdata).to_frame('label')
+            idx = basicu.stratified_sample(_df, 'label', n_cells).sort_index().index.values
+            
+            self.Xbalanced_refdata = self.Xnorm_refdata[idx,:]
+            self.ybalanced_refdata = self.y_refdata[idx]
+        else:
+            self.Xbalanced_refdata = self.Xnorm_refdata
+            self.ybalanced_refdata = self.y_refdata
         
     def trainModel(self):
         self.model.fit(self.Xbalanced_refdata, self.ybalanced_refdata)
@@ -76,7 +80,10 @@ def iterative_classify(
                  X_data,
                  levels,
                  model=None,
-                 verbose=True):
+                 verbose=True, 
+                 run_func='run',
+                 **run_kwargs,
+                 ):
     """
     """
     y_data = np.empty((len(X_data),len(levels)), dtype=object)
@@ -114,17 +121,21 @@ def iterative_classify(
                              local_y_refdata,
                              local_X_data,
                              model=model,
-                             verbose=verbose)
-            local_y_data = rc.run()
+                             verbose=verbose, 
+                             )
+            try:
+                local_y_data = getattr(rc, run_func)(**run_kwargs)
+                # catch results
+                y_data[idx_data, _iter] = local_y_data
 
-            # catch results
-            y_data[idx_data, _iter] = local_y_data
+                # set up for the next round
+                y_data_unique = np.unique(local_y_data)
+                for cluster in y_data_unique:
+                    next_rounds.append(f'level_{_iter+1}_cluster_{cluster}')
+                    next_rounds_idx_refdata.append(idx_refdata[(local_y_refdata == cluster)])
+                    next_rounds_idx_data.append(idx_data[(local_y_data == cluster)])
+            except:
+                logging.info(f'Failed splitting: {_round}')
 
-            # set up for the next round
-            y_data_unique = np.unique(local_y_data)
-            for cluster in y_data_unique:
-                next_rounds.append(f'level_{_iter+1}_cluster_{cluster}')
-                next_rounds_idx_refdata.append(idx_refdata[(local_y_refdata == cluster)])
-                next_rounds_idx_data.append(idx_data[(local_y_data == cluster)])
                 
     return y_data
