@@ -305,3 +305,9 @@ def clip_by_percentile(vector, low_p=5, high_p=95):
     high_val = np.percentile(vector, high_p)
     vector_clip = np.clip(vector, low_val, high_val)
     return vector_clip
+
+def rank(arr, **kwargs):
+    """rank is equivalent to argsort twice
+    """
+    arr = np.array(arr)
+    return np.argsort(np.argsort(arr, **kwargs), **kwargs)
