@@ -105,6 +105,11 @@ class CellTypeClassify(object):
             self.X_data = self.X_data*f_stats.reshape(1,-1)
             self.X_refdata = self.X_refdata*f_stats.reshape(1,-1)
 
+            if self.verbose == 2: # extremely verbose
+                f_stats_formatted = np.array2string(100*f_stats/np.sum(f_stats), precision=2, floatmode='fixed')
+                expected = 100*1/len(f_stats)
+                logging.info(f'F statistics (%): expected = {expected:.2g}\n{f_stats_formatted}')
+
             return f_stats
     
     def rankNorm(self):
@@ -113,7 +118,7 @@ class CellTypeClassify(object):
         self.X_data = basicu.rank(self.X_data, axis=1) # across cols (1) for each row
         self.X_refdata = basicu.rank(self.X_refdata, axis=1)
             
-    def classBalance(self, n_cells: Union[int, dict]=100):
+    def classBalance(self, n_cells: Union[int, dict]=100, random_state=0):
         """ Class Balance  the reference data 
         select `n_cells` from each cluster without replacement
         if n_cells > cluster size, it selects **all** cells 
@@ -124,14 +129,14 @@ class CellTypeClassify(object):
                 pass 
             elif n_cells > 0: # select equal number of cells
                 _df = pd.Series(self.y_refdata).to_frame('label')
-                idx = basicu.stratified_sample(_df, 'label', n_cells).sort_index().index.values
+                idx = basicu.stratified_sample(_df, 'label', n_cells, random_state=random_state).sort_index().index.values
 
                 self.X_refdata = self.X_refdata[idx,:]
                 self.y_refdata = self.y_refdata[idx]
                 
         elif isinstance(n_cells, dict): # non-equal number of cells
             _df = pd.Series(self.y_refdata).to_frame('label')
-            idx = basicu.stratified_sample(_df, 'label', n_cells).sort_index().index.values
+            idx = basicu.stratified_sample(_df, 'label', n_cells, random_state=random_state).sort_index().index.values
 
             self.X_refdata = self.X_refdata[idx,:]
             self.y_refdata = self.y_refdata[idx]
@@ -143,10 +148,12 @@ class CellTypeClassify(object):
         self.y_data = self.model.predict(self.X_data)
 
     ############################
-    def run(self, norm=True, ranknorm=False, n_cells: Union[int, dict]=100):
+    def run(self, norm=True, ranknorm=False, n_cells: Union[int, dict]=100, 
+        random_state=0,
+        ):
         """ sample, normalize, classify
         """
-        self.classBalance(n_cells=n_cells)
+        self.classBalance(n_cells=n_cells, random_state=random_state)
         self.normalizeData(norm=norm)
         if ranknorm: 
             self.rankNorm()
@@ -156,7 +163,45 @@ class CellTypeClassify(object):
         self.trainModel()
         self.predictLabels()
         return self.y_data
+
     ############################
+    def run_bagging(self, n_estimators=10, norm=True, ranknorm=False, n_cells: Union[int, dict]=100, 
+        random_state=0,
+        ):
+        """repeat the same algorithm for different subsets of samples several time, taking the average as the results
+        """
+        # backup
+        self.backup()
+
+        ensem_res = []
+        for i_estimate in np.arange(n_estimators):
+
+            self.classBalance(n_cells=n_cells, random_state=random_state)
+            self.normalizeData(norm=norm)
+            if ranknorm: 
+                self.rankNorm()
+
+            self.buildModel()
+            
+            self.trainModel()
+            self.predictLabels()
+
+            ensem_res.append(self.y_data)
+
+            self.reset()
+
+        ensem_res = np.array(ensem_res) # (#ensem, #cells)
+        labels, idx = np.unique(ensem_res, return_inverse=True)
+        idx = idx.reshape(ensem_res.shape)
+        mode, count = stats.mode(idx, axis=0)
+        if np.all(count == n_estimators):
+            logging.info("Warning: all estimators are the same -- check random seed!!")
+        # else:
+        #     logging.info("looking good!")
+        y_data = labels[mode].reshape(-1,)
+
+        self.y_data = y_data
+        return self.y_data
         
     def run_iterative_prior(self, 
                             overall_sample_fraction=0.5,
@@ -166,6 +211,7 @@ class CellTypeClassify(object):
                             subrun_func='run',
                             norm='per_bit_equalscale',
                             ranknorm=False,
+                            random_state=0,
                             ):
         """Iteratively set up the number of cell to sample, control overall sample fraction
         """
@@ -193,9 +239,11 @@ class CellTypeClassify(object):
             logging.info(f"Re-sample iteration {i_iter}, diff {diff}")
 
             # run 
-            self.y_data = getattr(self, subrun_func)(n_cells=n_cells, norm=norm, ranknorm=ranknorm) # note that n_cells are auto-generated
-            logging.info(f"Reference (scRNA-seq): {np.unique(self.y_refdata, return_counts=True)}")
-            logging.debug(f"Prediction (dredFISH): {np.unique(self.y_data, return_counts=True)}")
+            self.y_data = getattr(self, subrun_func)(n_cells=n_cells, norm=norm, ranknorm=ranknorm, random_state=random_state) # note that n_cells are auto-generated
+            _types, _counts = np.unique(self.y_refdata, return_counts=True)
+            logging.info(f"Reference (scRNA-seq) sampled: {_types} \n {_counts}")
+            _types, _counts = np.unique(self.y_data, return_counts=True)
+            logging.debug(f"Prediction (dredFISH) sampled: {_types} \n {_counts}")
 
             # retrieve cluster sizses
             types_new, sizes = np.unique(self.y_data, return_counts=True)
@@ -222,7 +270,9 @@ class CellTypeClassify(object):
                             min_cells=20,
                             p0=0, # no momentum
                             subrun_func='run',
-                            norm=True,
+                            norm='per_bit_equalscale',
+                            ranknorm=False,
+                            random_state=0,
                             ):
         """Iteratively set up the number of cell to sample, control baseline number of cells
         """
@@ -246,9 +296,11 @@ class CellTypeClassify(object):
             logging.info(f"Re-sample iteration {i_iter}, diff {diff}")
 
             # run 
-            self.y_data = getattr(self, subrun_func)(n_cells=n_cells, norm=norm) # note that n_cells are auto-generated
-            logging.info(f"Reference (scRNA-seq): {np.unique(self.y_refdata, return_counts=True)}")
-            logging.debug(f"Prediction (dredFISH): {np.unique(self.y_data, return_counts=True)}")
+            self.y_data = getattr(self, subrun_func)(n_cells=n_cells, norm=norm, ranknorm=ranknorm, random_state=random_state) # note that n_cells are auto-generated
+            _types, _counts = np.unique(self.y_refdata, return_counts=True)
+            logging.info(f"Reference (scRNA-seq) sampled: {_types} \n {_counts}")
+            _types, _counts = np.unique(self.y_data, return_counts=True)
+            logging.debug(f"Prediction (dredFISH) sampled: {_types} \n {_counts}")
 
             # retrieve cluster sizses
             types_new, sizes = np.unique(self.y_data, return_counts=True)

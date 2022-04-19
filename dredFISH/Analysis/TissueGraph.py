@@ -51,7 +51,6 @@ from pyemd import emd
 
 from PySpots.MERFISH_Objects.FISHData import *
 from dredFISH.Analysis import basicu
-from dredFISH.Analysis import regu
 from dredFISH.Visualization.cell_colors import *
 from dredFISH.Visualization.vor import voronoi_polygons, bounding_box
 
@@ -357,6 +356,7 @@ class TissueMultiGraph:
         Check if the selected allen section make sense at all, and if we need to flip the orientation.
         Nothing is saved and this runs fast.
         """
+        from dredFISH.Analysis import regu # the package ANTs is often incompatible with a few others
         spatial_data = regu.check_run(self.XY, 
                                 allen_template, 
                                 allen_annot, 
@@ -375,6 +375,7 @@ class TissueMultiGraph:
         ):
         """
         """
+        from dredFISH.Analysis import regu # the package ANTs is often incompatible with a few others
         spatial_data = regu.real_run(self.XY, 
                         allen_template,
                         allen_annot,

@@ -277,18 +277,18 @@ def zscore(v, allow_nan=False, **kwargs):
     else:
         return (v-np.mean(v, **kwargs))/(np.std(v, **kwargs))
 
-def stratified_sample(df, col, n: Union[int, dict], return_idx=False, group_keys=False, sort=False, **kwargs):
+def stratified_sample(df, col, n: Union[int, dict], return_idx=False, group_keys=False, sort=False, random_state=0, **kwargs):
     """
     n (int) represents the number for each group
     n (dict) can be used to sample different numbers for each group
     """
     if isinstance(n, int):
         dfsub = df.groupby(col, group_keys=group_keys, sort=sort, **kwargs).apply(
-            lambda x: x.sample(n=min(len(x), n), random_state=0)
+            lambda x: x.sample(n=min(len(x), n), random_state=random_state)
             )
     elif isinstance(n, dict):
         dfsub = df.groupby(col, group_keys=group_keys, sort=sort, **kwargs).apply(
-            lambda x: x.sample(n=min(len(x), n[x[col].iloc[0]]), random_state=0)
+            lambda x: x.sample(n=min(len(x), n[x[col].iloc[0]]), random_state=random_state)
             )
 
     if not return_idx:
