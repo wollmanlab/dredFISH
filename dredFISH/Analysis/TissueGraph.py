@@ -49,7 +49,7 @@ from shapely.geometry import Polygon, MultiPolygon, LineString, MultiLineString
 import dill as pickle
 from pyemd import emd
 
-from PySpots.MERFISH_Objects.FISHData import *
+from MERFISH_Objects.FISHData import *
 from dredFISH.Analysis import basicu
 from dredFISH.Visualization.cell_colors import *
 from dredFISH.Visualization.vor import voronoi_polygons, bounding_box
