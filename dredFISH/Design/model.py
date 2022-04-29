@@ -17,7 +17,7 @@ import torch.distributions as dist
 
 from multiprocessing import Pool
 
-from allen_data_iterators import DataIterCached
+from .allen_data_iterators import DataIterCached
 
 
 class InstNrm(nn.Module):

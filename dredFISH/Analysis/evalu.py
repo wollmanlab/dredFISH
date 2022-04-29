@@ -7,6 +7,7 @@ import seaborn as sns
 
 from .__init__plots import *
 from . import basicu
+from . import powerplots
 
 class Level3Res:
     def __init__(self, meta, levels, 
@@ -215,20 +216,31 @@ def plot_validation_genes_cluster_r(ax, Xmat, Ymat, xlabel='scRNA-seq', ylabel='
     ax.set_title(f'Mean r = {meanr:.2g}')
     return ax
 
-def plot_validation_genes_level3(Xmat, Ymat, splitat, splitat_v, xtitle='scRNA-seq', ytitle='dredFISH'):
+def plot_validation_genes_level3(Xmat, Ymat, splitat, splitat_v, xtitle='scRNA-seq', ytitle='dredFISH',
+    show_rows_in_both_only=False,
+    figsize=(12,10),
+    outpath="",
+    ):
     """
     """
     # var explained
     varexp = variance_explained(Xmat, Ymat) 
 
     # plot 
-    fig, axs = plt.subplots(1, 2, figsize=(12, 10))
+    fig, axs = plt.subplots(1, 2, figsize=figsize)
     cbar_ax = fig.add_axes([.97, .4, .01, .2])
     boxplot_ax = fig.add_axes([1.15, .3, .1, .4])
     plot_validation_genes_cluster_r(boxplot_ax, Xmat, Ymat, xlabel=xtitle, ylabel=ytitle)
     
-    # Xmat = Xmat.fillna(0)
-    Ymat = Ymat.fillna(0)
+    if show_rows_in_both_only:
+        rows_cond = ~np.any(np.isnan(Ymat), axis=1)
+        print(f"excluded: {Ymat[~rows_cond].index.values}")
+        Xmat = Xmat[rows_cond]
+        Ymat = Ymat[rows_cond]
+    else:
+        # Xmat = Xmat.fillna(0)
+        Ymat = Ymat.fillna(0)
+
     ax = axs[0]
     sns.heatmap(Xmat, 
                 yticklabels=True, xticklabels=True, 
@@ -262,6 +274,10 @@ def plot_validation_genes_level3(Xmat, Ymat, splitat, splitat_v, xtitle='scRNA-s
     ax.vlines(1+np.array(splitat_v), 0, Ymat.shape[0], linewidth=0.5, color='gray')
     
     fig.subplots_adjust(wspace=0.05)
+
+
+    if outpath:
+        powerplots.savefig_autodate(fig, outpath)
     plt.show()
 
 

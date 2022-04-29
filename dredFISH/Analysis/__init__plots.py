@@ -11,8 +11,8 @@ from IPython.display import set_matplotlib_formats
 
 set_matplotlib_formats('retina')
 mpl.rcParams['pdf.fonttype'] = 42 # editable text in matplotlib
-# mpl.rcParams['font.family'] = 'sans-serif'
-# mpl.rcParams['font.sans-serif'] = ['Arial']
+mpl.rcParams['font.family'] = 'sans-serif'
+mpl.rcParams['font.sans-serif'] = ['Arial']
 # PercentFormat = mtick.FuncFormatter(lambda y, _: '{:.1%}'.format(y))
 
 # empty rectangle (for legend)

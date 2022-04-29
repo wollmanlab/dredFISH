@@ -5,6 +5,17 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 from scipy import sparse
+import logging
+
+def reset_logging(**kwargs):
+    """reset logging.
+    """
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+
+    # logging.basicConfig(level=logging.WARNING)
+    logging.basicConfig(**kwargs)
+    return
 
 def rank_array(array):
     """Return ranking of each element of an array

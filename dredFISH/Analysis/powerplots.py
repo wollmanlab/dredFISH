@@ -5,6 +5,7 @@ import numpy as np
 import datashader as ds
 import colorcet
 import json
+from datetime import datetime
 
 from .__init__plots import *
 
@@ -517,6 +518,16 @@ def savefig(fig, path):
     """
     """
     fig.savefig(path, bbox_inches='tight', dpi=300)
+    return 
+
+def savefig_autodate(fig, path):
+    """
+    """
+    today = datetime.today().date()
+    assert path.endswith('.pdf') or path.endswith('.png') or path.endswith('.jpg')
+    path = path.replace('.', f'_{today}.')
+    savefig(fig, path)
+    print(f"saved the figure to: {path}")
     return 
 
 def rgb_to_hex(r, g, b):
