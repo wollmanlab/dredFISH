@@ -237,7 +237,7 @@ def group_sum(mat, groups, group_order=[]):
     
     return groupmat.dot(mat), group_order
 
-def group_mean(mat, groups, group_order=[]):
+def group_mean(mat, groups, group_order=[], expand=False):
     """
     mat is a matrix (cell-by-feature) ; group are the labels (for each cell).
     """
@@ -248,9 +248,12 @@ def group_mean(mat, groups, group_order=[]):
     
     group_idx = get_index_from_array(group_order, groups)
     groupmat = sparse.csc_matrix(([1]*m, (group_idx, np.arange(m)))) # group by cell
-    groupmat = groupmat/np.sum(groupmat, axis=1)  # row
+    groupmat_norm = groupmat/np.sum(groupmat, axis=1)  # row
     
-    return groupmat.dot(mat), group_order
+    if not expand:
+        return np.asarray(groupmat_norm.dot(mat)), group_order
+    else:
+        return np.asarray(groupmat.T.dot(groupmat_norm.dot(mat)))
 
 def libsize_norm(mat):
     """cell by gene matrix, norm to median library size
