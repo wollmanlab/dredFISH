@@ -28,22 +28,22 @@ class PlotScale:
         
         if pxl_scale:
             self.pxl_scale = pxl_scale
-            self.npxlx = int(rangex/pxl_scale)
-            self.npxly = int(rangey/pxl_scale)
+            self.npxlx = int(self.rangex/self.pxl_scale)
+            self.npxly = int(self.rangey/self.pxl_scale)
         if npxlx:
             assert isinstance(npxlx, int)
             self.npxlx = npxlx
-            self.pxl_scale = rangex/npxlx 
-            self.npxly = int(rangey/pxl_scale)
+            self.pxl_scale = self.rangex/self.npxlx 
+            self.npxly = int(self.rangey/self.pxl_scale)
         if npxly:
             assert isinstance(npxly, int)
             self.npxly = npxly
-            self.pxl_scale = rangey/npxly 
-            self.npxlx = int(rangex/pxl_scale)
+            self.pxl_scale = self.rangey/self.npxly 
+            self.npxlx = int(self.rangex/self.pxl_scale)
 
         self.num_pxl = self.npxlx*self.npxly
-        self.pxl_scale_ux = rangex/self.npxlx
-        self.pxl_scale_uy = rangey/self.npxly 
+        self.pxl_scale_ux = self.rangex/self.npxlx
+        self.pxl_scale_uy = self.rangey/self.npxly 
         self.check_dim()
     
     def check_dim(self):
