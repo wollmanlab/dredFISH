@@ -26,9 +26,9 @@ class InstNrm(nn.Module):
     
     Attributes
     ----------
-        min_pos: minimum position
+        min_pos: minimum position  
         min_sgnl: minimum signal
-        max_signl: maximum signal
+        max_sgnl: maximum signal
         scale: scaling factors
         noise: range of noises for Poisson parameter
     """
@@ -36,7 +36,7 @@ class InstNrm(nn.Module):
         super().__init__()
         self.scale= torch.tensor(scale).log()
         self.noise= noise
-        self.median= torch.tensor(min_pos)
+        self.median= torch.tensor(min_pos) # median intensity -- as each cell has half +; it is the "minimum pos" as well 
         self.min_sgnl= torch.tensor(min_sgnl)
         self.max_sgnl= torch.tensor(max_sgnl)
 
@@ -61,16 +61,15 @@ class InstNrm(nn.Module):
             X1= (X + torch.poisson(self.noise[0]*torch.ones_like(X) + self.noise[1]*torch.randn_like(X))).log()
         # each coarse level cell type will have a median expression value, which is the difference between the last low value
         # and the first high value 
-        # what's o, a, and b????
-        o= X1.sort(1)[0]
-        a= o[:,:o.shape[1]//2]
-        b= o[:,o.shape[1]//2:]
-        l= (a[:,-1:] + b[:,:1])/2
+        o= X1.sort(1)[0] # sort by bits (by col). [0] - val; [1] - indices
+        a= o[:,:o.shape[1]//2] # smaller half
+        b= o[:,o.shape[1]//2:] # bigger half
+        l= (a[:,-1:] + b[:,:1])/2 # middle values for each cell
         
         # lower and upper are bounds on expression, we want counts within their threshold
         lower= ((self.min_sgnl - X).clamp(0)**2).mean() # X lower than min
         upper= ((X - self.max_sgnl).clamp(0)**2).mean() # X larger than max
-        median= ((self.median - b.exp()).clamp(0)**2).mean() # median / min_position, b exp....
+        median= ((self.median - b.exp()).clamp(0)**2).mean() # larger half lower than median  
         return (X1-l)/self.scale, lower + upper + median
 
 
@@ -119,14 +118,14 @@ class CellTypeNet(nn.Module):
         n_cat: number of categories
         lab_map: map from fine to coarse labels 
         reduction: max vs mean pooling
-        min_pos: minimum position, difference from top gene counts [????] 
-        min_sgnl: minimum signal, difference to gene counts [????]
-        max_sgnl: maximum signal, difference from gene counts [????]
+        min_pos: minimum position, difference from top gene counts 
+        min_sgnl: minimum signal, difference to gene counts 
+        max_sgnl: maximum signal, difference from gene counts 
         scale: normalizing factor
-        noise: Poisson noise factors [???????????]
+        noise: Poisson noise factors 
         n_act: number of nodes for discriminator
         n_bit: number of bits for probe set 
-        cnst: not used, possibly the noise type [???????]
+        cnst: not used, possibly the noise type 
         mxpr: max expression
         drprt: dropout proportion
         lmd1: penalty factor on margin loss (projection range: min, max, median) 
@@ -171,10 +170,10 @@ class CellTypeNet(nn.Module):
         self.lab= LabPool(lab_map, reduction=reduction)
         # discriminator
         self.dsc= nn.Sequential(nn.Linear(n_bit, n_act), 
-                                nn.Softplus(), 
+                                nn.Softplus(), # smooth version of ReLU 
                                 nn.Linear(n_act, 1))
 
-    def get_emb(self, X, rnd= False):
+    def get_emb(self, X, rnd=False):
         """
         Finds tanh non-linear transform of data, essentially evaluting nodes at layer 1 and returns margin error
         
