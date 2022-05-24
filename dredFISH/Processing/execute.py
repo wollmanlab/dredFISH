@@ -1,10 +1,19 @@
 #!/usr/bin/env python
 import argparse
-from MERFISH_Objects.FISHData import *
 from datetime import datetime
-from fish_helpers import *
+import numpy as np
+import anndata
+from sklearn.cluster import KMeans
+import pandas as pd
+import importlib
+from metadata import Metadata
+import multiprocessing
+import sys
+from tqdm import tqdm
 from cellpose import models
+import cv2
 import torch
+import os
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -12,6 +21,9 @@ if __name__ == '__main__':
     parser.add_argument("-c","--cword_config", type=str,dest="cword_config",default='dredfish_processing_config', action='store',help="Name of Config File for analysis ie. dredfish_processing_config")
     parser.add_argument("-b", "--batches", type=int, dest="batches", default=2000, action='store', help="Number of batches")
     parser.add_argument("-n", "--ncpu", type=int, dest="ncpu", default=10, action='store', help="Number of threads")
+    parser.add_argument("-nr", "--nregions", type=int, dest="nregions", default=5, action='store', help="Number of Regions/Sections")
+    parser.add_argument("-o", "--outpath", type=str, dest="outpath", default='/bigstore/GeneralStorage/Data/dredFISH/', action='store', help="Path to save data")
+    parser.add_argument("-r", "--resolution", type=int, dest="resolution", default=10, action='store', help="esoltuino to round centroid before naming regions")
     args = parser.parse_args()
     
 class dredFISH_Position_Class(object):
@@ -30,10 +42,9 @@ class dredFISH_Position_Class(object):
         self.proceed = True
         
         self.cword_config = cword_config
-        self.merfish_config = importlib.import_module(self.cword_config)
-        self.parameters = self.merfish_config.parameters
-        self.fishdata = FISHData(os.path.join(self.metadata_path,self.parameters['fishdata']))
-        self.bitmap = self.merfish_config.bitmap
+        self.config = importlib.import_module(self.cword_config)
+        self.parameters = self.config.parameters
+        self.bitmap = self.config.bitmap
         
         self.nucstain_acq = self.parameters['nucstain_acq']
         self.total_acq = self.parameters['total_acq']
@@ -57,17 +68,25 @@ class dredFISH_Position_Class(object):
             self.save_data()
         
     def check_data(self):
-        if self.parameters['overwrite']==False:
-            self.data = self.fishdata.load_data(
-                'h5ad',dataset=self.dataset,posname=self.posname)
-            if isinstance(self.data,type(None))==False:
-                self.proceed==False
-            self.nuclei_mask = self.fishdata.load_data(
-                'nuclei_mask',dataset=self.dataset,posname=self.posname)
-            self.cytoplasm_mask = self.fishdata.load_data(
-                'cytoplasm_mask',dataset=self.dataset,posname=self.posname)
-            self.total_mask = self.fishdata.load_data(
-                'total_mask',dataset=self.dataset,posname=self.posname)
+        if self.parameters['overwrite']:
+            self.proceed = True
+        else:
+            if self.verbose:
+                self.update_user('Checking Existing Data')
+            """ Check If data already generated"""
+            try:
+                fname = os.path.join(self.metadata_path,
+                                     'fishdata',
+                                     self.dataset+'_'+self.posname+'_data.h5ad')
+                data = anndata.read_h5ad(fname)
+            except:
+                data = None
+            if isinstance(data,anndata._core.anndata.AnnData):
+                self.proceed = False
+                if self.verbose:
+                    self.update_user(self.posname+' Data Found')
+            else:
+                self.proceed = True
         
     def config_data(self):
         if self.verbose:
@@ -262,6 +281,16 @@ class dredFISH_Position_Class(object):
         self.cyto_vectors = cyto_vectors
         self.total_vectors = total_vectors
         
+    def add_and_save_data(self,data,dtype='h5ad'):
+        if not os.path.exists(os.path.join(self.metadata_path,'fishdata')):
+            os.mkdir(os.path.join(self.metadata_path,'fishdata'))
+        if dtype=='h5ad':
+            fname = os.path.join(self.metadata_path,'fishdata',self.dataset+'_'+self.posname+'_data.h5ad')
+            data.write(filename=fname)
+        else:
+            fname = os.path.join(self.metadata_path,'fishdata',self.dataset+'_'+self.posname+'_'+dtype+'.tif')
+            cv2.imwrite(fname, data.astype('uint16'))
+        
     def save_data(self):
         if self.verbose:
             self.update_user('Saving Data and Masks')
@@ -277,22 +306,11 @@ class dredFISH_Position_Class(object):
         """ Remove Nans"""
         data = data[np.isnan(data.layers['total_vectors'].sum(1))==False]
         self.data = data
-        self.fishdata.add_and_save_data(self.data,
-                                        dtype='h5ad',
-                                        dataset=self.dataset,
-                                        posname=self.posname)
-        self.fishdata.add_and_save_data(self.nuclei_mask.numpy(),
-                                        dtype='nuclei_mask',
-                                        dataset=self.dataset,
-                                        posname=self.posname)
-        self.fishdata.add_and_save_data(self.cytoplasm_mask.numpy(),
-                                        dtype='cytoplasm_mask',
-                                        dataset=self.dataset,
-                                        posname=self.posname)
-        self.fishdata.add_and_save_data(self.total_mask.numpy(),
-                                        dtype='total_mask',
-                                        dataset=self.dataset,
-                                        posname=self.posname)
+        self.add_and_save_data(self.data,dtype='h5ad')
+        self.add_and_save_data(self.nuclei_mask.numpy(),dtype='nuclei_mask')
+        self.add_and_save_data(self.cytoplasm_mask.numpy(),dtype='cytoplasm_mask')
+        self.add_and_save_data(self.total_mask.numpy(),dtype='total_mask')
+
         
 def wrapper(data):
     try:
@@ -301,19 +319,25 @@ def wrapper(data):
                                             data['posname'],
                                             data['cword_config'],
                                             verbose=False)
-        pos_class.main()
+        pos_class.run()
     except Exception as e:
         print(posname)
         print(e)
     return data
     
 if __name__ == '__main__':
+    """ Unload Parameters"""
     metadata_path = args.metadata_path
     cword_config = args.cword_config
-    merfish_config = importlib.import_module(cword_config)
-    fishdata = FISHData(os.path.join(metadata_path,merfish_config.parameters['fishdata']))
+    config = importlib.import_module(cword_config)
     batches = args.batches
     ncpu=args.ncpu
+    nregions = args.nregions
+    outpath = args.outpath
+    resolution = args.resolution
+    print(args)
+    
+    """ Setup Batches"""
     dataset = [i for i in metadata_path.split('/') if not i==''][-1]
     image_metadata = Metadata(metadata_path)
     hybes = np.array([i for i in image_metadata.acqnames if 'hybe' in i])
@@ -327,8 +351,7 @@ if __name__ == '__main__':
                 'posname':posname,
                 'cword_config':cword_config}
         Input.append(data)
-
-    print(len(Input))
+    """ Process Batches """
     temp_input = []
     for i in Input:
         temp_input.append(i)
@@ -355,15 +378,17 @@ if __name__ == '__main__':
     """ Merge Positions """
     data_list = []
     for posname in posnames:
-        data = fishdata.load_data('h5ad',
-                                            dataset=dataset,
-                                            posname=posname)
+        try:
+            data = anndata.read_h5ad(os.path.join(metadata_path,'fishdata',dataset+'_'+posname+'_data.h5ad'))
+        except:
+            data = None
         if isinstance(data,anndata._core.anndata.AnnData):
             data_list.append(data)
     data = anndata.concat(data_list)
+    
     """ Update Stage Coordiantes """
-    pixel_size = merfish_config.parameters['segment_pixel_size']
-    camera_direction = merfish_config.parameters['camera_direction']
+    pixel_size = config.parameters['pixel_size']
+    camera_direction = config.parameters['camera_direction']
     stage_x = np.array(data.obs['posname_stage_x']) + camera_direction[0]*pixel_size*np.array(data.obs['pixel_x'])
     stage_y = np.array(data.obs['posname_stage_y']) + camera_direction[1]*pixel_size*np.array(data.obs['pixel_y'])
     data.obs['stage_x'] = stage_x
@@ -372,8 +397,41 @@ if __name__ == '__main__':
     xy[:,0] = data.obs['stage_x']
     xy[:,1] = data.obs['stage_y']
     data.obsm['stage'] = xy
-    """ Save Data """
+    
     """ Remove Nans"""
     data = data[np.isnan(data.layers['total_vectors'].sum(1))==False]
-    fishdata.add_and_save_data(data,dtype='h5ad',dataset=dataset)
-    """ Manually Check Data and save to /bigstore/GeneralStorage/Data/dredFISH as dataset.h5ad"""
+    
+    """ Assign Brains"""
+    data.obs['dataset'] = dataset
+    data.obs['brain_index'] = KMeans(n_clusters=nregions, random_state=0,n_init=50).fit(data.obsm['stage']).labels_
+    
+    """ Separate and Save Data """
+    for region in tqdm(np.unique(data.obs['brain_index']),desc='Saving Brains'):
+        mask = data.obs['brain_index']==region
+        temp = data[mask]
+        # Name Region by Centroid to resolution's of ums
+        X = str(resolution*int(np.median(temp.obs['stage_x'])/resolution))
+        Y = str(resolution*int(np.median(temp.obs['stage_x'])/resolution))
+        brain_XY = 'Brain_'+X+'X_'+Y+'Y'
+        # Give Cells Unique Name 
+        temp.obs.index = [dataset+'_'+brain_XY+'_'+row.posname+'_Cell'+str(int(row.label)) for idx,row in temp.obs.iterrows()]
+        matrix = pd.DataFrame(temp.X,
+                              index=np.array(temp.obs.index),
+                              columns=np.array(temp.var.index))
+        fishdata.add_and_save_data(temp,
+                                   dtype='h5ad',
+                                   dataset=dataset+'_'+brain_XY)
+        temp.write(filename=os.path.join(metadata_path,
+                                         'fishdata',
+                                         dataset+'_'+brain_XY+'_data.h5ad'))
+        matrix.to_csv(os.path.join(metadata_path,
+                                   'fishdata',
+                                   dataset+'_'+brain_XY+'_matrix.csv'))
+        temp.obs.to_csv(os.path.join(metadata_path,
+                                     'fishdata',
+                                     dataset+'_'+brain_XY+'_metadata.csv'))
+        matrix.to_csv(os.path.join(outpath,
+                                   dataset+'_'+brain_XY+'_matrix.csv'))
+        temp.obs.to_csv(os.path.join(outpath,
+                                     dataset+'_'+brain_XY+'_metadata.csv'))
+        
