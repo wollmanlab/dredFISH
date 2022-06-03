@@ -5,6 +5,7 @@ import json
 import os
 import pandas as pd
 import numpy as np
+# import matplotlib.pyplot as plt
 
 from tqdm import tqdm
 from itertools import product
@@ -24,23 +25,24 @@ class DataIter():
         n_iter: number of iterations
         cell_train_itr: number of cells in an iteration
     """
-    def __init__(self, labels= ( 'Level_2_neighborhood_label',
-                                 'Level_3_subclass_label',
-                                 'Level_4_supertype_label',
-                                 'Level_5_cluster_label' ),
-                 path_dict= dict(root_path= '/bigstore/binfo/mouse/Brain/DRedFISH/Allen_V3_Reference',
-                                 prbe_constraints_path= './10X/probe_constraints.npy',
-                                 tenx_cells_path= './10X/cells.npy',
-                                 tenx_genes_path= './10X/genes.npy',
-                                 tenx_metadata_path= './10X/metadata.csv',
-                                 tenx_counts_path= './10X/matrix.npy',
-                                 smrt_lengths_path= './SmartSeq/gene_length.npy',
-                                 smrt_genes_path='./SmartSeq/genes.npy',
-                                 smrt_cells_path= './SmartSeq/cells.npy',
-                                 smrt_metadata_path= './SmartSeq/metadata.csv',
-                                 smrt_counts_path= './SmartSeq/matrix.npy'),
-                 n_iter= int(3e3),
-                 cell_train_itr= 50):
+    def __init__(self, labels=('Level_2_neighborhood_label',
+                               'Level_3_subclass_label',
+                               'Level_4_supertype_label',
+                               'Level_5_cluster_label' ),
+                 path_dict=dict(root_path= '/bigstore/binfo/mouse/Brain/DRedFISH/Allen_V3_Reference',
+                                prbe_constraints_path= './10X/probe_constraints.npy',
+                                tenx_cells_path= './10X/cells.npy',
+                                tenx_genes_path= './10X/genes.npy',
+                                tenx_metadata_path= './10X/metadata.csv',
+                                tenx_counts_path= './10X/matrix.npy',
+                                smrt_lengths_path= './SmartSeq/gene_length.npy',
+                                smrt_cells_path= './SmartSeq/cells.npy',
+                                smrt_genes_path='./SmartSeq/genes.npy',
+                                smrt_metadata_path= './SmartSeq/metadata.csv',
+                                smrt_counts_path= './SmartSeq/matrix.npy'),
+                 n_iter=int(3e3),
+                 cell_train_itr=50,
+                 ):
         self.iter= 0
         self.n_iter= n_iter
         self.finest= labels[-1]
@@ -87,6 +89,7 @@ class DataIter():
         self.tenx_coarse= torch.LongTensor(tenx_metadata['coarse'].values)
         self.tenx_fine= torch.LongTensor(tenx_metadata['fine'].values)
         
+        # to be removed
         def remap(i):
             """
             Remaps two cell types from SM2
@@ -94,12 +97,13 @@ class DataIter():
             lm= {'254_L5 PT CTX' : '245_L5 PT CTX', 
                  '78_Sst*' : '104_Sst*'}
             return lm.get(i, i)
-
+        # to be streamlined?
         smrt_metadata['coarse']= [-1 if pd.isna(i) else self.coarse_values.index(i) for i in smrt_metadata['Level_3_subclass_label']]
         smrt_metadata['fine']= [-1 if pd.isna(i) else self.fine_values.index(remap(i)) for i in smrt_metadata['Level_5_cluster_label']]
         self.smrt_coarse= torch.LongTensor(smrt_metadata['coarse'].values)
         self.smrt_fine= torch.LongTensor(smrt_metadata['fine'].values)
 
+        # what does indices do????
         indices= torch.LongTensor(sorted(set(map(tuple, tenx_metadata[tenx_metadata.fine>-1][['coarse','fine']].values.tolist())))).t()
         self.labl_map= torch.sparse_coo_tensor(indices, torch.ones(indices.shape[1])).to_dense()
         
@@ -203,6 +207,7 @@ class DataIter():
 class DataIterCached():
     """
     Load cached data.
+    Randomly load a data batch with replacement.
     
     Attributes
     ----------
