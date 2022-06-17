@@ -14,6 +14,8 @@ from cellpose import models
 import cv2
 import torch
 import os
+import shutil
+from dredFISH.Processing.putils import *
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -23,7 +25,7 @@ if __name__ == '__main__':
     parser.add_argument("-n", "--ncpu", type=int, dest="ncpu", default=10, action='store', help="Number of threads")
     parser.add_argument("-nr", "--nregions", type=int, dest="nregions", default=5, action='store', help="Number of Regions/Sections")
     parser.add_argument("-o", "--outpath", type=str, dest="outpath", default='/bigstore/GeneralStorage/Data/dredFISH/', action='store', help="Path to save data")
-    parser.add_argument("-r", "--resolution", type=int, dest="resolution", default=10, action='store', help="esoltuino to round centroid before naming regions")
+    parser.add_argument("-r", "--resolution", type=int, dest="resolution", default=10, action='store', help="resolution to round centroid before naming regions")
     args = parser.parse_args()
     
 class dredFISH_Position_Class(object):
@@ -76,7 +78,7 @@ class dredFISH_Position_Class(object):
             """ Check If data already generated"""
             try:
                 fname = os.path.join(self.metadata_path,
-                                     'fishdata',
+                                     self.config.parameters['fishdata'],
                                      self.dataset+'_'+self.posname+'_data.h5ad')
                 data = anndata.read_h5ad(fname)
             except:
@@ -214,7 +216,13 @@ class dredFISH_Position_Class(object):
                 cx,cy = self.label_cyto_coord_dict[label]
                 tx,ty = self.label_total_coord_dict[label]
                 label = label
-                data = [float(label),float(nx.float().mean()),float(ny.float().mean()),
+                if self.config.parameters['flipxy']:
+                    x = float(nx.float().mean())
+                    y = float(ny.float().mean())
+                else:
+                    y = float(nx.float().mean())
+                    x = float(ny.float().mean())
+                data = [float(label),x,y,
                         float(nx.shape[0]),float(torch.median(self.total_image[nx,ny])),
                         float(cx.shape[0]),float(torch.median(self.total_image[cx,cy])),
                         float(tx.shape[0]),float(torch.median(self.total_image[tx,ty]))]
@@ -282,13 +290,13 @@ class dredFISH_Position_Class(object):
         self.total_vectors = total_vectors
         
     def add_and_save_data(self,data,dtype='h5ad'):
-        if not os.path.exists(os.path.join(self.metadata_path,'fishdata')):
-            os.mkdir(os.path.join(self.metadata_path,'fishdata'))
+        if not os.path.exists(os.path.join(self.metadata_path,self.config.parameters['fishdata'])):
+            os.mkdir(os.path.join(self.metadata_path,self.config.parameters['fishdata']))
         if dtype=='h5ad':
-            fname = os.path.join(self.metadata_path,'fishdata',self.dataset+'_'+self.posname+'_data.h5ad')
+            fname = os.path.join(self.metadata_path,self.config.parameters['fishdata'],self.dataset+'_'+self.posname+'_data.h5ad')
             data.write(filename=fname)
         else:
-            fname = os.path.join(self.metadata_path,'fishdata',self.dataset+'_'+self.posname+'_'+dtype+'.tif')
+            fname = os.path.join(self.metadata_path,self.config.parameters['fishdata'],self.dataset+'_'+self.posname+'_'+dtype+'.tif')
             cv2.imwrite(fname, data.astype('uint16'))
         
     def save_data(self):
@@ -324,6 +332,97 @@ def wrapper(data):
         print(posname)
         print(e)
     return data
+
+class dredFISH_Section_Class(object):
+    def __init__(self,
+                 metadata_path,
+                 dataset,
+                 section,
+                 cword_config,
+                 verbose=False):
+        self.metadata_path = metadata_path
+        self.dataset = dataset
+        self.section = section
+        self.cword_config = cword_config
+        self.config = importlib.import_module(self.cword_config)
+        self.metadata = ''
+        self.data = ''
+        self.verbose=verbose
+    
+    def run(self):
+        self.load_data()
+        self.generate_QC()
+        
+        
+    def update_user(self,message):
+        if self.verbose:
+            i = [i for i in tqdm([],desc=str(datetime.now().strftime("%H:%M:%S"))+' '+str(message))]
+        
+    def load_data(self):
+        if isinstance(self.data,str):
+            self.update_user('Loading Data')
+            filename=os.path.join(self.metadata_path,
+                                         self.config.parameters['fishdata'],
+                                         self.dataset+'_'+self.section+'_data.h5ad')
+            self.data = anndata.read_h5ad(filename)
+        self.posnames = np.unique(self.data.obs['posname'])
+        
+        if isinstance(self.metadata,str):
+            self.update_user('Loading Metadata')
+            self.metadata = Metadata(self.metadata_path)
+        
+    def generate_stitched(self,acq,channel):
+        self.update_user('Stitching Images')
+        stitched = generate_stitched(self.metadata,
+                                     acq,channel,
+                                     pixel_size=self.config.parameters['pixel_size'],
+                                     rotate = self.config.parameters['stitch_rotate'],
+                                     flipud=self.config.parameters['stitch_flipud'],
+                                     fliplr=self.config.parameters['stitch_fliplr'],
+                                     posnames=self.posnames)
+        """ Downsample """
+        self.update_user('Downsampling Stitched')
+        ratio = self.config.parameters['pixel_size']/self.config.parameters['QC_pixel_size']
+        scale = (np.array(stitched.shape)*ratio).astype(int)
+        stitched = np.array(Image.fromarray(stitched.astype(float)).resize((scale[1],scale[0]), Image.BICUBIC))
+        """ Save """
+        self.update_user('Saving Stitched')
+        self.out_path = os.path.join(self.metadata_path,'Results')
+        if not os.path.exists(self.out_path):
+            os.mkdir(self.out_path)
+        self.out_path = os.path.join(self.out_path,self.section)
+        if not os.path.exists(self.out_path):
+            os.mkdir(self.out_path)
+        fname = os.path.join(self.out_path,self.dataset+'_'+self.section+'_'+acq+'_'+channel+'.tif')
+        stitched[stitched<0] = 0
+        cv2.imwrite(fname, stitched.astype('uint16'))
+        
+    def generate_QC(self):
+        """ For each Hybe+PolyT+Nucstain Generate Stitched"""
+        if self.config.parameters['nucstain_acq']=='infer':
+            acq = [i for i in self.metadata.acqnames if 'nucstain_' in i][-1]
+            self.generate_stitched(acq,self.config.parameters['nucstain_channel'])
+        elif self.config.parameters['nucstain_acq']=='none':
+            do = 'nothing'
+        else:
+            self.generate_stitched(self.config.parameters['nucstain_acq'],
+                                   self.config.parameters['nucstain_channel'])
+            
+        if self.config.parameters['total_acq']=='infer':
+            acq = [i for i in self.metadata.acqnames if 'nucstain_' in i][-1]
+            self.generate_stitched(acq,self.config.parameters['total_channel'])
+        elif self.config.parameters['total_acq']=='none':
+            do = 'nothing'
+        else:
+            self.generate_stitched(self.config.parameters['total_acq'],
+                                   self.config.parameters['total_channel'])
+            
+        for r,h,c in self.config.bitmap:
+            acq = [i for i in self.metadata.acqnames if h+'_' in i][-1]
+            self.generate_stitched(acq,c)
+        
+        
+    
     
 if __name__ == '__main__':
     """ Unload Parameters"""
@@ -337,6 +436,7 @@ if __name__ == '__main__':
     resolution = args.resolution
     print(args)
     
+    config = importlib.import_module(cword_config)
     """ Setup Batches"""
     dataset = [i for i in metadata_path.split('/') if not i==''][-1]
     image_metadata = Metadata(metadata_path)
@@ -379,7 +479,9 @@ if __name__ == '__main__':
     data_list = []
     for posname in posnames:
         try:
-            data = anndata.read_h5ad(os.path.join(metadata_path,'fishdata',dataset+'_'+posname+'_data.h5ad'))
+            data = anndata.read_h5ad(os.path.join(metadata_path,
+                                                  config.parameters['fishdata'],
+                                                  dataset+'_'+posname+'_data.h5ad'))
         except:
             data = None
         if isinstance(data,anndata._core.anndata.AnnData):
@@ -401,37 +503,51 @@ if __name__ == '__main__':
     """ Remove Nans"""
     data = data[np.isnan(data.layers['total_vectors'].sum(1))==False]
     
-    """ Assign Brains"""
+    """ Assign Sections """
     data.obs['dataset'] = dataset
-    data.obs['brain_index'] = KMeans(n_clusters=nregions, random_state=0,n_init=50).fit(data.obsm['stage']).labels_
-    
+    if nregions>1:
+        data.obs['section_index'] = KMeans(n_clusters=nregions,
+                                           random_state=0,
+                                           n_init=50).fit(data.obsm['stage']).labels_
+    else:
+        data.obs['section_index'] = 0
+    data.write(filename=os.path.join(metadata_path,
+                                         config.parameters['fishdata'],
+                                         dataset+'_data.h5ad'))
     """ Separate and Save Data """
-    for region in tqdm(np.unique(data.obs['brain_index']),desc='Saving Brains'):
-        mask = data.obs['brain_index']==region
+    for region in tqdm(np.unique(data.obs['section_index']),desc='Saving Sections'):
+        mask = data.obs['section_index']==region
         temp = data[mask]
         # Name Region by Centroid to resolution's of ums
         X = str(resolution*int(np.median(temp.obs['stage_x'])/resolution))
-        Y = str(resolution*int(np.median(temp.obs['stage_x'])/resolution))
-        brain_XY = 'Brain_'+X+'X_'+Y+'Y'
+        Y = str(resolution*int(np.median(temp.obs['stage_y'])/resolution))
+        section_XY = 'Section_'+X+'X_'+Y+'Y'
         # Give Cells Unique Name 
-        temp.obs.index = [dataset+'_'+brain_XY+'_'+row.posname+'_Cell'+str(int(row.label)) for idx,row in temp.obs.iterrows()]
+        temp.obs.index = [dataset+'_'+section_XY+'_'+row.posname+'_Cell'+str(int(row.label)) for idx,row in temp.obs.iterrows()]
+        """ Save With Raw Data """
         matrix = pd.DataFrame(temp.X,
                               index=np.array(temp.obs.index),
                               columns=np.array(temp.var.index))
-        fishdata.add_and_save_data(temp,
-                                   dtype='h5ad',
-                                   dataset=dataset+'_'+brain_XY)
         temp.write(filename=os.path.join(metadata_path,
-                                         'fishdata',
-                                         dataset+'_'+brain_XY+'_data.h5ad'))
+                                         config.parameters['fishdata'],
+                                         dataset+'_'+section_XY+'_data.h5ad'))
         matrix.to_csv(os.path.join(metadata_path,
-                                   'fishdata',
-                                   dataset+'_'+brain_XY+'_matrix.csv'))
+                                   config.parameters['fishdata'],
+                                   dataset+'_'+section_XY+'_matrix.csv'))
         temp.obs.to_csv(os.path.join(metadata_path,
-                                     'fishdata',
-                                     dataset+'_'+brain_XY+'_metadata.csv'))
+                                     config.parameters['fishdata'],
+                                     dataset+'_'+section_XY+'_metadata.csv'))
+        """ Save to Shared Location"""
         matrix.to_csv(os.path.join(outpath,
-                                   dataset+'_'+brain_XY+'_matrix.csv'))
+                                   dataset+'_'+section_XY+'_matrix.csv'))
         temp.obs.to_csv(os.path.join(outpath,
-                                     dataset+'_'+brain_XY+'_metadata.csv'))
-        
+                                     dataset+'_'+section_XY+'_metadata.csv'))
+        """ Generate QC Report """
+        section = dredFISH_Section_Class(metadata_path,
+                                         dataset,
+                                         section_XY,
+                                         cword_config,
+                                         verbose=True)
+        section.metadata = image_metadata
+        section.data = temp
+        section.run()
