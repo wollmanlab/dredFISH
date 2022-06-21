@@ -4,6 +4,7 @@ import anndata
 import pandas as pd
 import importlib
 from metadata import Metadata
+from functools import partial
 import multiprocessing
 from tqdm import tqdm
 import cv2

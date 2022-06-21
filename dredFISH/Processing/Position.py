@@ -360,9 +360,6 @@ class Position_Class(object):
         """
         if self.verbose:
             self.update_user('Saving Data and Masks')
-        # data = anndata.AnnData(X=self.nuclei_vectors.numpy(),
-        #                        var=pd.DataFrame(index=np.array([h for r,h,c in self.bitmap])),
-        #                        obs=pd.DataFrame(index=self.cell_metadata.index.astype(str)))
         data = anndata.AnnData(X=self.nuclei_vectors.numpy(),
                                var=pd.DataFrame(index=np.array([h for r,h,c in self.bitmap])),
                                obs=self.cell_metadata)
@@ -373,8 +370,6 @@ class Position_Class(object):
         xy[:,0] = self.cell_metadata['stage_x']
         xy[:,1] = self.cell_metadata['stage_y']
         data.obsm['stage'] = xy
-        # for column in self.cell_metadata.columns:
-        #     data.obs[column] = np.array(self.cell_metadata[column])
         data.obs_names_make_unique()
         data = data[np.isnan(data.layers['total_vectors'].sum(1))==False]
         self.data = data
