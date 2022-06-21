@@ -4,8 +4,10 @@ so that data source outputs are indistinguishable
 """
 import os
 import json
+from tkinter import E
 from tqdm import tqdm
 from itertools import product
+import logging
 
 import numpy as np
 import pandas as pd
@@ -16,7 +18,7 @@ import torch.distributions as dist
 
 from multiprocessing import Pool
 # from dredFISH.Design.allen_data_iterators_subgenes import DataIterCached
-from dredFISH.Design import data_loader_scrna
+from Design import data_loader_scrna_tinydata
 
 class InstNrm(nn.Module):
     """
@@ -125,6 +127,10 @@ class CellTypeNet(nn.Module):
 
         # encoder
         self.enc= nn.Embedding(n_gns, n_bit)
+
+        # decoder 
+        self.dcd= nn.Embedding(n_bit, n_cat)
+
         # decoder -- genes
         # self.rcn = nn.Embedding(n_bit, n_gns)
         n_mid = max(self.n_gsub//2, n_bit)
@@ -197,11 +203,12 @@ class CellTypeNet(nn.Module):
             emb: embedding of weights from first layer of network
             mrgn: margin error
         """
-        emb, mrgn= self.get_emb(X, rnd)
+        emb, mrgn = self.get_emb(X, rnd)
         Xrcn = self.rcn(emb) #.exp()
-        return Xrcn, emb, mrgn
+        fine = emb.mm(self.dcd.weight)
+        return fine, Xrcn, emb, mrgn
 
-    def fit(self, dataloader, test_dataloader, cnstrnts, device, lr= 1e-1, n_iter=1000):
+    def fit(self, dataloader, test_dataloader, cnstrnts, device, lr= 1e-1, n_iter=None):
         """
         Train NN on gene counts to predict cell type label at two levels for SM2 and 10X data
         where we do not want to learn features specific to one data type. 
@@ -221,65 +228,88 @@ class CellTypeNet(nn.Module):
                                         list(self.nrm.parameters()), 
                                         lr= lr)
         self.train()
+            
         for i,(smrt_ftrs, smrt_clsts) in tqdm(enumerate(dataloader)):
-            if i > n_iter:
+            if n_iter and i > n_iter:
                 break
+
+            # get data
             smrt_ftrs= smrt_ftrs.float().to(device)
+            smrt_clsts= smrt_clsts.long().to(device)
             smrt_ftrs_gsub= (smrt_ftrs[:,self.gsubidx]+1).log() # log(x+1) norm
+
+            # logistics 
+            if i == 0:
+                batch_size = len(smrt_ftrs)
+                # report freq
+                if n_iter:
+                    en_iter = n_iter
+                else:
+                    en_iter = int(len(dataloader.dataset)/batch_size)
+                report_freq = np.clip(en_iter//10, 1, 100) 
 
             # forward propagation and get predicted labels 
             optimizer_gen.zero_grad()
             
-            smrt_ftrs_rcn, smrt_emb, smrt_mrg_lss= self.forward(smrt_ftrs)
+            smrt_plgt_fine, smrt_ftrs_rcn, smrt_emb, smrt_mrg_lss= self.forward(smrt_ftrs)
             smrt_rcn_lss = nn.MSELoss()(smrt_ftrs_rcn, smrt_ftrs_gsub)
+            smrt_ctg_lss = nn.CrossEntropyLoss()(smrt_plgt_fine, smrt_clsts)
 
             # recon loss
             rcn_lss = smrt_rcn_lss
-
+            # ctg loss
+            ctg_lss = smrt_ctg_lss
             # forward loss
-            mrg_lss= smrt_mrg_lss
+            mrg_lss = smrt_mrg_lss
             
-            # subtract the 10X expected number of transcripts per gene as another loss value 
-            # should not be expected number of transcripts(?), 
-            # but the prx should not exceed the number of available probes per gene.
-            if self.lmd2:
-                wts= self.enc.weight.exp()
-                prx= wts / wts.sum() * self.mxpr
-                row_cnst= ((prx.sum(1) - cnstrnts).clamp(0)**2).mean() # number of probes per gene
+            # # subtract the 10X expected number of transcripts per gene as another loss value 
+            # # should not be expected number of transcripts(?), 
+            # # but the prx should not exceed the number of available probes per gene.
+            # if self.lmd2:
+            #     wts= self.enc.weight.exp()
+            #     prx= wts / wts.sum() * self.mxpr
+            #     row_cnst= ((prx.sum(1) - cnstrnts).clamp(0)**2).mean() # number of probes per gene
 
             # overall loss
-            loss_gen= rcn_lss*self.lmd0 + mrg_lss*self.lmd1 + row_cnst*self.lmd2
+            loss_gen= ctg_lss + rcn_lss*self.lmd0 # + mrg_lss*self.lmd1 + row_cnst*self.lmd2
             loss_gen.backward()
             optimizer_gen.step()
             
             # add validation results to learning curve every 10%
-            if not i%(np.clip(n_iter//10, 1, None)):
+            if not i%report_freq:
                 # eval mode
                 self.eval()
                 with torch.no_grad():
-                    # data= dataloader_vald
+                    # validation dataset
                     smrt_ftrs, smrt_clsts = next(iter(test_dataloader))
                     smrt_ftrs= smrt_ftrs.float().to(device)
+                    smrt_clsts= smrt_clsts.long().to(device)
                     smrt_ftrs_gsub= (smrt_ftrs[:,self.gsubidx]+1).log() # log(x+1) norm
 
-                    smrt_ftrs_rcn, smrt_emb, smrt_mrgn= self.forward(smrt_ftrs, rnd=True)
-                    smrt_rcn_lss = (smrt_ftrs_rcn - smrt_ftrs_gsub).square().mean()
+                    smrt_plgt_fine, smrt_ftrs_rcn, smrt_emb, smrt_mrg_lss = self.forward(smrt_ftrs, rnd=True)
+                    smrt_prds_fine = smrt_plgt_fine.max(1)[1]
+                    smrt_fine_acc = (smrt_prds_fine == smrt_clsts).float().mean()
+                    smrt_rcn_lss = nn.MSELoss()(smrt_ftrs_rcn, smrt_ftrs_gsub)
+                    smrt_ctg_lss = nn.CrossEntropyLoss()(smrt_plgt_fine, smrt_clsts)
 
-                    print('\n'+self.name)
-                    print('%d\t'%i,
-                        '|ttl (ctg1,ctg2,mse,row,mrg): %.2E (%.2E,%.2E,%.2E)  '%(loss_gen.item(),
-                                                                                smrt_rcn_lss.item(),
-                                                                                    row_cnst.item(),
-                                                                                    mrg_lss.item())
+                    logging.info(f' {i*batch_size:>5d}/{len(dataloader.dataset):>5d}\t'
+                        f'|ttl (ctg, rcn, ctg_acc):'
+                        f'{loss_gen.item():.2E}, (' 
+                        f'{smrt_ctg_lss.item():.2E},'
+                        f'{smrt_rcn_lss.item():.2E},'
+                        f'{smrt_fine_acc.item():.2E},'
+                        ')'
                         )
 
                 learning_crvs[i]= {  
                                     'smrt_rcn_lss': smrt_rcn_lss.item(),
+                                    'smrt_ctg_lss': smrt_ctg_lss.item(),
+                                    'smrt_fine_acc': smrt_fine_acc.item(),
                                 }
                 self.train()
         return learning_crvs
 
-def train_model(res_path, lmd0, lmd1, min_pos, n_bit=24, n_rcn_layers=2, lr=0.1, n_iter=2000,):
+def train_model(res_path, lmd0, lmd1, min_pos, n_bit=24, n_rcn_layers=2, lr=0.1, n_epochs=2, n_iter=2000,):
     """
     Load some subset of data, train model, save model, performance, and encoder embedding to directory
     
@@ -295,13 +325,18 @@ def train_model(res_path, lmd0, lmd1, min_pos, n_bit=24, n_rcn_layers=2, lr=0.1,
     """
     # to GPU
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
+    logging.info(f'Start training on device: {device}')
 
-    trn_dataloader = data_loader_scrna.load_Allen_data_train('counts', 'l3_code', 'l3_cat')
-    tst_dataloader = data_loader_scrna.load_Allen_data_test('counts', 'l3_code', 'l3_cat')
+    trn_dataloader = data_loader_scrna_tinydata.load_Allen_data_train('counts', 'l3_code', 'l3_cat')
+    tst_dataloader = data_loader_scrna_tinydata.load_Allen_data_test('counts', 'l3_code', 'l3_cat')
     n_gns = trn_dataloader.dataset.X.shape[1] # number of genes
     n_cat = len(trn_dataloader.dataset.Ycat) # number of clusters
-    gsubidx = torch.from_numpy(np.arange(n_gns)).to(device) # selected genes for recon
-    cnstrnts = torch.from_numpy(trn_dataloader.dataset.data['num_probe_limit']).to(device)
+    cnstrnts = torch.tensor(trn_dataloader.dataset.data['num_probe_limit']).to(device)
+
+    # gsubidx = torch.tensor(np.arange(n_gns)).to(device) # selected genes for recon
+    f = os.path.join('/bigstore/GeneralStorage/fangming/projects/dredfish/data/', 'rna', 'gidx_sub140_smrt_v1.pt')
+    gsubidx = torch.load(f).to(device)
 
     model= CellTypeNet(n_gns=     n_gns,                      
                        n_cat=     n_cat,                      
@@ -319,7 +354,13 @@ def train_model(res_path, lmd0, lmd1, min_pos, n_bit=24, n_rcn_layers=2, lr=0.1,
     model.to(device)
     
     # fit model; get results
-    result= model.fit(trn_dataloader, tst_dataloader, cnstrnts, device, lr=lr, n_iter=n_iter)
+    # train lots of epochs
+    results = {}
+    logging.info(f'\n {model.name}')
+    for i in range(n_epochs):
+        logging.info(f"epoch: {i+1}/{n_epochs} ======================")
+        result= model.fit(trn_dataloader, tst_dataloader, cnstrnts, device, lr=lr, n_iter=n_iter)
+        results[i+1] = result
     # get the encoding layer
     embmat= (model.enc.weight.exp() / model.enc.weight.exp().sum() * model.mxpr).round().detach().tolist()
 
@@ -329,8 +370,8 @@ def train_model(res_path, lmd0, lmd1, min_pos, n_bit=24, n_rcn_layers=2, lr=0.1,
     # - embmat
     if not os.path.isdir(res_path):
         os.mkdir(res_path)
-    torch.save(model.state_dict(), os.path.join(res_path, 'model=%s.pt'%(model.name)))
-    open(os.path.join(res_path, './result=%s.json'%model.name), 'w').write(json.dumps(result))
-    open(os.path.join(res_path, './embmat=%s.json'%model.name), 'w').write(json.dumps(embmat))
+    torch.save(model.state_dict(), os.path.join(res_path, f'model={model.name}.pt'))
+    open(os.path.join(res_path, f'./result={model.name}.json'), 'w').write(json.dumps(results))
+    open(os.path.join(res_path, f'./embmat={model.name}.json'), 'w').write(json.dumps(embmat))
 
     return model.name

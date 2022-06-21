@@ -295,14 +295,40 @@ def stratified_sample(df, col, n: Union[int, dict], return_idx=False, group_keys
     """
     n (int) represents the number for each group
     n (dict) can be used to sample different numbers for each group
+    does not allow oversampling
     """
     if isinstance(n, int):
         dfsub = df.groupby(col, group_keys=group_keys, sort=sort, **kwargs).apply(
-            lambda x: x.sample(n=min(len(x), n), random_state=random_state)
+            lambda x: x.sample(n=min(len(x), n), 
+                random_state=random_state)
             )
     elif isinstance(n, dict):
         dfsub = df.groupby(col, group_keys=group_keys, sort=sort, **kwargs).apply(
-            lambda x: x.sample(n=min(len(x), n[x[col].iloc[0]]), random_state=random_state)
+            lambda x: x.sample(n=min(len(x), n[x[col].iloc[0]]), 
+                random_state=random_state)
+            )
+
+    if not return_idx:
+        return dfsub
+    else:
+        idx = get_index_from_array(df.index.values, dfsub.index.values)
+        return dfsub, idx
+
+def stratified_sample_withrep(df, col, n: Union[int, dict], return_idx=False, group_keys=False, sort=False, random_state=0, **kwargs):
+    """
+    n (int) represents the number for each group
+    n (dict) can be used to sample different numbers for each group
+    replace=True: allow oversampling
+    """
+    if isinstance(n, int):
+        dfsub = df.groupby(col, group_keys=group_keys, sort=sort, **kwargs).apply(
+            lambda x: x.sample(n=n, 
+                replace=True, random_state=random_state)
+            )
+    elif isinstance(n, dict):
+        dfsub = df.groupby(col, group_keys=group_keys, sort=sort, **kwargs).apply(
+            lambda x: x.sample(n=n[x[col].iloc[0]], 
+                replace=True, random_state=random_state)
             )
 
     if not return_idx:
