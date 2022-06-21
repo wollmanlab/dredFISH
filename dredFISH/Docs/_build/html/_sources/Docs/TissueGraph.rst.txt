@@ -1,0 +1,7 @@
+TissueGraph module
+==================
+
+.. automodule:: TissueGraph
+   :members:
+   :undoc-members:
+   :show-inheritance:

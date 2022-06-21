@@ -34,6 +34,7 @@ from IPython import embed
 from dredFISH.Visualization.cell_colors import *
 from dredFISH.Visualization.vor import * 
 
+
 from dredFISH.Analysis.TissueGraph import *
 
 from dataclasses import dataclass
@@ -104,22 +105,23 @@ class Panel:
         
 class Map(Panel):
     """
-    MapView extends View to allow plotting of maps, it adds the methods:
+    Map extends Panel to allow plotting of maps, it adds the methods:
         plot_points
         plot_lines
         plot_bounding_box
         plot_polys
         plot_map
-        plot_map_zoom
+
     """
     def __init__(self,name=None,pos = (0,0,1,1),**kwargs):
-        super().__init__(name,pos,**kwargs)
+        super().__init__(name,pos)
         
-        # Fundamentally, a view keeps tab of all the type for different geoms
+        # Fundamentally, a map panel keeps tab of all the type for different geoms
         # and a dictionary that maps these ids to color/shape etc. 
         
         # types, maps each points, line, or polygon to a specific type key. 
         # in these dataframes, the index must match the TMG Geom and different columns store different attributes
+        
         self.Styles['line'] = pd.DataFrame()
         self.Styles['point'] = pd.DataFrame()
         self.Styles['polygon'] = pd.DataFrame()
@@ -128,11 +130,20 @@ class Map(Panel):
         # colormap is avaliable in case some derived Views needs to use it (for coloring PolyCollection for example)
         self.clrmp = None
         
+        self.xlim = kwargs.get('xlim',None)
+        self.ylim = kwargs.get('ylim',None)
+        
     def set_view(self): 
         """
         Key abstract method - has to be implemented in the subclass
         signature should always include the TMG (and other stuff if needed)
         """
+        mx = np.max(np.array(self.V.TMG.Geoms['BoundingBox'].exterior.xy).T,axis=0)
+        mn = np.min(np.array(self.V.TMG.Geoms['BoundingBox'].exterior.xy).T,axis=0)
+        if self.xlim is None: 
+            self.xlim = [mn[0],mx[0]]
+        if self.ylim is None: 
+            self.ylim = [mn[1],mx[1]]
         return
         
     
@@ -180,10 +191,10 @@ class Map(Panel):
             self.plot_lines()
         
         # set up limits and remove frame
-        mx = np.max(np.array(self.V.TMG.Geoms['BoundingBox'].exterior.xy).T,axis=0)
-        mn = np.min(np.array(self.V.TMG.Geoms['BoundingBox'].exterior.xy).T,axis=0)
-        self.ax.set_xlim(mn[0],mx[0])
-        self.ax.set_ylim(mn[1],mx[1])
+
+        self.ax.set_xlim(self.xlim[0],self.xlim[1])
+        self.ax.set_ylim(self.ylim[0],self.ylim[1])
+        self.ax.set_aspect('equal', 'box')
         self.ax.axis('off')
         
 class Zoom(Panel):
@@ -233,7 +244,9 @@ class Colorpleth(Map):
         self.clrmp = kwargs.get('colormap',"hot")
         self.colorbar = kwargs.get('colorbar',False)
         
+        
     def set_view(self):
+        super().set_view()
         # check that number of items in values to map make sense valu
         lvlarr = np.flatnonzero(np.equal(self.V.TMG.N,len(self.Data['values_to_map'])))
         if len(lvlarr)!=1:
@@ -251,11 +264,11 @@ class RandomColorpleth(Colorpleth):
     """
     Show geo-units (cells, iso-zones, heterozones, neighborhoods) each colored randomly. 
     """
-    def __init__(self,id_vec = 0, name = "Random Colorpleth" ,pos = (0,0,1,1)):
+    def __init__(self,id_vec = 0, name = "Random Colorpleth" ,pos = (0,0,1,1),**kwargs):
         if len(np.shape(id_vec))==0: # if the id_vec is pointing to a current level, give each unit it's own color 
             name = name + " of level: " + str(id_vec)
             id_vec = np.arange(TMG.N[id_vec])
-        super().__init__(name = name, values_to_map = id_vec)
+        super().__init__(name = name, values_to_map = id_vec,**kwargs)
         
     def set_view(self):
         super().set_view()

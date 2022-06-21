@@ -1,0 +1,61 @@
+Visualization package
+=====================
+
+Submodules
+----------
+
+Visualization.Viz module
+------------------------
+
+.. automodule:: Visualization.Viz
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Visualization.cell\_colors module
+---------------------------------
+
+.. automodule:: Visualization.cell_colors
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Visualization.test\_colors module
+---------------------------------
+
+.. automodule:: Visualization.test_colors
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Visualization.test\_plot module
+-------------------------------
+
+.. automodule:: Visualization.test_plot
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Visualization.utils module
+--------------------------
+
+.. automodule:: Visualization.utils
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Visualization.vor module
+------------------------
+
+.. automodule:: Visualization.vor
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: Visualization
+   :members:
+   :undoc-members:
+   :show-inheritance:
