@@ -218,6 +218,7 @@ class DataIterCached():
         self.train_files= [os.path.join(cached_path, 'train_dat', i) for i in os.listdir(os.path.join(cached_path, 'train_dat')) if i.endswith('pt')]
         self.valid_files= [os.path.join(cached_path, 'valid_dat', i) for i in os.listdir(os.path.join(cached_path, 'valid_dat')) if i.endswith('pt')]
         self.current= torch.load(np.random.choice(self.train_files))
+        self.gsubidx = torch.load(os.path.join(cached_path, 'gidx_sub140.pt'))
 
     def validation(self):
         """

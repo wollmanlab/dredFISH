@@ -1,0 +1,6 @@
+{
+    "r.rpath.linux": "/home/fangming/anaconda3/envs/renv/bin/R",
+    "r.rterm.linux": "/home/fangming/anaconda3/envs/renv/bin/radian",
+    "python.pythonPath": "/home/fangming/anaconda3/envs/renv/bin/python",
+    "python.terminal.activateEnvironment": true
+}
