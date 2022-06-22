@@ -253,12 +253,14 @@ class Position_Class(object):
                 cx,cy = self.label_cyto_coord_dict[label]
                 tx,ty = self.label_total_coord_dict[label]
                 label = label
-                if self.config.parameters['flipxy']:
-                    x = float(nx.float().mean())
-                    y = float(ny.float().mean())
-                else:
-                    y = float(nx.float().mean())
-                    x = float(ny.float().mean())
+                y = float(nx.float().mean())
+                x = float(ny.float().mean())
+                # if self.config.parameters['flipxy']:
+                #     x = float(nx.float().mean())
+                #     y = float(ny.float().mean())
+                # else:
+                #     y = float(nx.float().mean())
+                #     x = float(ny.float().mean())
                 #  Pull Data from Images
                 data = [int(label),x,y,
                         int(nx.shape[0]),float(torch.median(self.total_image[nx,ny])),
@@ -289,9 +291,13 @@ class Position_Class(object):
             # Update Stage Coordinates
             pixel_size = self.config.parameters['pixel_size']
             camera_direction = self.config.parameters['camera_direction']
-            self.cell_metadata['stage_x'] = np.array(self.cell_metadata['posname_stage_x']) + camera_direction[0]*pixel_size*np.array(self.cell_metadata['pixel_x'])
-            self.cell_metadata['stage_y'] = np.array(self.cell_metadata['posname_stage_y']) + camera_direction[1]*pixel_size*np.array(self.cell_metadata['pixel_y'])
-            
+            if self.config.parameters['flipxy']:
+                self.cell_metadata['stage_x'] = np.array(self.cell_metadata['posname_stage_x']) + camera_direction[0]*pixel_size*np.array(self.cell_metadata['pixel_y'])
+                self.cell_metadata['stage_y'] = np.array(self.cell_metadata['posname_stage_y']) + camera_direction[1]*pixel_size*np.array(self.cell_metadata['pixel_x'])
+            else:
+                self.cell_metadata['stage_x'] = np.array(self.cell_metadata['posname_stage_x']) + camera_direction[0]*pixel_size*np.array(self.cell_metadata['pixel_x'])
+                self.cell_metadata['stage_y'] = np.array(self.cell_metadata['posname_stage_y']) + camera_direction[1]*pixel_size*np.array(self.cell_metadata['pixel_y'])
+
     def segmentation(self):
         """
         segmentation Segment Cells Nuclei and Total Before Pulling Vector
