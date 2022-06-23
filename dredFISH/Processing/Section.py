@@ -13,6 +13,7 @@ import os
 from PIL import Image
 from scipy.ndimage import gaussian_filter
 import time
+import torch
 
 class Section_Class(object):
     def __init__(self,
@@ -61,8 +62,12 @@ class Section_Class(object):
         """
         if self.verbose:
             i = [i for i in tqdm([],desc=str(datetime.now().strftime("%H:%M:%S"))+' '+str(message))]
-        
+
     def load_data(self):
+        self.load_metadata()
+        self.load_h5ad()
+        
+    def load_h5ad(self):
         """
         load_data Load Previously Processed Data
         """
@@ -73,7 +78,12 @@ class Section_Class(object):
                                          self.dataset+'_'+self.section+'_data.h5ad')
             self.data = anndata.read_h5ad(filename)
         self.posnames = np.unique(self.data.obs['posname'])
-        
+
+
+    def load_metadata(self):
+        """
+        load_data Load Previously Processed Data
+        """
         if isinstance(self.metadata,str):
             self.update_user('Loading Metadata')
             self.metadata = Metadata(self.metadata_path)
@@ -146,6 +156,40 @@ class Section_Class(object):
         for r,h,c in self.config.bitmap:
             acq = [i for i in self.metadata.acqnames if h+'_' in i][-1]
             stitched = self.generate_stitched(acq,c)
+
+    def remove_outliers(self):
+        self.update_user('Removing Outliers')
+        XY = torch.tensor(self.data.obsm['stage'].copy())
+        center = torch.median(XY,axis=0).values
+        distances = torch.cdist(XY,center[:,None].T).numpy()
+        thresh = np.percentile(distances,99)
+        mask = distances<thresh
+        self.data = self.data[mask]
+
+    def load_allen(self):
+        allen_template = regu.load_allen_template(allen_template_path)
+        allen_tree, allen_maps = regu.load_allen_tree(allen_tree_path)
+        allen_annot = regu.load_allen_annot(allen_annot_path) # takes about 30 seconds
+
+    def register_preview(self):
+        spatial_data = regu.check_run(self.data.obsm['stage'].copy(), 
+                                    allen_template, 
+                                    allen_annot, 
+                                    allen_maps,
+                                    idx_ccf, 
+                                    flip=flip)
+
+    def register(self):
+        spatial_data = regu.real_run(self.data.obsm['stage'].copy(), 
+                                    allen_template, 
+                                    allen_annot, 
+                                    allen_maps,
+                                    idx_ccf, 
+                                    flip=flip,
+                    dataset="", # a name
+                    outprefix=outprefix, 
+                    force=force,
+                    )
         
 
 def generate_img(data,FF=''):
@@ -338,3 +382,5 @@ def colorize_segmented_image(img, color_type='rgb'):
         rgb_img[tuple(regions[i].coords.T)] = colors[i]  # won't use the 1st color
 
     return rgb_img.astype(np.int)
+
+
