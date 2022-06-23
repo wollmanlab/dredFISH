@@ -89,27 +89,35 @@ class Section_Class(object):
         """
 
         self.update_user('Stitching Images')
-        stitched = generate_stitched(self.metadata,
-                                     acq,channel,
-                                     pixel_size=self.config.parameters['pixel_size'],
-                                     rotate = self.config.parameters['stitch_rotate'],
-                                     flipud=self.config.parameters['stitch_flipud'],
-                                     fliplr=self.config.parameters['stitch_fliplr'],
-                                     posnames=self.posnames)
-        self.update_user('Downsampling Stitched')
-        ratio = self.config.parameters['pixel_size']/self.config.parameters['QC_pixel_size']
-        scale = (np.array(stitched.shape)*ratio).astype(int)
-        stitched = np.array(Image.fromarray(stitched.astype(float)).resize((scale[1],scale[0]), Image.BICUBIC))
-        self.update_user('Saving Stitched')
-        self.out_path = os.path.join(self.metadata_path,'Results')
+        proceed = True
+        self.out_path = os.path.join(self.metadata_path,self.config.parameters['results'])
         if not os.path.exists(self.out_path):
             os.mkdir(self.out_path)
         self.out_path = os.path.join(self.out_path,self.section)
         if not os.path.exists(self.out_path):
             os.mkdir(self.out_path)
         fname = os.path.join(self.out_path,self.dataset+'_'+self.section+'_'+acq+'_'+channel+'.tif')
-        stitched[stitched<0] = 0
-        cv2.imwrite(fname, stitched.astype('uint16'))
+        if not self.config.parameters['overwrite']:
+            if os.path.exists(fname):
+                self.update_user('Loading Stitched')
+                stitched = cv2.imread(fname,-1)
+                proceed = False
+        if proceed:
+            stitched = generate_stitched(self.metadata,
+                                        acq,channel,
+                                        pixel_size=self.config.parameters['pixel_size'],
+                                        rotate = self.config.parameters['stitch_rotate'],
+                                        flipud=self.config.parameters['stitch_flipud'],
+                                        fliplr=self.config.parameters['stitch_fliplr'],
+                                        posnames=self.posnames)
+            self.update_user('Downsampling Stitched')
+            ratio = self.config.parameters['pixel_size']/self.config.parameters['QC_pixel_size']
+            scale = (np.array(stitched.shape)*ratio).astype(int)
+            stitched = np.array(Image.fromarray(stitched.astype(float)).resize((scale[1],scale[0]), Image.BICUBIC))
+            self.update_user('Saving Stitched')
+            stitched[stitched<0] = 0
+            cv2.imwrite(fname, stitched.astype('uint16'))
+        return stitched
         
     def generate_QC(self):
         """
@@ -119,25 +127,25 @@ class Section_Class(object):
         self.update_user('Generating QC')
         if self.config.parameters['nucstain_acq']=='infer':
             acq = [i for i in self.metadata.acqnames if 'nucstain_' in i][-1]
-            self.generate_stitched(acq,self.config.parameters['nucstain_channel'])
+            stitched = self.generate_stitched(acq,self.config.parameters['nucstain_channel'])
         elif self.config.parameters['nucstain_acq']=='none':
             do = 'nothing'
         else:
-            self.generate_stitched(self.config.parameters['nucstain_acq'],
+            stitched = self.generate_stitched(self.config.parameters['nucstain_acq'],
                                    self.config.parameters['nucstain_channel'])
             
         if self.config.parameters['total_acq']=='infer':
             acq = [i for i in self.metadata.acqnames if 'nucstain_' in i][-1]
-            self.generate_stitched(acq,self.config.parameters['total_channel'])
+            stitched = self.generate_stitched(acq,self.config.parameters['total_channel'])
         elif self.config.parameters['total_acq']=='none':
             do = 'nothing'
         else:
-            self.generate_stitched(self.config.parameters['total_acq'],
+            stitched = self.generate_stitched(self.config.parameters['total_acq'],
                                    self.config.parameters['total_channel'])
             
         for r,h,c in self.config.bitmap:
             acq = [i for i in self.metadata.acqnames if h+'_' in i][-1]
-            self.generate_stitched(acq,c)
+            stitched = self.generate_stitched(acq,c)
         
 
 def generate_img(data,FF=''):

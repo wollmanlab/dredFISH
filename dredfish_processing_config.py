@@ -27,11 +27,24 @@ bitmap = [('RS0109_cy5', 'hybe2', 'FarRed'),
 
 nbits = len(bitmap)
 parameters = {}
-parameters['camera_direction'] = [-1,-1] # NEW [-1,1] # OLD [-1,-1]
-parameters['flipxy'] = False
-parameters['fishdata']='fishdata_2022Jun21'
+# """ Old Microscope Setup"""
+# parameters['camera_direction'] = [-1,-1] # NEW [-1,1] # OLD [-1,-1]
+# parameters['pixel_size'] = 0.330 # um 490 or 330
+# parameters['stitch_rotate'] = 1 # NEW 0
+# parameters['stitch_flipud'] = False# NEW False
+# parameters['stitch_fliplr'] = True# NEW True
+# parameters['flipxy'] = False
+
+""" New Microscope Setup"""
+parameters['camera_direction'] = [-1,1] # NEW [-1,1] # OLD [-1,-1]
+parameters['pixel_size'] = 0.490 # um 490 or 330
+parameters['stitch_rotate'] = 0 # NEW 0
+parameters['stitch_flipud'] = False# NEW False
+parameters['stitch_fliplr'] = True# NEW True
+parameters['flipxy'] = True
+
 parameters['segment_gpu'] = False
-parameters['pixel_size'] = 0.330 # um 490 or 330
+parameters['fishdata']='fishdata_2022Jun21'
 parameters['QC_pixel_size'] = 5 # um
 parameters['diameter'] = 15 # um
 parameters['segment_diameter'] = parameters['diameter']/parameters['pixel_size']
@@ -39,13 +52,12 @@ parameters['nucstain_channel'] = 'DeepBlue'
 parameters['nucstain_acq'] = 'infer'
 parameters['total_channel'] = 'FarRed'
 parameters['total_acq'] = 'infer'
-parameters['overwrite'] = False
-parameters['stitch_rotate'] = 1 # NEW 0
-parameters['stitch_flipud'] = False# NEW False
-parameters['stitch_fliplr'] = True# NEW True
+parameters['overwrite'] = True #False
 parameters['batches'] = 2000 #"Number of batches"
 parameters['ncpu'] = 10 #"Number of threads"
 parameters['nregions'] = 6#4 #"Number of Regions/Sections"
+parameters['results'] = 'Results' #"Path to save data"
 parameters['outpath'] = '/bigstore/GeneralStorage/Data/dredFISH/' #"Path to save data"
 parameters['resolution'] = 100 #"resolution to round centroid before naming regions"
 parameters['flip'] = False #"Flip Section when centering and rotating"
+
