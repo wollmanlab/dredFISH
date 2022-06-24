@@ -52,9 +52,11 @@ class Section_Class(object):
         run Main Executable
         """
         self.load_data()
+        self.remove_outliers()
+        self.save_data()
+        self.register_preview()
         self.generate_QC()
-        
-        
+    
     def update_user(self,message):
         """
         update_user Send Message to User
@@ -68,6 +70,21 @@ class Section_Class(object):
     def load_data(self):
         self.load_metadata()
         self.load_h5ad()
+
+    def save_data(self):
+        matrix = pd.DataFrame(self.data.X,
+                              index=np.array(self.data.obs.index),
+                              columns=np.array(self.data.var.index))
+        self.data.write(filename=os.path.join(self.metadata_path,
+                                         self.config.parameters['fishdata'],
+                                         self.dataset+'_'+self.section+'_data.h5ad'))
+        matrix.to_csv(os.path.join(self.metadata_path,
+                                   self.config.parameters['fishdata'],
+                                   self.dataset+'_'+self.section+'_matrix.csv'))
+        self.data.obs.to_csv(os.path.join(self.metadata_path,
+                                     self.config.parameters['fishdata'],
+                                     self.dataset+'_'+self.section+'_metadata.csv'))
+                                     
         
     def load_h5ad(self):
         """
@@ -108,7 +125,8 @@ class Section_Class(object):
         self.out_path = os.path.join(self.out_path,self.section)
         if not os.path.exists(self.out_path):
             os.mkdir(self.out_path)
-        fname = os.path.join(self.out_path,self.dataset+'_'+self.section+'_'+acq+'_'+channel+'.tif')
+        hybe = acq.split('_')[0]
+        fname = os.path.join(self.out_path,self.dataset+'_'+self.section+'_'+hybe+'_'+channel+'.tif')
         if not self.config.parameters['overwrite']:
             if os.path.exists(fname):
                 self.update_user('Loading Stitched')
@@ -197,7 +215,8 @@ class Section_Class(object):
         self.data.obs['coord_y'] = np.array(spatial_data.points_rot[:,1])
         self.data.obs['region_id'] = np.array(spatial_data.region_id)
         self.data.obs['region_color'] = np.array(spatial_data.region_color) 
-        self.data.obs['region_acronym'] = np.array(spatial_data.region_acronym) 
+        self.data.obs['region_acronym'] = np.array(spatial_data.region_acronym)
+        self.save_data()
         
 
 def generate_img(data,FF=''):

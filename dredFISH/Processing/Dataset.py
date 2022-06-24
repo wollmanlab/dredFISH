@@ -160,18 +160,7 @@ class Dataset_Class(object):
         section_XY = 'Section_'+X+'X_'+Y+'Y'
         # Give Cells Unique Name 
         temp.obs.index = [self.dataset+'_'+section_XY+'_'+row.posname+'_Cell'+str(int(row.label)) for idx,row in temp.obs.iterrows()]
-        matrix = pd.DataFrame(temp.X,
-                              index=np.array(temp.obs.index),
-                              columns=np.array(temp.var.index))
-        temp.write(filename=os.path.join(self.metadata_path,
-                                         self.config.parameters['fishdata'],
-                                         self.dataset+'_'+section_XY+'_data.h5ad'))
-        matrix.to_csv(os.path.join(self.metadata_path,
-                                   self.config.parameters['fishdata'],
-                                   self.dataset+'_'+section_XY+'_matrix.csv'))
-        temp.obs.to_csv(os.path.join(self.metadata_path,
-                                     self.config.parameters['fishdata'],
-                                     self.dataset+'_'+section_XY+'_metadata.csv'))
+        temp.obs['section'] = section_XY
         section = Section_Class(self.metadata_path,
                                          self.dataset,
                                          section_XY,
