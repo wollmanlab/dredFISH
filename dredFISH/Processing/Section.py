@@ -4,6 +4,7 @@ import anndata
 import pandas as pd
 import importlib
 from metadata import Metadata
+from functools import partial
 import multiprocessing
 from tqdm import tqdm
 import cv2
@@ -12,6 +13,9 @@ import os
 from PIL import Image
 from scipy.ndimage import gaussian_filter
 import time
+import torch
+from dredFISH.Analysis import regu
+from dredFISH.Analysis.regu import *
 
 class Section_Class(object):
     def __init__(self,
@@ -48,9 +52,11 @@ class Section_Class(object):
         run Main Executable
         """
         self.load_data()
+        self.remove_outliers()
+        self.save_data()
+        self.register_preview()
         self.generate_QC()
-        
-        
+    
     def update_user(self,message):
         """
         update_user Send Message to User
@@ -60,8 +66,27 @@ class Section_Class(object):
         """
         if self.verbose:
             i = [i for i in tqdm([],desc=str(datetime.now().strftime("%H:%M:%S"))+' '+str(message))]
-        
+
     def load_data(self):
+        self.load_metadata()
+        self.load_h5ad()
+
+    def save_data(self):
+        matrix = pd.DataFrame(self.data.X,
+                              index=np.array(self.data.obs.index),
+                              columns=np.array(self.data.var.index))
+        self.data.write(filename=os.path.join(self.metadata_path,
+                                         self.config.parameters['fishdata'],
+                                         self.dataset+'_'+self.section+'_data.h5ad'))
+        matrix.to_csv(os.path.join(self.metadata_path,
+                                   self.config.parameters['fishdata'],
+                                   self.dataset+'_'+self.section+'_matrix.csv'))
+        self.data.obs.to_csv(os.path.join(self.metadata_path,
+                                     self.config.parameters['fishdata'],
+                                     self.dataset+'_'+self.section+'_metadata.csv'))
+                                     
+        
+    def load_h5ad(self):
         """
         load_data Load Previously Processed Data
         """
@@ -72,7 +97,12 @@ class Section_Class(object):
                                          self.dataset+'_'+self.section+'_data.h5ad')
             self.data = anndata.read_h5ad(filename)
         self.posnames = np.unique(self.data.obs['posname'])
-        
+
+
+    def load_metadata(self):
+        """
+        load_data Load Previously Processed Data
+        """
         if isinstance(self.metadata,str):
             self.update_user('Loading Metadata')
             self.metadata = Metadata(self.metadata_path)
@@ -88,27 +118,36 @@ class Section_Class(object):
         """
 
         self.update_user('Stitching Images')
-        stitched = generate_stitched(self.metadata,
-                                     acq,channel,
-                                     pixel_size=self.config.parameters['pixel_size'],
-                                     rotate = self.config.parameters['stitch_rotate'],
-                                     flipud=self.config.parameters['stitch_flipud'],
-                                     fliplr=self.config.parameters['stitch_fliplr'],
-                                     posnames=self.posnames)
-        self.update_user('Downsampling Stitched')
-        ratio = self.config.parameters['pixel_size']/self.config.parameters['QC_pixel_size']
-        scale = (np.array(stitched.shape)*ratio).astype(int)
-        stitched = np.array(Image.fromarray(stitched.astype(float)).resize((scale[1],scale[0]), Image.BICUBIC))
-        self.update_user('Saving Stitched')
-        self.out_path = os.path.join(self.metadata_path,'Results')
+        proceed = True
+        self.out_path = os.path.join(self.metadata_path,self.config.parameters['results'])
         if not os.path.exists(self.out_path):
             os.mkdir(self.out_path)
         self.out_path = os.path.join(self.out_path,self.section)
         if not os.path.exists(self.out_path):
             os.mkdir(self.out_path)
-        fname = os.path.join(self.out_path,self.dataset+'_'+self.section+'_'+acq+'_'+channel+'.tif')
-        stitched[stitched<0] = 0
-        cv2.imwrite(fname, stitched.astype('uint16'))
+        hybe = acq.split('_')[0]
+        fname = os.path.join(self.out_path,self.dataset+'_'+self.section+'_'+hybe+'_'+channel+'.tif')
+        if not self.config.parameters['overwrite']:
+            if os.path.exists(fname):
+                self.update_user('Loading Stitched')
+                stitched = cv2.imread(fname,-1)
+                proceed = False
+        if proceed:
+            stitched = generate_stitched(self.metadata,
+                                        acq,channel,
+                                        pixel_size=self.config.parameters['pixel_size'],
+                                        rotate = self.config.parameters['stitch_rotate'],
+                                        flipud=self.config.parameters['stitch_flipud'],
+                                        fliplr=self.config.parameters['stitch_fliplr'],
+                                        posnames=self.posnames)
+            self.update_user('Downsampling Stitched')
+            ratio = self.config.parameters['pixel_size']/self.config.parameters['QC_pixel_size']
+            scale = (np.array(stitched.shape)*ratio).astype(int)
+            stitched = np.array(Image.fromarray(stitched.astype(float)).resize((scale[1],scale[0]), Image.BICUBIC))
+            self.update_user('Saving Stitched')
+            stitched[stitched<0] = 0
+            cv2.imwrite(fname, stitched.astype('uint16'))
+        return stitched
         
     def generate_QC(self):
         """
@@ -118,25 +157,66 @@ class Section_Class(object):
         self.update_user('Generating QC')
         if self.config.parameters['nucstain_acq']=='infer':
             acq = [i for i in self.metadata.acqnames if 'nucstain_' in i][-1]
-            self.generate_stitched(acq,self.config.parameters['nucstain_channel'])
+            stitched = self.generate_stitched(acq,self.config.parameters['nucstain_channel'])
         elif self.config.parameters['nucstain_acq']=='none':
             do = 'nothing'
         else:
-            self.generate_stitched(self.config.parameters['nucstain_acq'],
+            stitched = self.generate_stitched(self.config.parameters['nucstain_acq'],
                                    self.config.parameters['nucstain_channel'])
             
         if self.config.parameters['total_acq']=='infer':
             acq = [i for i in self.metadata.acqnames if 'nucstain_' in i][-1]
-            self.generate_stitched(acq,self.config.parameters['total_channel'])
+            stitched = self.generate_stitched(acq,self.config.parameters['total_channel'])
         elif self.config.parameters['total_acq']=='none':
             do = 'nothing'
         else:
-            self.generate_stitched(self.config.parameters['total_acq'],
+            stitched = self.generate_stitched(self.config.parameters['total_acq'],
                                    self.config.parameters['total_channel'])
             
         for r,h,c in self.config.bitmap:
             acq = [i for i in self.metadata.acqnames if h+'_' in i][-1]
-            self.generate_stitched(acq,c)
+            stitched = self.generate_stitched(acq,c)
+
+    def remove_outliers(self):
+        self.update_user('Removing Outliers')
+        XY = torch.tensor(self.data.obsm['stage'].copy())
+        center = torch.median(XY,axis=0).values
+        distances = torch.cdist(XY,center[:,None].T).numpy()
+        thresh = np.percentile(distances,99)
+        mask = distances<thresh
+        self.data = self.data[mask]
+
+    def load_allen(self):
+        self.allen_template = regu.load_allen_template(self.config.parameters['allen_template_path'])
+        self.allen_tree, self.allen_maps = regu.load_allen_tree(self.config.parameters['allen_tree_path'])
+        self.allen_annot = regu.load_allen_annot(self.config.parameters['allen_annot_path']) # takes about 30 seconds
+
+    def register_preview(self):
+        spatial_data = regu.check_run(self.data.obsm['stage'].copy(), 
+                                    self.allen_template, 
+                                    self.allen_annot, 
+                                    self.allen_maps,
+                                    self.config.parameters['registration_idx'], 
+                                    flip=self.config.parameters['registration_flip'])
+
+    def register(self):
+        spatial_data = regu.real_run(self.data.obsm['stage'].copy(), 
+                                    self.allen_template, 
+                                    self.allen_annot, 
+                                    self.allen_maps,
+                                    self.config.parameters['registration_idx'], 
+                                    flip=self.config.parameters['registration_flip'],
+                                    dataset=self.dataset+'_'+self.section,
+                                    outprefix=self.dataset+'_'+self.section, 
+                                    force=self.config.parameters['registration_force'],
+                                    )
+        # update results to anndata (cell level atrributes)
+        self.data.obs['coord_x'] = np.array(spatial_data.points_rot[:,0])
+        self.data.obs['coord_y'] = np.array(spatial_data.points_rot[:,1])
+        self.data.obs['region_id'] = np.array(spatial_data.region_id)
+        self.data.obs['region_color'] = np.array(spatial_data.region_color) 
+        self.data.obs['region_acronym'] = np.array(spatial_data.region_acronym)
+        self.save_data()
         
 
 def generate_img(data,FF=''):
@@ -329,3 +409,5 @@ def colorize_segmented_image(img, color_type='rgb'):
         rgb_img[tuple(regions[i].coords.T)] = colors[i]  # won't use the 1st color
 
     return rgb_img.astype(np.int)
+
+
