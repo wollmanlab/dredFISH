@@ -96,8 +96,8 @@ def get_index_from_array(arr, inqs, na_rep=-1):
 def diag_matrix(X, rows=np.array([]), cols=np.array([]), threshold=None):
     """Diagonalize a matrix as much as possible
     threshold controls the level of diagnalization
-    a smaller threshold enforces more number of strict diagnal values,
-    while encourages less number of free columns (quasi-diagnal)
+    a smaller threshold encourges more number of strict diagnal values,
+    while discourages less number of free columns (quasi-diagnal)
     """
     di, dj = X.shape
     transposed = 0
@@ -205,6 +205,15 @@ def diag_matrix_rows(X):
     new_X = new_X[new_row_order, :].copy()
     new_rows = new_rows[new_row_order]
     
+    return new_X, new_rows, new_cols 
+
+def diag_matrix_cols(X):
+    """
+    """
+    new_X, new_rows, new_cols = diag_matrix_rows(X.T)
+    # flip back
+    new_X = new_X.T
+    new_cols, new_rows = new_rows, new_cols
     return new_X, new_rows, new_cols 
 
 def encode_mat(a, d, entrysize=1):

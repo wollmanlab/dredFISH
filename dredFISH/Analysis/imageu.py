@@ -185,5 +185,5 @@ def get_img_centroid(mat, scale=1):
 def flip_points(points):
     """assume a n*2 matrix
     """
-    trans_mat = np.array([[1,0],[0,-1]])
+    trans_mat = np.array([[-1,0],[0,-1]])
     return np.dot(points, trans_mat)

@@ -62,7 +62,7 @@ class Data():
     def flip_rotated(self):
         prot = imageu.flip_points(self.points_rot)
         self.points_rot = prot 
-        self.trans_rot = self.trans_rot.dot(np.array([[1,0],[0,-1]]))
+        self.trans_rot = self.trans_rot.dot(np.array([[-1,0],[0,-1]]))
         self.img_rot, self.img_rot_coords = imageu.pointset_to_image(prot, resolution=10, return_coords=True) # update
         return 
     
