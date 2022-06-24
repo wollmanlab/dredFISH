@@ -14,8 +14,9 @@ from PIL import Image
 from scipy.ndimage import gaussian_filter
 import time
 import torch
-from dredFISH.Analysis import regu
-from dredFISH.Analysis.regu import *
+
+from dredFISH.Utils import regu
+# from dredFISH.Analysis.regu import *
 
 class Section_Class(object):
     def __init__(self,
@@ -207,7 +208,7 @@ class Section_Class(object):
                                     self.config.parameters['registration_idx'], 
                                     flip=self.config.parameters['registration_flip'],
                                     dataset=self.dataset+'_'+self.section,
-                                    outprefix=self.dataset+'_'+self.section, 
+                                    outprefix=self.config.parameters['registration_output_prefix'], # CHECK THIS
                                     force=self.config.parameters['registration_force'],
                                     )
         # update results to anndata (cell level atrributes)

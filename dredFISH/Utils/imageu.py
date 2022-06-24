@@ -48,7 +48,7 @@ def block_downsamp_3d(ar, fact):
     return res 
 
 # rotation transformation
-def pca_rotate(pmat, allow_reflection=True, vec_chiral=np.array([]), random_state=0):
+def pca_rotate(pmat, allow_reflection=False, vec_chiral=np.array([]), random_state=0):
     """(n,2) matrix as input (point set)
     learn a rotation/reflection along PC1 and PC2.
     """

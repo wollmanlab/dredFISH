@@ -18,7 +18,7 @@ from . import imageu
 from . import basicu
 from . import powerplots
 
-class Data():
+class RegData():
     """
         self.points_raw -- starting point
         self.points_rot -- after rotation
@@ -52,8 +52,8 @@ class Data():
         assert self.img_ccf_template.shape == self.img_ccf_annot.shape
         return 
     
-    def pca_rotate(self):
-        prot, Vt = imageu.pca_rotate(self.points_raw)
+    def pca_rotate(self, allow_reflection=False):
+        prot, Vt = imageu.pca_rotate(self.points_raw, allow_reflection=allow_reflection)
         self.points_rot = prot
         self.trans_rot = Vt.T # V -- right dot
         self.img_rot, self.img_rot_coords = imageu.pointset_to_image(prot, resolution=10, return_coords=True)
@@ -481,7 +481,7 @@ class Data():
 def read_registered_data(file):
     """
     """
-    obj = Data('', np.zeros((2,2))) # create an empty one
+    obj = RegData('', np.zeros((2,2))) # create an empty one
     with h5py.File(file, 'r') as fh:
         for key in fh.keys():
             # print(fh[key])
@@ -514,7 +514,7 @@ def check_run(XY,
     ccf_template and ccf_annot are 3-dimensional matrices of the same shape
     """
     # initiation
-    data = Data(dataset, XY)
+    data = RegData(dataset, XY)
     # rotate
     data.pca_rotate()
     if flip:

@@ -1,65 +1,11 @@
-"""Misc functions that provide functionality to dredFISH module
-
 """
-
+"""
 from typing import Union
 import numpy as np
 import pandas as pd
 from scipy import stats
-from scipy.spatial.distance import jensenshannon, pdist, squareform
-from sklearn.decomposition import LatentDirichletAllocation
 from scipy import sparse
 import logging
-import itertools
-from collections import Counter
-from pyemd import emd
-
-
-def normalize_data(X, in_place = False, norm_cell=True, norm_basis=True,onlypos = True):
-    """Row and col normalization of data
-    
-    Parameters
-    ----------
-    Xorg : numpy 2D matrix
-            The data to normalized in the forms of cells (rows) x basis (cols)
-    in_place : bool (default = False)
-        are calculatoins done in place or should we create a new copy of the data? 
-    norm_cell : bool
-        should row be normalized to sum to 1? 
-    norm_basis : bool 
-        should columns be normalized using z-score? 
-    onlypos : bool
-        should negative data (<0) be cliped to 0? 
-
-    Returns
-    -------
-    Xnrm : numpy 2D matrix
-        The normalized matrix. 
-    
-
-    """
-    
-    Xnrm = X.copy()
-    
-    # clip at 0
-    if onlypos:
-        X = np.clip(X, 0, None)
-
-    # total counts per cell
-    basissum = X.sum(axis=1)
-    logging.info(f"{basissum.shape[0]} cells, minimum counts = {basissum.min()}")
-
-    # normalize by cell 
-    if norm_cell:
-        X = X/basissum.reshape(-1,1)
-
-    # normalize by bit
-    if norm_basis:
-        X = zscore(X, axis=0) # 0 - across rows (cells) for each col (bit) 
-
-    return X # finalized
-
-
 
 def reset_logging(**kwargs):
     """reset logging.
@@ -150,8 +96,8 @@ def get_index_from_array(arr, inqs, na_rep=-1):
 def diag_matrix(X, rows=np.array([]), cols=np.array([]), threshold=None):
     """Diagonalize a matrix as much as possible
     threshold controls the level of diagnalization
-    a smaller threshold enforces more number of strict diagnal values,
-    while encourages less number of free columns (quasi-diagnal)
+    a smaller threshold encourges more number of strict diagnal values,
+    while discourages less number of free columns (quasi-diagnal)
     """
     di, dj = X.shape
     transposed = 0
@@ -261,6 +207,15 @@ def diag_matrix_rows(X):
     
     return new_X, new_rows, new_cols 
 
+def diag_matrix_cols(X):
+    """
+    """
+    new_X, new_rows, new_cols = diag_matrix_rows(X.T)
+    # flip back
+    new_X = new_X.T
+    new_cols, new_rows = new_rows, new_cols
+    return new_X, new_rows, new_cols 
+
 def encode_mat(a, d, entrysize=1):
     """ Given a matrix and a dictionary; map elements of a according to d
     a - numpy array
@@ -349,14 +304,40 @@ def stratified_sample(df, col, n: Union[int, dict], return_idx=False, group_keys
     """
     n (int) represents the number for each group
     n (dict) can be used to sample different numbers for each group
+    does not allow oversampling
     """
     if isinstance(n, int):
         dfsub = df.groupby(col, group_keys=group_keys, sort=sort, **kwargs).apply(
-            lambda x: x.sample(n=min(len(x), n), random_state=random_state)
+            lambda x: x.sample(n=min(len(x), n), 
+                random_state=random_state)
             )
     elif isinstance(n, dict):
         dfsub = df.groupby(col, group_keys=group_keys, sort=sort, **kwargs).apply(
-            lambda x: x.sample(n=min(len(x), n[x[col].iloc[0]]), random_state=random_state)
+            lambda x: x.sample(n=min(len(x), n[x[col].iloc[0]]), 
+                random_state=random_state)
+            )
+
+    if not return_idx:
+        return dfsub
+    else:
+        idx = get_index_from_array(df.index.values, dfsub.index.values)
+        return dfsub, idx
+
+def stratified_sample_withrep(df, col, n: Union[int, dict], return_idx=False, group_keys=False, sort=False, random_state=0, **kwargs):
+    """
+    n (int) represents the number for each group
+    n (dict) can be used to sample different numbers for each group
+    replace=True: allow oversampling
+    """
+    if isinstance(n, int):
+        dfsub = df.groupby(col, group_keys=group_keys, sort=sort, **kwargs).apply(
+            lambda x: x.sample(n=n, 
+                replace=True, random_state=random_state)
+            )
+    elif isinstance(n, dict):
+        dfsub = df.groupby(col, group_keys=group_keys, sort=sort, **kwargs).apply(
+            lambda x: x.sample(n=n[x[col].iloc[0]], 
+                replace=True, random_state=random_state)
             )
 
     if not return_idx:
@@ -379,53 +360,3 @@ def rank(arr, **kwargs):
     """
     arr = np.array(arr)
     return np.argsort(np.argsort(arr, **kwargs), **kwargs)
-
-
-def count_values(V,refvals,sz = None,norm_to_one = True):
-    """
-    count_values - simple tabulation with default values (refvals)
-    """
-    Cnt = Counter(V)
-    if sz is not None: 
-        for i in range(len(V)): 
-            Cnt.update({V[i] : sz[i]-1}) # V[i] is already represented, so we need to subtract 1 from sz[i]  
-            
-    cntdict = dict(Cnt)
-    missing = list(set(refvals) - set(V))
-    cntdict.update(zip(missing, np.zeros(len(missing))))
-    Pv = np.array([cntdict.get(k) for k in sorted(cntdict.keys())])
-    if norm_to_one:
-        Pv=Pv/np.sum(Pv)
-    return(Pv)
-
-def dist_emd(E1,E2,Dsim):
-    
-    if E2 is None: 
-        cmb = np.array(list(itertools.combinations(np.arange(E1.shape[0]), r=2)))
-        D = dist_emd(E1[cmb[:,0],:],E1[cmb[:,1],:],Dsim)
-    else:
-        sum_of_rows = E1.sum(axis=1)
-        E1 = E1 / sum_of_rows[:, None]
-        E1 = E1.astype('float64')
-        sum_of_rows = E2.sum(axis=1)
-        E2 = E2 / sum_of_rows[:, None]
-        E2 = E2.astype('float64')
-        D = np.zeros(E1.shape[0])
-        Dsim = Dsim.astype('float64')
-        for i in range(E1.shape[0]):
-            e1=E1[i,:]
-            e2=E2[i,:]
-            D[i] = emd(e1,e2,Dsim)
-    
-    return D
-
-def dist_jsd(M1,M2 = None):
-    if M2 is None: 
-        D = pdist(M1,metric = 'jensenshannon')
-    else: 
-        D = jensenshannon(M1,M2,base=2,axis=1)
-    return D
-
-
-
-
