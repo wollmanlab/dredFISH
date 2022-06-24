@@ -14,6 +14,8 @@ from PIL import Image
 from scipy.ndimage import gaussian_filter
 import time
 import torch
+from dredFISH.Analysis import regu
+from dredFISH.Analysis.regu import *
 
 class Section_Class(object):
     def __init__(self,
@@ -167,29 +169,35 @@ class Section_Class(object):
         self.data = self.data[mask]
 
     def load_allen(self):
-        allen_template = regu.load_allen_template(allen_template_path)
-        allen_tree, allen_maps = regu.load_allen_tree(allen_tree_path)
-        allen_annot = regu.load_allen_annot(allen_annot_path) # takes about 30 seconds
+        self.allen_template = regu.load_allen_template(self.config.parameters['allen_template_path'])
+        self.allen_tree, self.allen_maps = regu.load_allen_tree(self.config.parameters['allen_tree_path'])
+        self.allen_annot = regu.load_allen_annot(self.config.parameters['allen_annot_path']) # takes about 30 seconds
 
     def register_preview(self):
         spatial_data = regu.check_run(self.data.obsm['stage'].copy(), 
-                                    allen_template, 
-                                    allen_annot, 
-                                    allen_maps,
-                                    idx_ccf, 
-                                    flip=flip)
+                                    self.allen_template, 
+                                    self.allen_annot, 
+                                    self.allen_maps,
+                                    self.config.parameters['registration_idx'], 
+                                    flip=self.config.parameters['registration_flip'])
 
     def register(self):
         spatial_data = regu.real_run(self.data.obsm['stage'].copy(), 
-                                    allen_template, 
-                                    allen_annot, 
-                                    allen_maps,
-                                    idx_ccf, 
-                                    flip=flip,
-                    dataset="", # a name
-                    outprefix=outprefix, 
-                    force=force,
-                    )
+                                    self.allen_template, 
+                                    self.allen_annot, 
+                                    self.allen_maps,
+                                    self.config.parameters['registration_idx'], 
+                                    flip=self.config.parameters['registration_flip'],
+                                    dataset=self.dataset+'_'+self.section,
+                                    outprefix=self.dataset+'_'+self.section, 
+                                    force=self.config.parameters['registration_force'],
+                                    )
+        # update results to anndata (cell level atrributes)
+        self.data.obs['coord_x'] = np.array(spatial_data.points_rot[:,0])
+        self.data.obs['coord_y'] = np.array(spatial_data.points_rot[:,1])
+        self.data.obs['region_id'] = np.array(spatial_data.region_id)
+        self.data.obs['region_color'] = np.array(spatial_data.region_color) 
+        self.data.obs['region_acronym'] = np.array(spatial_data.region_acronym) 
         
 
 def generate_img(data,FF=''):
