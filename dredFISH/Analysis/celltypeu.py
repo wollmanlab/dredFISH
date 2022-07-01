@@ -53,7 +53,7 @@ class CellTypeClassify(object):
         # default model
         if self.model == None:
             self.model = KNeighborsClassifier(n_neighbors=15, metric='correlation')
-        # other wise uses the user input
+        # otherwise uses the user input
         
     def normalizeData(self, norm='per_bit'):
         # interprete (back compatible)
