@@ -1,4 +1,15 @@
 {
     "jupyter.jupyterServerType": "local",
     "esbonio.sphinx.confDir": ""
+    "r.rpath.linux": "/home/fangming/anaconda3/envs/renv/bin/R",
+    "r.rterm.linux": "/home/fangming/anaconda3/envs/renv/bin/radian",
+    "r.rpath.mac": "/home/fangming/anaconda3/envs/renv/bin/R",
+    "r.rpath.windows": "/home/fangming/anaconda3/envs/renv/bin/R",
+    "r.rterm.mac": "/home/fangming/anaconda3/envs/renv/bin/radian",
+    "r.rterm.windows": "/home/fangming/anaconda3/envs/renv/bin/radian",
+
+    // "python.defaultInterpreterPath": "/home/fangming/anaconda3/envs/renv/bin/python",
+    // "python.terminal.activateEnvironment": true,
+    "r.bracketedPaste": true,
+    "r.alwaysUseActiveTerminal": true,
 }
