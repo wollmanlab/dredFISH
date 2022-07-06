@@ -14,9 +14,8 @@ from PIL import Image
 from scipy.ndimage import gaussian_filter
 import time
 import torch
-
 from dredFISH.Utils import regu
-# from dredFISH.Analysis.regu import *
+from skimage.measure import regionprops
 
 class Section_Class(object):
     def __init__(self,
@@ -140,7 +139,7 @@ class Section_Class(object):
                                         rotate = self.config.parameters['stitch_rotate'],
                                         flipud=self.config.parameters['stitch_flipud'],
                                         fliplr=self.config.parameters['stitch_fliplr'],
-                                        posnames=self.posnames)
+                                        posnames=self.posnames,parameters=self.config.parameters)
             self.update_user('Downsampling Stitched')
             ratio = self.config.parameters['pixel_size']/self.config.parameters['QC_pixel_size']
             scale = (np.array(stitched.shape)*ratio).astype(int)
@@ -230,6 +229,7 @@ def generate_img(data,FF=''):
                 data['image_metadata'] = image_metadata
                 data['channel'] = channel
                 data['exposure'] = exposure
+                data['parameters'] = parameters
     :type data: dict
     :param FF: Flat Field Image array of same shape as image, defaults to ''
     :type FF: np.array, optional
@@ -241,26 +241,33 @@ def generate_img(data,FF=''):
         posname = data['posname']
         image_metadata = data['image_metadata']
         channel = data['channel']
-        if 'hybe' in acq:
-            strip = 'strip' + acq.split('hybe')[1].split('_')[0] + '_' +str(int(acq.split('_')[1])-1)
-        if ('nucstain' in acq)&(channel!='DeepBlue'):
-            strip = 'backround' + acq.split('nucstain')[1].split('_')[0] + '_' +str(int(acq.split('_')[1])-1)
-        if not isinstance(FF,str):
-            if data['exposure']!='':
-                img = FF*image_metadata.stkread(Position=posname,Channel=channel,acq=acq,Exposure=data['exposure']).max(axis=2).astype(float)
-            else:
-                img = FF*image_metadata.stkread(Position=posname,Channel=channel,acq=acq).max(axis=2).astype(float)
+        parameters = data['parameters']
+        if 'mask' in channel:
+            metadata_path = image_metadata.base_pth
+            dataset = [i for i in metadata_path.split('/') if not i==''][-1]
+            fname = os.path.join(metadata_path,parameters['fishdata'],dataset+'_'+posname+'_'+channel+'.tif')
+            img = cv2.imread(fname, -1).astype(float)
         else:
-            if data['exposure']!='':
-                img = image_metadata.stkread(Position=posname,Channel=channel,acq=acq,Exposure=data['exposure']).max(axis=2).astype(float)
-            else:
-                img = image_metadata.stkread(Position=posname,Channel=channel,acq=acq).max(axis=2).astype(float)
             if 'hybe' in acq:
+                strip = 'strip' + acq.split('hybe')[1].split('_')[0] + '_' +str(int(acq.split('_')[1])-1)
+            if ('nucstain' in acq)&(channel!='DeepBlue'):
+                strip = 'backround' + acq.split('nucstain')[1].split('_')[0] + '_' +str(int(acq.split('_')[1])-1)
+            if not isinstance(FF,str):
                 if data['exposure']!='':
-                    bkg = image_metadata.stkread(Position=posname,Channel=channel,acq=strip,Exposure=data['exposure']).max(axis=2).astype(float)
+                    img = FF*image_metadata.stkread(Position=posname,Channel=channel,acq=acq,Exposure=data['exposure']).max(axis=2).astype(float)
                 else:
-                    bkg = image_metadata.stkread(Position=posname,Channel=channel,acq=strip).max(axis=2).astype(float)
-                img = img-bkg
+                    img = FF*image_metadata.stkread(Position=posname,Channel=channel,acq=acq).max(axis=2).astype(float)
+            else:
+                if data['exposure']!='':
+                    img = image_metadata.stkread(Position=posname,Channel=channel,acq=acq,Exposure=data['exposure']).max(axis=2).astype(float)
+                else:
+                    img = image_metadata.stkread(Position=posname,Channel=channel,acq=acq).max(axis=2).astype(float)
+                if 'hybe' in acq:
+                    if data['exposure']!='':
+                        bkg = image_metadata.stkread(Position=posname,Channel=channel,acq=strip,Exposure=data['exposure']).max(axis=2).astype(float)
+                    else:
+                        bkg = image_metadata.stkread(Position=posname,Channel=channel,acq=strip).max(axis=2).astype(float)
+                    img = img-bkg
         return posname,img
     except Exception as e:
         print(e)
@@ -281,12 +288,15 @@ def generate_FF(image_metadata,acq,channel):
     :return: flat field image
     :rtype: np.array
     """
-    posnames = image_metadata.image_table[image_metadata.image_table.acq==acq].Position.unique()
-    random_posnames = posnames[0:20]
-    FF = torch.dstack([torch.tensor(image_metadata.stkread(Position=posname,Channel=channel,acq=acq).min(2).astype(float)) for posname in random_posnames]).min(2).values
-    FF = gaussian_filter(FF.numpy(),5)
-    FF = FF.mean()/FF
-    return FF
+    if 'mask' in channel:
+        return ''
+    else:
+        posnames = image_metadata.image_table[image_metadata.image_table.acq==acq].Position.unique()
+        random_posnames = posnames[0:20]
+        FF = torch.dstack([torch.tensor(image_metadata.stkread(Position=posname,Channel=channel,acq=acq).min(2).astype(float)) for posname in random_posnames]).min(2).values
+        FF = gaussian_filter(FF.numpy(),5)
+        FF = FF.mean()/FF
+        return FF
 
 def generate_stitched(image_metadata,
                       acq,channel,
@@ -297,6 +307,7 @@ def generate_stitched(image_metadata,
                       flipud=False,
                       fliplr=False,
                       dtype = torch.int32,
+                      parameters={},
                       verbose=True,
                       posnames=[]):
     """
@@ -322,6 +333,8 @@ def generate_stitched(image_metadata,
     :type fliplr: bool, optional
     :param dtype: datatype for final stitched image, defaults to torch.int32
     :type dtype: _type_, optional
+    :param parameters: parameters from self.config.parameters
+    :type parameters: dict, optional
     :param verbose: loading bars and print statements, defaults to True
     :type verbose: bool, optional
     :param posnames: list of position names if only a subset is desired, defaults to []
@@ -351,6 +364,7 @@ def generate_stitched(image_metadata,
         data['image_metadata'] = image_metadata
         data['channel'] = channel
         data['exposure'] = exposure
+        data['parameters'] = parameters
         Input.append(data)
     pfunc = partial(generate_img,FF=FF)
     with multiprocessing.Pool(60) as p:
