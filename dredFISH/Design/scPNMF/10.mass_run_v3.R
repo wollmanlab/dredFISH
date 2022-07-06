@@ -6,10 +6,10 @@ np <- import("numpy")
 # example
 ddir <- "/bigstore/GeneralStorage/fangming/projects/dredfish/res_dpnmf/"
 ddirout <- "/bigstore/GeneralStorage/fangming/projects/dredfish/res_dpnmf/v2/"
-name0 <- "smrt" 
+name0 <- "smrt_withrep" 
 k <- 24 
 mu_range <- c(1e4, 1e2, 1, 1e-2, 1e-4)
-namex_range <- c("all")
+namex_range <- c("subL5n100")
 namey_range <- c("L5") # same length as namex_range
 
 # namex_range <- c(
