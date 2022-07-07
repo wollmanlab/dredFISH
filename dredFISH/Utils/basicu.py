@@ -360,3 +360,25 @@ def rank(arr, **kwargs):
     """
     arr = np.array(arr)
     return np.argsort(np.argsort(arr, **kwargs), **kwargs)
+
+def normalize_fishdata(X, norm_cell=True, norm_basis=True):
+    """
+    X -- cell by basis raw count matrix
+    
+    0 clipping; cell normalization; bit normalization
+    """
+    # clip at 0
+    X = np.clip(X, 0, None)
+    # total counts per cell
+    bitssum = X.sum(axis=1)
+    logging.info(f"{bitssum.shape[0]} cells, minimum counts = {bitssum.min()}")
+
+    # normalize by cell 
+    if norm_cell:
+        X = X/bitssum.reshape(-1,1)
+
+    # further normalize by bit
+    if norm_basis:
+        X = zscore(X, axis=0) # 0 - across rows (cells) for each col (bit) 
+
+    return X 

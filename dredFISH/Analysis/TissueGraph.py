@@ -17,7 +17,6 @@ TMG is created in a folder with csv file(s) that have cells transcriptional stat
 The creation of TMG follows the methods to create different layers (create_cell_layer, create_zone_layer, create_region_layer) and creating Geoms using create_geoms. 
 """
 
-
 # dependencies
 from cmath import nan
 import functools
@@ -25,46 +24,34 @@ from textwrap import indent
 import ipyparallel as ipp
 from collections import Counter
 import numpy as np
+rng = np.random.default_rng()
 import pandas as pd
 import itertools
 import logging
 import os.path 
 import glob
 import json
-
 import pickle
 
-from igraph import *
+# from igraph import *
+import igraph
 import pynndescent 
 from scipy.spatial import Delaunay,Voronoi
-from scipy.spatial.distance import jensenshannon, pdist, squareform
 from scipy.sparse.csgraph import dijkstra
-from scipy.stats import entropy, mode,median_abs_deviation
-from scipy.sparse import csr_matrix
-
-import sklearn
-from sklearn.preprocessing import normalize
-import sklearn.decomposition
-from sklearn.decomposition import LatentDirichletAllocation
-from sklearn.neighbors import NearestNeighbors
-
 
 import anndata
-
-from numpy.random import default_rng
-rng = default_rng()
-
 # to create geomtries
 from shapely.geometry import Polygon, MultiPolygon, LineString, MultiLineString
 
-from dredFISH.Utils.basicu import *
+from dredFISH.Utils import basicu 
+from dredFISH.Utils import tmgu
 from dredFISH.Utils.geomu import voronoi_polygons, bounding_box
 
 # for debuding mostly
 import warnings
 import time
 from IPython import embed
-
+from . import Taxonomy
 
 class TissueMultiGraph: 
     """Main class used to manage the creation of multi-layer graph representation of tissues. 
@@ -99,7 +86,6 @@ class TissueMultiGraph:
         Stores relationship between TG layers and Taxonomies
         
  """
-    
     def __init__(self, basepath = None, redo = False):
         """Create a TMG object
         
@@ -136,32 +122,41 @@ class TissueMultiGraph:
             self.Geoms = list()
             
             self.Taxonomies = list() # a list of Taxonomies
-            self.layer_taxonomy_mapping = list() # a list of tuples that keep tracks of which TissueGraph (index into Layer) 
+            self.layer_taxonomy_mapping = dict() # list() # a list of tuples that keep tracks of which TissueGraph (index into Layer) 
                                                  # uses which taxonomy (index into Taxonomies
+                                                 # FIXME -- has to be a dictinary 
 
         else: 
             # load from drive
-            self._config = json.load(os.path.join(basepath,"TMG.json"))
+            with open(os.path.join(basepath,"TMG.json")) as fh:
+                self._config = json.load(fh)
             
             # start with Taxonomies: 
             TaxNameList = self._config["Taxonomies"]
+            self.Taxonomies = [None]*len(TaxNameList)
             for i in range(len(TaxNameList)): 
                 self.Taxonomies[i] = Taxonomy(basepath,TaxNameList[i])
                     
-            self.layer_taxonomy_mapping = self._config["layer_taxonomy_mapping"];
+            # convert string key to int key (fixing an artifects of JSON dump and load)
+            ltm = self._config["layer_taxonomy_mapping"]
+            ltm = {int(layer_ix): tax_ix for layer_ix, tax_ix in ltm.items()}
+            self.layer_taxonomy_mapping = ltm 
+            # print(ltm)
             
             LayerNameList = self._config["Layers"]
+            self.Layers = [None]*len(LayerNameList)
             for i in range(len(LayerNameList)): 
-                tax_ix = self.layer_taxonomy_mapping[self.layer_taxonomy_mapping[:,0]==i,1]
-                self.Layers[i] = TissueGraph(basepath = basepath, 
-                                             layer_type = LayerNameList[i], 
-                                             tax = self.Taxonomies[tax_ix], redo = False)
+                tax_ix = self.layer_taxonomy_mapping[i]
+                self.Layers[i] = TissueGraph(basepath=basepath, 
+                                             layer_type=LayerNameList[i], 
+                                             tax=self.Taxonomies[tax_ix], 
+                                             redo=False)
                 
             self.layers_graph = self._config["layers_graph"]
 
             # at this point, not saving geoms to file so recalculate them here:             
+            self.Geoms = list()
             self.add_geoms()
-
 
         return None
     
@@ -185,7 +180,6 @@ class TissueMultiGraph:
         # with open(os.path.join(self.basepath,"Geoms.pkl"), 'w') as pickle_file:
         #     pickle.dump(self.Geoms, pickle_file, pickle.HIGHEST_PROTOCOL)
             
-            
         for i in range(len(self.Layers)): 
             self.Layers[i].save()
         
@@ -193,7 +187,6 @@ class TissueMultiGraph:
             self.Taxonomies[i].save(self.basepath)
             
         logging.info(f"saved")
-
         
     def add_type_informations(self,layer_id,type_vec,tax): 
         """Adds type information to TMG
@@ -222,10 +215,10 @@ class TissueMultiGraph:
         self.Layers[layer_id].tax = tax
 
         # add mapping between layers and taxonomies to TMG (self)
-        self.layer_taxonomy_mapping.append((layer_id,tax))
+        self.layer_taxonomy_mapping[layer_id] = tax #.append((layer_id,tax))
         return 
     
-    def create_cell_layer(self,metric = 'cosine'): 
+    def create_cell_layer(self, metric='cosine'): 
         """Creating cell layer from raw data. 
         TODO: Fix documentaion after finishing Taxonomy class. 
         
@@ -251,7 +244,6 @@ class TissueMultiGraph:
             xys_i = np.array(df[["stage_x","stage_y","section_index"]])
             XYS = np.vstack((XYS,xys_i))
         
-
         matrix_files = glob.glob(f"{self.basepath}//*_matrix.csv")
         matrix_files.sort()
         df = pd.read_csv(matrix_files[0],index_col=0)
@@ -263,12 +255,16 @@ class TissueMultiGraph:
             cellnames = cellnames + list(df.index)
         
         logging.info('done reading files')
+        # return FISHbasis
         
-        # normalize data
-        FISHbasis = normalize_data(FISHbasis)
+        # FISH basis is the raw count matrices from imaging; normalize data
+        FISHbasis = basicu.normalize_fishdata(FISHbasis, norm_cell=True, norm_basis=True)
         
         # creating first layer - cell tissue graph
-        TG = TissueGraph(feature_mat = FISHbasis,basepath = self.basepath,layer_type="cells")
+        TG = TissueGraph(feature_mat=FISHbasis,
+                         basepath=self.basepath,
+                         layer_type="cells", 
+                         redo=True)
         
         # add observations and init size to 1 for all cells
         TG.node_size = np.ones((FISHbasis.shape[0],1))
@@ -281,7 +277,7 @@ class TissueMultiGraph:
         logging.info('building spatial graphs')
         TG.build_spatial_graph(XYS)
         logging.info('building feature graphs')
-        TG.build_feature_graph(FISHbasis,metric = metric)
+        TG.build_feature_graph(FISHbasis, metric=metric)
         
         
         # add layer
@@ -317,23 +313,19 @@ class TissueMultiGraph:
         
 #         # add types and key data
 
-        
-
     def create_isozone_layer(self, cell_layer = 0):
         """Creates isozones layer using cell types. 
-        
+        = IsoZoneLayer.tax 
         Contract cell types to create isozone graph. 
         
         """
         IsoZoneLayer = self.Layers[cell_layer].contract_graph()
         self.Layers.append(IsoZoneLayer)
         layer_id = len(self.Layers)-1                             
-        self.layer_taxonomy_mapping.append((layer_id,IsoZoneLayer.tax))
+        self.layer_taxonomy_mapping[layer_id] = IsoZoneLayer.tax # .append((layer_id,IsoZoneLayer.tax))
         self.layers_graph.append((cell_layer,layer_id))
-                                     
     
-    
-    def create_region_layer(self,topics, region_tax, cell_layer = 0):
+    def create_region_layer(self, topics, region_tax, cell_layer=0):
         """Add region layor given cells' region types (topics)
         
         Parameters
@@ -359,7 +351,7 @@ class TissueMultiGraph:
         Env = Env/row_sums
         
         # create the region layer merging information from contracted graph and environments
-        RegionLayer = TissueGraph(feature_mat = Env, basepath=self.basepath,layer_type="region")
+        RegionLayer = TissueGraph(feature_mat=Env, basepath=self.basepath, layer_type="region", redo=True)
         RegionLayer.SG = CG.SG.copy()
         RegionLayer.node_size = CG.node_size.copy()
         RegionLayer.Upstream = CG.Upstream.copy()
@@ -447,7 +439,7 @@ class TissueMultiGraph:
         else: 
             return VecToMap
     
-    def find_regions_edge_level(self,region_layer = 2):
+    def find_regions_edge_level(self, region_layer=2):
         """ finds cells graph edges edges that are also region edges
         """
         
@@ -599,7 +591,7 @@ class TissueGraph:
 
 
     """
-    def __init__(self,feature_mat = None, basepath = None, layer_type = None, tax = None,redo = False):
+    def __init__(self, feature_mat=None, basepath=None, layer_type=None, tax=None, redo=False):
         """Create a TissueGraph object
         
         Parameters
@@ -625,15 +617,17 @@ class TissueGraph:
         self.filename = os.path.join(basepath,f"{layer_type}.h5ad")
         
         # if anndata file exists and redo is False, just read the file. 
+        print(self.filename)
         if not redo and os.path.exists(self.filename): 
             self.adata = anndata.read_h5ad(self.filename)
-            # create SG and FG from Anndata
-            sg = np.array(self.adata.obsp["SG"])
-            self.SG = Graph.Adjacency((sg > 0).tolist())
-            fg = np.array(self.adata.obsp["FG"])
-            self.FG = Graph.Adjacency((fg > 0).tolist())
+            if "SG" in self.adata.obsp.keys():
+                # create SG and FG from Anndata
+                sg = self.adata.obsp["SG"] # csr matrix
+                self.SG = tmgu.adjacency_to_igraph(sg, directed=False) # leiden requires undirected
+            if "FG" in self.adata.obsp.keys():
+                fg = self.adata.obsp["FG"] # csr matrix
+                self.FG = tmgu.adjacency_to_igraph(fg, directed=False)
             
-
         else: # create an object from given feature_mat data
             # validate input
             if feature_mat is None: 
@@ -682,7 +676,6 @@ class TissueGraph:
         """save TG to file"""
         if not self.is_empty():
             self.adata.write(self.filename)
-        
     
     @property
     def names(self):
@@ -694,7 +687,6 @@ class TissueGraph:
     @names.setter
     def names(self,names):
         self.adata.obs[self.adata_mapping["name"]]=names
-    
     
     @property
     def Upstream(self):
@@ -753,8 +745,6 @@ class TissueGraph:
         else: 
             raise ValueError('TissueGraph does not contain an AnnData object, please verify!')
     
-
-
     @property
     def node_size(self):
         if self.is_empty():
@@ -763,7 +753,6 @@ class TissueGraph:
             raise ValueError("Mapping of type to AnnData is broken, please check!")
         else: 
             return self.adata.obs[self.adata_mapping["node_size"]]
-        
     
     @node_size.setter
     def node_size(self,Nsz):
@@ -797,7 +786,6 @@ class TissueGraph:
         else: 
             return self.adata.obsm[self.adata_mapping["XY"]]
 
-    
     @XY.setter
     def XY(self,XY): 
         self.adata.obsm[self.adata_mapping["XY"]]=XY
@@ -894,7 +882,7 @@ class TissueGraph:
 
         # build graph
         edgeList = np.vstack((id_from,id_to)).T
-        G = Graph(n=X.shape[0], edges=edgeList)
+        G = igraph.Graph(n=X.shape[0], edges=edgeList)
         G.simplify()
         if return_graph:
             return G
@@ -950,7 +938,7 @@ class TissueGraph:
             # convert to list of tuples to make igraph happy and add them. 
             el = el + list(zip(EL[:,0], EL[:,1]))
         
-        self.SG  = Graph(n=XYS.shape[0],edges=el,directed=False).simplify()
+        self.SG  = igraph.Graph(n=XYS.shape[0],edges=el,directed=False).simplify()
         logging.info("updating anndata")
         self.adata.obsp["SG"] = self.SG.get_adjacency_sparse()
         self.adata.obsm[self.adata_mapping["XY"]]=XYS[:,0:2]
@@ -962,7 +950,7 @@ class TissueGraph:
         logging.info("done building spatial graph")
         
     
-    def contract_graph(self,TypeVec = None):
+    def contract_graph(self, TypeVec=None):
         """find zones/region, i.e. spatially continous areas in the graph the same (cell/microenvironment) type
         
         reduce graph size by merging spatial neighbors of same type. 
@@ -997,7 +985,7 @@ class TissueGraph:
         EL = EL[np.take(TypeVec,EL[:,0]) == np.take(TypeVec,EL[:,1]),:]
         
         # remake a graph with potentially many components
-        IsoZonesGraph = Graph(n=self.N, edges=EL, directed = False)
+        IsoZonesGraph = igraph.Graph(n=self.N, edges=EL, directed = False)
         IsoZonesGraph = IsoZonesGraph.as_undirected().simplify()
 
         # because we used both type and proximity, the original graph (based only on proximity)
@@ -1036,7 +1024,11 @@ class TissueGraph:
         ZSG.simplify()
 
         # create a new Tissue graph by copying existing one, contracting, and updating XY
-        ZoneGraph = TissueGraph(feature_mat = zone_feat_mat, basepath=self.basepath,layer_type="isozones")
+        ZoneGraph = TissueGraph(feature_mat=zone_feat_mat, 
+                                basepath=self.basepath,
+                                layer_type="isozones",
+                                redo=True,
+                                )
 
         ZoneGraph.SG = ZSG
         ZoneGraph.names = ZoneName
@@ -1057,7 +1049,7 @@ class TissueGraph:
         if self.Type is None: 
             raise ValueError("Type not yet assigned, can't count frequencies")
         unqTypes = np.unique(self.Type)
-        Ptypes = count_values(self.Type,unqTypes,self.node_size)
+        Ptypes = tmgu.count_values(self.Type,unqTypes,self.node_size)
         
         return Ptypes,unqTypes
     
