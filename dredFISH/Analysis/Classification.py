@@ -7,6 +7,8 @@ abstract methods (train and classify) that any subclass will have to implement.
 """
 import logging
 import abc
+from signal import valid_signals
+import string
 import numpy as np
 import itertools
 
@@ -17,9 +19,16 @@ from scipy.optimize import minimize_scalar
 from sklearn.metrics import adjusted_rand_score, adjusted_mutual_info_score 
 from sklearn.decomposition import LatentDirichletAllocation
 # from sklearn.neighbors import NearestNeighbors
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn import svm
 import pynndescent 
+import anndata
 
 from dredFISH.Analysis import TissueGraph
+
+from dredFISH.Utils import pathu
+from dredFISH.Utils import basicu
+from dredFISH.Utils import celltypeu
 
 class Classifier(metaclass=abc.ABCMeta): 
     """Interface for classifiers 
@@ -280,3 +289,80 @@ class TopicClassifier(Classifier):
         topics = id[ix]
 
         return topics
+    
+class KnownCellTypeClassifier(Classifier): 
+    """
+    """
+    def __init__(self, TG, 
+        tax_name='known_celltypes',
+        ref='allen_smrt_dpnmf', 
+        ref_levels=['class_label', 'neighborhood_label', 'subclass_label', 'cluster_label'], 
+        model='knn',
+        ):
+        """
+        Parameters
+        ----------
+        TG : TissueGraph
+            Required parameter - the TissueGraph object we're going to use for unsupervised clustering. 
+            The TG is required to have a `TG.adata.layers['raw']` matrix
+        ref : 
+            tag of a reference dataset, or path to a reference dataset (.h5ad)
+        """
+        # specific packages to this task
+
+        if not isinstance(TG, TissueGraph.TissueGraph): 
+            raise ValueError("This Classifier requires a (cell level) TissueGraph object as input")
+
+        super().__init__(tax=None)
+        self.tax.name = tax_name
+        self._TG = TG # data
+        self.ref_path = pathu.get_path(ref, check=True) # refdata
+        self.ref_levels = ref_levels 
+
+        # model could be a string or simply sklearn classifier (many kinds)
+        if isinstance(model, str):
+            if model == 'knn':
+                self.model = KNeighborsClassifier(n_neighbors=15, metric='correlation') # metric 'cosine' is also good
+            elif model == 'svm':
+                self.model = svm.SVC(kernel='rbf')
+            else:
+                raise ValueError("Need to choose from: `knn`, `svm`")
+        else:
+            self.model = model
+
+        #### TODO: subselect data by brain regions
+
+        #### preproc data
+        logging.info("Loading and preprocessing data")
+        # get ref data features
+        ref_adata = anndata.read(self.ref_path)
+        self.ref_ftrs = np.array(ref_adata.X)
+        self.ref_lbls = ref_adata.obs[self.ref_levels].values # multiple levels
+
+        # pre normalize to get features
+        self.ftrs = basicu.normalize_fishdata(self._TG.adata.layers['raw'], norm_cell=True, norm_basis=False) 
+
+
+    def train(self, 
+        run_func='run', # baseline
+        run_kwargs_perlevel=[dict(norm='per_bit_equalscale', ranknorm=False, n_cells=100)], 
+        verbose=True,
+        ignore_internal_failure=False,
+        ):
+        """
+        """
+        lbls = celltypeu.iterative_classify(
+                        self.ref_ftrs,
+                        self.ref_lbls,
+                        self.ftrs,
+                        levels=self.ref_levels, # levels of cell types
+                        run_func=run_func, # baseline
+                        run_kwargs_perlevel=run_kwargs_perlevel, 
+                        model=self.model,
+                        verbose=verbose,
+                        ignore_internal_failure=ignore_internal_failure,
+        )
+        self.TypeVec = lbls
+        
+    def classify(self):
+        return self.TypeVec

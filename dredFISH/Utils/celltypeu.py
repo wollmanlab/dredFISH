@@ -12,7 +12,7 @@ from sklearn.neighbors import KNeighborsClassifier
 import scanpy as sc
 logging.basicConfig(level=logging.INFO)
 
-from dredFISH.Analysis import basicu
+from . import basicu
 
 class CellTypeClassify(object):
     def __init__(self,
