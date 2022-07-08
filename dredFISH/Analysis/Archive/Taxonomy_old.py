@@ -31,7 +31,6 @@ import pynndescent
 from igraph import *
 
 class Taxonomy: 
-    
     def __init__(self):
         self.data = None
         self.leaflabels = None
@@ -49,7 +48,6 @@ class Taxonomy:
         q = q_no/q_deno
         q[np.isnan(q)]=0
         return(q)
-    
     
     def BuildTree(self,method='average'): 
         """ perform hierarchial clustering (wraps around scipy.cluster.hierarchy) 
@@ -108,8 +106,3 @@ class Taxonomy:
         else: 
             return self.treeasmat 
     
-
-    
-
-
-

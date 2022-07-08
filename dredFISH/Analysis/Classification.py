@@ -5,8 +5,11 @@ The module is composed of a class hierarchy of classifiers. The "root" of this h
 abstract methods (train and classify) that any subclass will have to implement. 
 
 """
+import logging
+import abc
+import numpy as np
+import itertools
 
-from scipy.stats import mode
 from scipy.stats import entropy, mode, median_abs_deviation
 from scipy.spatial.distance import squareform
 from scipy.optimize import minimize_scalar
@@ -14,13 +17,7 @@ from scipy.optimize import minimize_scalar
 from sklearn.metrics import adjusted_rand_score, adjusted_mutual_info_score 
 from sklearn.decomposition import LatentDirichletAllocation
 # from sklearn.neighbors import NearestNeighbors
-
 import pynndescent 
-import logging
-
-import abc
-import numpy as np
-import itertools
 
 from dredFISH.Analysis import TissueGraph
 
@@ -35,7 +32,7 @@ class Classifier(metaclass=abc.ABCMeta):
         A taxonomy system that the classifier classifies into. 
     """
     
-    def __init__(self,tax = None): 
+    def __init__(self, tax=None): 
         """Create a classifier
         
         Parameters
@@ -44,11 +41,8 @@ class Classifier(metaclass=abc.ABCMeta):
             The taxonomical system that is used for classification. 
         """
         if tax is None: 
-            tax = TissueGraph.Taxonomy(name = 'clusters')
+            tax = TissueGraph.Taxonomy(name='clusters')
         self.tax = tax
-        
-        pass
-        
     
     @abc.abstractmethod
     def train(self):
@@ -61,8 +55,6 @@ class Classifier(metaclass=abc.ABCMeta):
         """Classifies input into types
         """
         pass
-    
-    
 class KNNClassifier(Classifier): 
     """k-nearest-neighbor classifier
     
@@ -92,7 +84,6 @@ class KNNClassifier(Classifier):
         self.k = k
         self.approx_nn = approx_nn
         self.metric = metric
-        pass
 
     def train(self, ref_data, ref_label_id):
         """ Builds approx. KNN graph for queries
@@ -103,7 +94,6 @@ class KNNClassifier(Classifier):
         
         # update the taxonomy
         self.tax.add_types(ref_label_id,ref_data)
-        pass
 
     def classify(self, data): 
         """Find class of rows in data based on approx. KNN
@@ -116,8 +106,6 @@ class KNNClassifier(Classifier):
             kids = self._ref_label_id[indices]
             ids = mode(kids,axis=1)
         return ids.flatten()
-    
-
 class OptimalLeidenKNNClassifier(KNNClassifier):
     """Classifiy cells based on unsupervized Leiden 
     
@@ -138,7 +126,6 @@ class OptimalLeidenKNNClassifier(KNNClassifier):
         #set up the KNN portion
         super().__init__(k=1,approx_nn = 10,metric = 'correlation')
         self._TG = TG
-        pass
     
     def train(self, opt_res=None, opt_params={'iters' : 10, 'n_consensus' : 50}):
         """training for this class is performing optimal leiden clustering 
@@ -210,7 +197,6 @@ class OptimalLeidenKNNClassifier(KNNClassifier):
 
     def classify(self):
         return self.TypeVec
-
 class TopicClassifier(Classifier): 
     """Uses Latent Dirichlet Allocation to classify cells into regions types. 
 

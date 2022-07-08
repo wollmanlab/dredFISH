@@ -33,7 +33,6 @@ import glob
 import json
 import pickle
 
-# from igraph import *
 import igraph
 import pynndescent 
 from scipy.spatial import Delaunay,Voronoi
@@ -51,7 +50,6 @@ from dredFISH.Utils.geomu import voronoi_polygons, bounding_box
 import warnings
 import time
 from IPython import embed
-from . import Taxonomy
 
 class TissueMultiGraph: 
     """Main class used to manage the creation of multi-layer graph representation of tissues. 
@@ -116,7 +114,7 @@ class TissueMultiGraph:
         # check to see if a TMG.json file exists in that folder
         # is not, create an empty TMG. 
         if redo or not os.path.exists(os.path.join(basepath,"TMG.json")):
-            self.Layers = list()
+            self.Layers = list() # a list of TissueGraphs
             self.layers_graph = list() # a list of tuples that keep track of the relationship between different layers 
             
             self.Geoms = list()
@@ -135,13 +133,12 @@ class TissueMultiGraph:
             TaxNameList = self._config["Taxonomies"]
             self.Taxonomies = [None]*len(TaxNameList)
             for i in range(len(TaxNameList)): 
-                self.Taxonomies[i] = Taxonomy(basepath,TaxNameList[i])
+                self.Taxonomies[i] = Taxonomy(TaxNameList[i])
                     
             # convert string key to int key (fixing an artifects of JSON dump and load)
             ltm = self._config["layer_taxonomy_mapping"]
             ltm = {int(layer_ix): tax_ix for layer_ix, tax_ix in ltm.items()}
             self.layer_taxonomy_mapping = ltm 
-            # print(ltm)
             
             LayerNameList = self._config["Layers"]
             self.Layers = [None]*len(LayerNameList)
@@ -157,7 +154,6 @@ class TissueMultiGraph:
             # at this point, not saving geoms to file so recalculate them here:             
             self.Geoms = list()
             self.add_geoms()
-
         return None
     
     def save(self):
@@ -174,7 +170,7 @@ class TissueMultiGraph:
                        "Taxonomies" : [tx.name for tx in self.Taxonomies], 
                        "Layers" : [tg.layer_type for tg in self.Layers]}
         
-        with open(os.path.join(self.basepath,"TMG.json"), 'w') as json_file:
+        with open(os.path.join(self.basepath, "TMG.json"), 'w') as json_file:
             json.dump(self._config, json_file)
 
         # with open(os.path.join(self.basepath,"Geoms.pkl"), 'w') as pickle_file:
@@ -188,7 +184,7 @@ class TissueMultiGraph:
             
         logging.info(f"saved")
         
-    def add_type_informations(self,layer_id,type_vec,tax): 
+    def add_type_information(self, layer_id, type_vec, tax): 
         """Adds type information to TMG
         
         Bookeeping method to add type information and update taxonomies etc. 
@@ -196,7 +192,7 @@ class TissueMultiGraph:
         Parameters
         ----------
         layer_id : int 
-            what layers are we adding type info to? 
+            what layers are we adding type info to? should be a `cell` layer 
         type_vec : numpy 1D array / list
             the integer codes of type 
         tax : int / Taxonomy
@@ -205,16 +201,23 @@ class TissueMultiGraph:
         """
         if len(self.Layers) < layer_id or layer_id is None or layer_id < 0: 
             raise ValueError(f"requested layer id: {layer_id} doesn't exist")
-            
+
+        if self.Layers[layer_id].Type is not None:
+            print("!! .Type already exists in that layer; return ...")
+            return
+
+        # update .Type  
         self.Layers[layer_id].Type = type_vec
-        if isinstance(tax,Taxonomy):
+
+        # add Tax
+        # add a reference of which taxonomy index belongs to this TG
+        if isinstance(tax, Taxonomy): # add to the pool and use an index to represent it
             self.Taxonomies.append(tax)
             tax = len(self.Taxonomies)-1
-        
-        # add a reference of which taxonomy index belongs to this TG
         self.Layers[layer_id].tax = tax
 
-        # add mapping between layers and taxonomies to TMG (self)
+        # update mapping between layers and taxonomies to TMG (self)
+        # this decides on which type to move on next...
         self.layer_taxonomy_mapping[layer_id] = tax #.append((layer_id,tax))
         return 
     
@@ -233,6 +236,11 @@ class TissueMultiGraph:
         
          
         """
+        for TG in self.Layers:
+            if TG.layer_type == "cell":
+                print("!!`cell` layer already exists; return...")
+                return 
+
         logging.info('In TMG.create_cell_layer')
         # load all data - create the FISHbasis and XYS variables
         logging.info('Started reading matrices and metadata')
@@ -263,7 +271,7 @@ class TissueMultiGraph:
         # creating first layer - cell tissue graph
         TG = TissueGraph(feature_mat=FISHbasis,
                          basepath=self.basepath,
-                         layer_type="cells", 
+                         layer_type="cell", 
                          redo=True)
         
         # add observations and init size to 1 for all cells
@@ -319,6 +327,10 @@ class TissueMultiGraph:
         Contract cell types to create isozone graph. 
         
         """
+        for TG in self.Layers:
+            if TG.layer_type == "isozone":
+                print("!!`isozone` layer already exists; return...")
+                return 
         IsoZoneLayer = self.Layers[cell_layer].contract_graph()
         self.Layers.append(IsoZoneLayer)
         layer_id = len(self.Layers)-1                             
@@ -338,6 +350,10 @@ class TissueMultiGraph:
             Which layer in TMG is the cell layer?          
 
         """
+        for TG in self.Layers:
+            if TG.layer_type == "region":
+                print("!!`region` layer already exists; return...")
+                return 
 
         # create region layers through graph contraction
         CG = self.Layers[cell_layer].contract_graph(topics)
@@ -358,7 +374,7 @@ class TissueMultiGraph:
 
         self.Layers.append(RegionLayer)
         current_layer_id = len(self.Layers)-1
-        self.add_type_informations(current_layer_id,CG.Type,region_tax)
+        self.add_type_information(current_layer_id,CG.Type,region_tax)
 
         # update the layers graph to show that regions are created from cells
         self.layers_graph.append((cell_layer,current_layer_id))
@@ -558,9 +574,6 @@ class TissueMultiGraph:
             slice_geoms['point'] = XY
 
             self.Geoms.append(slice_geoms)
-            
-
-
 class TissueGraph:
     """Representation of transcriptional state of biospatial units as a graph. 
     
@@ -610,6 +623,8 @@ class TissueGraph:
             raise ValueError("missing basepath in TissueGraph constructor")
         if layer_type is None: 
             raise ValueError("Missing layer type information in TissueGraph constructor")
+        if layer_type not in ['cell', 'isozone', 'region']:
+            raise ValueError("Invalid layer type")
 
         # what is stored in this layer (cells, zones, regions, etc)
         self.layer_type = layer_type # label layers by their type
@@ -724,7 +739,8 @@ class TissueGraph:
         if self.is_empty():
             return None
         elif self.adata_mapping["Type"] not in self.adata.obs.columns.values.tolist(): 
-            raise ValueError("Mapping of type to AnnData is broken, please check!")
+            return None
+            # raise ValueError("Mapping of type to AnnData is broken, please check!")
         else:
             typ = self.adata.obs[self.adata_mapping["Type"]]
             typ = np.array(typ) 
@@ -948,7 +964,6 @@ class TissueGraph:
         else: 
             self.adata.obs[self.adata_mapping["name"]] = names
         logging.info("done building spatial graph")
-        
     
     def contract_graph(self, TypeVec=None):
         """find zones/region, i.e. spatially continous areas in the graph the same (cell/microenvironment) type
@@ -1026,7 +1041,7 @@ class TissueGraph:
         # create a new Tissue graph by copying existing one, contracting, and updating XY
         ZoneGraph = TissueGraph(feature_mat=zone_feat_mat, 
                                 basepath=self.basepath,
-                                layer_type="isozones",
+                                layer_type="isozone",
                                 redo=True,
                                 )
 
@@ -1039,8 +1054,6 @@ class TissueGraph:
         
         return(ZoneGraph)
                              
-
-                             
     def type_freq(self): 
         """return the catogorical probability for each type in TG
         
@@ -1052,7 +1065,6 @@ class TissueGraph:
         Ptypes = tmgu.count_values(self.Type,unqTypes,self.node_size)
         
         return Ptypes,unqTypes
-    
     
     def cond_entropy(self):
         """calculate conditional entropy of the tissue graph
@@ -1144,7 +1156,6 @@ class TissueGraph:
         Smoothed = np.multiply(Smoothed,kernel)
         Smoothed = Smoothed.sum(axis=1)
         return(Smoothed)
-
     
     def watershed(self,InputVec):
         """Watershed segmentation based on InputVec values
@@ -1394,9 +1405,6 @@ class TissueGraph:
             ix = np.array(ind[j],dtype=np.int64)
             Smoothed[j] = np.nanmedian(VecToSmooth[ix])
         return(Smoothed)
-    
-
-        
 class Taxonomy:
     """Taxonomical system for different biospatial units (cells, isozones, regions)
     
@@ -1407,7 +1415,9 @@ class Taxonomy:
     
     """
     
-    def __init__(self,name = None,Types = None,feature_mat = None): 
+    def __init__(self, name=None, 
+        # Types=None, feature_mat=None
+        ): 
         """Create a Taxonomy object
 
         Parameters
@@ -1419,10 +1429,10 @@ class Taxonomy:
         """
         if name is None: 
             raise ValueError("Taxonomy must get a name")
+        self.name = name
             
         self._df = pd.DataFrame()
         self._feature_cols = list()
-        self.name = name
         return None
     
     @property
@@ -1475,22 +1485,20 @@ class Taxonomy:
         
         self._feature_cols = df_features.columns
         
-        
     def is_empty(self):
         """ determie if taxonomy is empty
         """
         return (self._df.empty)
         
-    def save(self,basepath):
+    def save(self, basepath):
         """save to basepath using Taxonomy name
         """
-        self._df.to_csv(os.path.join(basepath,f"Taxonomy_{self.name}.csv"))
+        self._df.to_csv(os.path.join(basepath, f"Taxonomy_{self.name}.csv"))
         
-    def load(self,basepath):
+    def load(self, basepath):
         """save from basepath using Taxonomy name
         """
-        self._df = pd.read_csv(os.path.join(basepath,f"Taxonomy_{self.name}.csv"))
-        
+        self._df = pd.read_csv(os.path.join(basepath, f"Taxonomy_{self.name}.csv"))
         
     def add_types(self,new_types,feature_mat):
         """add new types and their feature average to the Taxonomy
