@@ -292,34 +292,6 @@ class TissueMultiGraph:
         self.Layers.append(TG)
         logging.info('done with create_cell_layer')
         return
-        
-        # Add taxonomy (type) information. 
-        # There are three possiblities, unsupervized, supervized, and hybrid
-        
-#         # completely unsupervised:
-#         if celltypes_org is None: 
-#             # cluster cell types optimally - all cells from scratch
-#             celltypes,optres = TG.multilayer_Leiden_with_cond_entropy(return_res = True)
-            
-#             cell_taxonomy = Taxonomy()
-#             cell_taxonomy.add_labels(feature_mat = FISHbasis,labels = celltypes)
-        
-#         # hybrid: 
-#         elif expand_types is not None : 
-#             celltypes = celltypes_org.copy()
-#             mx_subtypes = 10000
-#             celltypes = TG.multi_optim_Leiden_from_existing_types(base_types = celltypes,
-#                                                                         types_to_expand = expand_types,
-#                                                                         FeatureMat = FeatureMat,
-#                                                                         max_subtypes = mx_subtypes)
-#             ix_exanded_types = np.isin(celltypes_org,expand_types)
-#             cell_taxonomy.add_types(feature_mat = FISHbasis[ix_exanded_types,:],labels = celltypes[ix_exanded_types])
-#         # completely supervised
-#         else: 
-#             celltypes = celltypes_org.copy()
-               
-        
-#         # add types and key data
 
     def create_isozone_layer(self, cell_layer = 0):
         """Creates isozones layer using cell types. 

@@ -11,6 +11,7 @@ from signal import valid_signals
 import string
 import numpy as np
 import itertools
+from multiprocessing import Pool
 
 from scipy.stats import entropy, mode, median_abs_deviation
 from scipy.spatial.distance import squareform
@@ -229,54 +230,45 @@ class TopicClassifier(Classifier):
         row_sums = row_sums[:,None]
         Env = Env/row_sums
         self.Env = Env
+    
 
-    def train(self, use_parallel=False, max_num_of_topics=100):
+    def lda_fit(self, n_topics):
+        """This cannot be nested inside
+        """
+        Env = self.Env
+
+        lda = LatentDirichletAllocation(n_components=n_topics)
+        B = lda.fit(Env)
+        T = lda.transform(Env)
+        return (B,T)
+
+    def train(self, 
+        n_topics_list=np.geomspace(2,100,num=10).astype(int), 
+        n_procs=1):
         """fit multiple LDA models and chose the one with highest type entropy
         """
+        # define function handle
         
-        Ntopics = np.arange(2,max_num_of_topics)  
-        
-        if use_parallel: 
-            logging.info("Running LDA in parallel")
-            # define function handle
-            def lda_fit(n_topics,Env = None):
-                lda = LatentDirichletAllocation(n_components=n_topics)
-                B = lda.fit(Env)
-                T = lda.transform(Env)
-                return (B,T)
-
-            # start parallel engine
-            rc = ipp.Client()
-            dview = rc[:]
-            dview.push({'Env': self.Env})
-            with dview.sync_imports():
-                # import sklearn.decomposition
-                pass
-            # add env to lda_fit to create new function handle we can use in parallel
-            g = functools.partial(lda_fit, Env=self.Env)
-            result = dview.map_sync(g,Ntopics)
+        if n_procs == 1: 
+            logging.info("Running LDA in serial") 
+            results = [self.lda_fit(n_topics) for n_topics in n_topics_list]
         else:
-            logging.info("Running LDA n serial") 
-            result = list()
-            for i in range(len(Ntopics)):
-                lda = LatentDirichletAllocation(n_components=Ntopics[i])
-                B = lda.fit(self.Env)
-                T = lda.transform(self.Env)
-                result.append((B,T))
-                
-        IDs = np.zeros((self._TG.N,len(result)))
-        for i in range(len(result)):
-            IDs[:,i] = np.argmax(result[i][1],axis=1)
+            n_procs = max(n_procs, len(n_topics_list))
+            logging.info(f"Running LDA in parallel with {n_procs} cores")
+            with Pool(n_procs) as pl:
+                results = pl.map(self.lda_fit, n_topics_list)
+
+        IDs = np.zeros((self._TG.N,len(results)))
+        for i in range(len(results)):
+            IDs[:,i] = np.argmax(results[i][1],axis=1)
         Type_entropy = np.zeros(IDs.shape[1])
         for i in range(IDs.shape[1]):
             _,cnt = np.unique(IDs[:,i],return_counts=True)
             cnt=cnt/cnt.sum()
             Type_entropy[i] = entropy(cnt,base=2) 
 
-        self._lda = result[np.argmax(Type_entropy)][0]
-
+        self._lda = results[np.argmax(Type_entropy)][0]
         return self
-
 
     def classify(self,data):
         """classify based on fitted LDA"""
