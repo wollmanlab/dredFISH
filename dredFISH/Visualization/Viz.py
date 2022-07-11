@@ -1,9 +1,35 @@
-"""
-Module Viz deals with all TissueMultiGraph vizualization needs. 
+"""Viz module manages all TissueMultiGraph vizualization needs
 
-Module has few accessory function and the View class hierarchy. 
+The module contains two elements: View and the Panel class hierarchy. 
+View acts as:
+#. connection to specific TMG container,
+#. manage figure related stuff (size, save/load, etc)  
+#. container of different Panels. 
+
+The Panel hierarchy is where the specific graphics are created. 
+The base class (Panel) is an absatract class with two abstract method user has to overload: 
+#. set_view : do all calculations here
+#. plot : actual plotting of the panel
+
+All Panels include few important propertues: 
+#. V : a pointer to the View that this Panel belogs to. This also acts as the link to TMG (self.V.TMG)
+#. Styles : dataframes with information  
+#. Data : a dict container for any data required for Viz, either given as input during __init__ or calculated by the Panel in set_view()
+
+A specific type of Panel that is important in the hierarchy is Map which is dedicated to spatial plotting of a TMG section. 
+
+Other panels (UMAP, Historgram, LogLogPlot) etc do what you think they do... 
+"""
 
 """
+TODO: 
+1. Add section information everywhere. 
+2. Map - fix xy ratio
+3. Map - add scalebar
+4. Add UMAP panels
+5. integrate optimal color selection (see notebook not on git yet)
+"""
+
 from matplotlib.gridspec import GridSpec, SubplotSpec
 import matplotlib.cm as cm
 from matplotlib.colors import ListedColormap
@@ -16,6 +42,7 @@ import colorcet as cc
 import pickle
 import io
 import copy
+import abc
 
 import seaborn as sns
 
@@ -80,7 +107,7 @@ class View:
             self.Panels[i].plot()
 
 
-class Panel:
+class Panel(metaclass=abc.ABCMeta):
     def __init__(self,name = None,pos = (0,0,1,1)):
         self.V = None
         self.name = name
@@ -90,18 +117,20 @@ class Panel:
         self.Styles = {}
         self.clrmp = None
 
+    @abc.abstractmethod
     def set_view(self):  
         """
         Key abstract method - has to be implemented in the subclass
         signature should always include the TMG (and other stuff if needed)
         """
-        return
+        pass
     
+    @abc.abstractmethod
     def plot(self):
         """
         actual plotting happens here, overload in subclasses! 
         """
-        return
+        pass
         
 class Map(Panel):
     """
@@ -113,7 +142,7 @@ class Map(Panel):
         plot_map
 
     """
-    def __init__(self,name=None,pos = (0,0,1,1),**kwargs):
+    def __init__(self,section = None,name = None,pos = (0,0,1,1),**kwargs):
         super().__init__(name,pos)
         
         # Fundamentally, a map panel keeps tab of all the type for different geoms
@@ -122,6 +151,12 @@ class Map(Panel):
         # types, maps each points, line, or polygon to a specific type key. 
         # in these dataframes, the index must match the TMG Geom and different columns store different attributes
         
+        if section is None: 
+            raise ValueError("Section can't be empty - create Maps for specific section")
+
+        # section information: which section in TMG are we plotting
+        self.section = section
+
         self.Styles['line'] = pd.DataFrame()
         self.Styles['point'] = pd.DataFrame()
         self.Styles['polygon'] = pd.DataFrame()
@@ -132,14 +167,16 @@ class Map(Panel):
         
         self.xlim = kwargs.get('xlim',None)
         self.ylim = kwargs.get('ylim',None)
+
+
         
     def set_view(self): 
         """
         Key abstract method - has to be implemented in the subclass
         signature should always include the TMG (and other stuff if needed)
         """
-        mx = np.max(np.array(self.V.TMG.Geoms['BoundingBox'].exterior.xy).T,axis=0)
-        mn = np.min(np.array(self.V.TMG.Geoms['BoundingBox'].exterior.xy).T,axis=0)
+        mx = np.max(np.array(self.V.TMG.Geoms[self.section]['BoundingBox'].exterior.xy).T,axis=0)
+        mn = np.min(np.array(self.V.TMG.Geoms[self.section]['BoundingBox'].exterior.xy).T,axis=0)
         if self.xlim is None: 
             self.xlim = [mn[0],mx[0]]
         if self.ylim is None: 
@@ -148,7 +185,7 @@ class Map(Panel):
         
     
     def plot_boundingbox(self): 
-        xy=np.array(self.V.TMG.Geoms['BoundingBox'].exterior.xy).T
+        xy=np.array(self.V.TMG.Geoms[self.section]['BoundingBox'].exterior.xy).T
         self.ax.plot(xy[:,0],xy[:,1],color=self.Styles['boundingbox']['color'])
     
     
@@ -159,14 +196,14 @@ class Map(Panel):
                     c=self.Styles['point']['color'])
         
     def plot_polys(self): 
-        p = PolyCollection(self.V.TMG.Geoms['poly'],cmap=self.clrmp)
+        p = PolyCollection(self.V.TMG.Geoms[self.section]['poly'],cmap=self.clrmp)
         p.set_array(self.Styles['polygon']['scalar'])
         self.ax.add_collection(p)
         
     def plot_lines(self): 
         # get regions lines (subset of line geom)
         region_edge = self.V.TMG.find_regions_edge_level()
-        segs = [self.V.TMG.Geoms['line'][edges] for edges in region_edge]
+        segs = [self.V.TMG.Geoms[self.section]['line'][edges] for edges in region_edge]
         segs = np.array(segs)
         
         line_segments = LineCollection(segs,
@@ -262,12 +299,12 @@ class Colorpleth(Map):
 
 class RandomColorpleth(Colorpleth):
     """
-    Show geo-units (cells, iso-zones, heterozones, neighborhoods) each colored randomly. 
+    Show geo-units (cells, iso-zones, regions) each colored randomly. 
     """
     def __init__(self,id_vec = 0, name = "Random Colorpleth" ,pos = (0,0,1,1),**kwargs):
         if len(np.shape(id_vec))==0: # if the id_vec is pointing to a current level, give each unit it's own color 
             name = name + " of level: " + str(id_vec)
-            id_vec = np.arange(TMG.N[id_vec])
+            id_vec = np.arange(self.V.TMG.N[id_vec])
         super().__init__(name = name, values_to_map = id_vec,**kwargs)
         
     def set_view(self):
@@ -513,12 +550,15 @@ class IsoZones(Colorpleth):
 class Histogram(Panel):
     def __init__(self,values_to_count,name = 'hist',pos = (0,0,1,1),n_bins = 50,**kwargs):
         self.n_bins = 50
-        self.values_to_count = values_to_count
+        self.Data['values_to_count'] = values_to_count
         self.pos = pos
         self.name = name
-        
+
+    def set_view(self):
+        pass
+
     def plot(self): 
-        self.ax.hist(self.values_to_count,bins = self.n_bins)
+        self.ax.hist(self.Data['values_to_count'],bins = self.n_bins)
     
         
 class LogLogPlot(Histogram):
