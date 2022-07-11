@@ -5,29 +5,32 @@ The module is composed of a class hierarchy of classifiers. The "root" of this h
 abstract methods (train and classify) that any subclass will have to implement. 
 
 """
+import logging
+import abc
+from signal import valid_signals
+import string
+import numpy as np
+import itertools
+from multiprocessing import Pool
 
-from scipy.stats import mode
+from scipy.stats import entropy, mode, median_abs_deviation
 from scipy.spatial.distance import squareform
 from scipy.optimize import minimize_scalar
+
 from sklearn.metrics import adjusted_rand_score, adjusted_mutual_info_score 
+from sklearn.decomposition import LatentDirichletAllocation
+# from sklearn.neighbors import NearestNeighbors
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn import svm
 import pynndescent 
+import anndata
 
+from dredFISH.Analysis import TissueGraph
 
-import os.path 
-import abc
-import numpy as np
-import pandas as pd
-import itertools
+from dredFISH.Utils import pathu
+from dredFISH.Utils import basicu
+from dredFISH.Utils import celltypeu
 
-from dredFISH.Analysis.TissueGraph import *
-from dredFISH.Utils.basicu import *
-
-
-
-
-
-    
-    
 class Classifier(metaclass=abc.ABCMeta): 
     """Interface for classifiers 
 
@@ -39,7 +42,7 @@ class Classifier(metaclass=abc.ABCMeta):
         A taxonomy system that the classifier classifies into. 
     """
     
-    def __init__(self,tax = None): 
+    def __init__(self, tax=None): 
         """Create a classifier
         
         Parameters
@@ -48,11 +51,8 @@ class Classifier(metaclass=abc.ABCMeta):
             The taxonomical system that is used for classification. 
         """
         if tax is None: 
-            tax = Taxonomy(name = 'clusters')
+            tax = TissueGraph.Taxonomy(name='clusters')
         self.tax = tax
-        
-        pass
-        
     
     @abc.abstractmethod
     def train(self):
@@ -65,8 +65,6 @@ class Classifier(metaclass=abc.ABCMeta):
         """Classifies input into types
         """
         pass
-    
-    
 class KNNClassifier(Classifier): 
     """k-nearest-neighbor classifier
     
@@ -96,9 +94,8 @@ class KNNClassifier(Classifier):
         self.k = k
         self.approx_nn = approx_nn
         self.metric = metric
-        pass
 
-    def train(self,ref_data,ref_label_id):
+    def train(self, ref_data, ref_label_id):
         """ Builds approx. KNN graph for queries
         """
         self._knn = pynndescent.NNDescent(ref_data,n_neighbors = self.approx_nn, metric = self.metric)
@@ -107,9 +104,8 @@ class KNNClassifier(Classifier):
         
         # update the taxonomy
         self.tax.add_types(ref_label_id,ref_data)
-        pass
 
-    def classify(self,data): 
+    def classify(self, data): 
         """Find class of rows in data based on approx. KNN
         """
         # get indices and remove self. 
@@ -120,31 +116,28 @@ class KNNClassifier(Classifier):
             kids = self._ref_label_id[indices]
             ids = mode(kids,axis=1)
         return ids.flatten()
-    
-
 class OptimalLeidenKNNClassifier(KNNClassifier):
     """Classifiy cells based on unsupervized Leiden 
     
     This classifiers is trained using unsupervized learning with later classification done by knn (k=1)
-    the implementations uses the same classify method is KNNClassifier.  
+    the implementations uses the same classify method as KNNClassifier.  
     The overladed train method does the unsupervized learning before calling super().train to create the KNN index.
     """
-    def __init__(self,TG):
+    def __init__(self, TG):
         """
         Parameters
         ----------
         TG : TissueGraph
             Required parameter - the TissueGraph object we're going to use for unsupervised clustering. 
         """
-        if not isinstance(TG,TissueGraph): 
+        if not isinstance(TG, TissueGraph.TissueGraph): 
             raise ValueError("OptimalLeidenKNNClassifier requires a TissueGraph object as input")
             
         #set up the KNN portion
         super().__init__(k=1,approx_nn = 10,metric = 'correlation')
         self._TG = TG
-        pass
     
-    def train(self,opt_res = None, opt_params = {'iters' : 10, 'n_consensus' : 50}):
+    def train(self, opt_res=None, opt_params={'iters' : 10, 'n_consensus' : 50}):
         """training for this class is performing optimal leiden clustering 
         
         Optimization is done over resolution parameter trying to maximize the TG conditional entropy. 
@@ -160,9 +153,7 @@ class OptimalLeidenKNNClassifier(KNNClassifier):
             'n_consensus' is the number of times to do the final clustering with optimal resolution.   
             
         """
-            
-
-        def ObjFunLeidenRes(res,return_types = False):
+        def ObjFunLeidenRes(res, return_types=False):
             """
             Basic optimization routine for Leiden resolution parameter. 
             Implemented using igraph leiden community detection
@@ -175,9 +166,9 @@ class OptimalLeidenKNNClassifier(KNNClassifier):
                 EntropyVec[i] = self._TG.contract_graph(TypeVec).cond_entropy()
             Entropy = EntropyVec.mean()
             if return_types: 
-                return -Entropy,TypeVec
+                return (-Entropy, TypeVec)
             else:
-                return(-Entropy)
+                return (-Entropy)
 
         if opt_res is None: 
             print(f"Calling initial optimization")
@@ -195,7 +186,7 @@ class OptimalLeidenKNNClassifier(KNNClassifier):
         # consensus clustering
         TypeVec = np.zeros((self._TG.N,opt_params['n_consensus']))
         for i in range(opt_params['n_consensus']):
-            ent,TypeVec[:,i] = ObjFunLeidenRes(self._opt_res,return_types = True)
+            ent, TypeVec[:,i] = ObjFunLeidenRes(self._opt_res, return_types=True)
             
         if opt_params['n_consensus']>1:
             cmb = np.array(list(itertools.combinations(np.arange(opt_params['n_consensus']), r=2)))
@@ -206,32 +197,29 @@ class OptimalLeidenKNNClassifier(KNNClassifier):
             total_rand_scr = rand_scr.sum(axis=0)
             TypeVec = TypeVec[:,np.argmax(total_rand_scr)]
                                                   
-
         print(f"Number of types: {len(np.unique(TypeVec))} initial entropy: {ent} number of evals: {evls}")
+        self.TypeVec = TypeVec
         
+        # return self._TG.feature_mat, TypeVec
         # train the KNN classifier using the types we found
-        super().train(self._TG.feature_mat,TypeVec)
-        
+        # super().train(self._TG.feature_mat, TypeVec)
         # train doesn't return anything. 
-        pass
 
-
-
+    def classify(self):
+        return self.TypeVec
 class TopicClassifier(Classifier): 
     """Uses Latent Dirichlet Allocation to classify cells into regions types. 
 
     Decision on number of topics comes from maximizing overall entropy. 
     """
-
-
-    def __init__(self,TG, ordr = 4):
+    def __init__(self,TG, ordr=4):
         """
         Parameters
         ----------
         TG : TissueGraph
             Required parameter - the TissueGraph object we're going to use for unsupervised clustering. 
         """
-        if not isinstance(TG,TissueGraph): 
+        if not isinstance(TG, TissueGraph.TissueGraph): 
             raise ValueError("TopicClassifier requires a (cell level) TissueGraph object as input")
 
         super().__init__(tax = None)
@@ -242,54 +230,45 @@ class TopicClassifier(Classifier):
         row_sums = row_sums[:,None]
         Env = Env/row_sums
         self.Env = Env
+    
 
+    def lda_fit(self, n_topics):
+        """This cannot be nested inside
+        """
+        Env = self.Env
 
-    def train(self,use_parallel = False,max_num_of_topics = 100):
+        lda = LatentDirichletAllocation(n_components=n_topics)
+        B = lda.fit(Env)
+        T = lda.transform(Env)
+        return (B,T)
+
+    def train(self, 
+        n_topics_list=np.geomspace(2,100,num=10).astype(int), 
+        n_procs=1):
         """fit multiple LDA models and chose the one with highest type entropy
         """
+        # define function handle
         
-        Ntopics = np.arange(2,max_num_of_topics)  
-        
-        if use_parallel: 
-            logging.info("Running LDA in parallel")
-            # define function handle
-            def lda_fit(n_topics,Env = None):
-                lda = LatentDirichletAllocation(n_components=n_topics)
-                B = lda.fit(Env)
-                T = lda.transform(Env)
-                return (B,T)
-
-            # start parallel engine
-            rc = ipp.Client()
-            dview = rc[:]
-            dview.push({'Env': self.Env})
-            with dview.sync_imports():
-                import sklearn.decomposition
-            # add env to lda_fit to create new function handle we can use in parallel
-            g = functools.partial(lda_fit, Env=self.Env)
-            result = dview.map_sync(g,Ntopics)
+        if n_procs == 1: 
+            logging.info("Running LDA in serial") 
+            results = [self.lda_fit(n_topics) for n_topics in n_topics_list]
         else:
-            logging.info("Running LDA n serial") 
-            result = list()
-            for i in range(len(Ntopics)):
-                lda = LatentDirichletAllocation(n_components=Ntopics[i])
-                B = lda.fit(self.Env)
-                T = lda.transform(self.Env)
-                result.append((B,T))
-                
-        IDs = np.zeros((self._TG.N,len(result)))
-        for i in range(len(result)):
-            IDs[:,i] = np.argmax(result[i][1],axis=1)
+            n_procs = max(n_procs, len(n_topics_list))
+            logging.info(f"Running LDA in parallel with {n_procs} cores")
+            with Pool(n_procs) as pl:
+                results = pl.map(self.lda_fit, n_topics_list)
+
+        IDs = np.zeros((self._TG.N,len(results)))
+        for i in range(len(results)):
+            IDs[:,i] = np.argmax(results[i][1],axis=1)
         Type_entropy = np.zeros(IDs.shape[1])
         for i in range(IDs.shape[1]):
             _,cnt = np.unique(IDs[:,i],return_counts=True)
             cnt=cnt/cnt.sum()
             Type_entropy[i] = entropy(cnt,base=2) 
 
-        self._lda = result[np.argmax(Type_entropy)][0]
-
+        self._lda = results[np.argmax(Type_entropy)][0]
         return self
-
 
     def classify(self,data):
         """classify based on fitted LDA"""
@@ -302,3 +281,80 @@ class TopicClassifier(Classifier):
         topics = id[ix]
 
         return topics
+    
+class KnownCellTypeClassifier(Classifier): 
+    """
+    """
+    def __init__(self, TG, 
+        tax_name='known_celltypes',
+        ref='allen_smrt_dpnmf', 
+        ref_levels=['class_label', 'neighborhood_label', 'subclass_label', 'cluster_label'], 
+        model='knn',
+        ):
+        """
+        Parameters
+        ----------
+        TG : TissueGraph
+            Required parameter - the TissueGraph object we're going to use for unsupervised clustering. 
+            The TG is required to have a `TG.adata.layers['raw']` matrix
+        ref : 
+            tag of a reference dataset, or path to a reference dataset (.h5ad)
+        """
+        # specific packages to this task
+
+        if not isinstance(TG, TissueGraph.TissueGraph): 
+            raise ValueError("This Classifier requires a (cell level) TissueGraph object as input")
+
+        super().__init__(tax=None)
+        self.tax.name = tax_name
+        self._TG = TG # data
+        self.ref_path = pathu.get_path(ref, check=True) # refdata
+        self.ref_levels = ref_levels 
+
+        # model could be a string or simply sklearn classifier (many kinds)
+        if isinstance(model, str):
+            if model == 'knn':
+                self.model = KNeighborsClassifier(n_neighbors=15, metric='correlation') # metric 'cosine' is also good
+            elif model == 'svm':
+                self.model = svm.SVC(kernel='rbf')
+            else:
+                raise ValueError("Need to choose from: `knn`, `svm`")
+        else:
+            self.model = model
+
+        #### TODO: subselect data by brain regions
+
+        #### preproc data
+        logging.info("Loading and preprocessing data")
+        # get ref data features
+        ref_adata = anndata.read(self.ref_path)
+        self.ref_ftrs = np.array(ref_adata.X)
+        self.ref_lbls = ref_adata.obs[self.ref_levels].values # multiple levels
+
+        # pre normalize to get features
+        self.ftrs = basicu.normalize_fishdata(self._TG.adata.layers['raw'], norm_cell=True, norm_basis=False) 
+
+
+    def train(self, 
+        run_func='run', # baseline
+        run_kwargs_perlevel=[dict(norm='per_bit_equalscale', ranknorm=False, n_cells=100)], 
+        verbose=True,
+        ignore_internal_failure=False,
+        ):
+        """
+        """
+        lbls = celltypeu.iterative_classify(
+                        self.ref_ftrs,
+                        self.ref_lbls,
+                        self.ftrs,
+                        levels=self.ref_levels, # levels of cell types
+                        run_func=run_func, # baseline
+                        run_kwargs_perlevel=run_kwargs_perlevel, 
+                        model=self.model,
+                        verbose=verbose,
+                        ignore_internal_failure=ignore_internal_failure,
+        )
+        self.TypeVec = lbls
+        
+    def classify(self):
+        return self.TypeVec

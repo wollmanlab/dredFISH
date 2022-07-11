@@ -10,7 +10,7 @@ name0 <- "smrt"
 k <- 24 
 mu_range <- c(1e4, 1e2, 1, 1e-2, 1e-4)
 namex_range <- c("all")
-namey_range <- c("L3", "L5")
+namey_range <- c("L5") # same length as namex_range
 
 # namex_range <- c(
 #     "subL3n10", "subL3n100", "subL3n1000", 
@@ -59,7 +59,7 @@ for (i in 1:length(namex_range)){
         print("Running DPNMF...")
         res <- PNMFfun(X = X, 
                     K = k, 
-                    method = "DPNMF", # "EucDist", # "DPNMF"
+                    method =  "DPNMF", # "EucDist", # "DPNMF"
                     label = labels,
                     mu = mu,
                     lambda = 0.01,
@@ -72,8 +72,8 @@ for (i in 1:length(namex_range)){
         S <- res$Score
 
         # select good basis (test of corr vs library size; multimodal test)
-        W_sel <- scPNMF::basisSelect(W = W, S = S,
-                                X = X, toTest = TRUE, toAnnotate = FALSE, mc.cores = 4)
+        W_sel <- basisSelect(W = W, S = S,
+                                X = X, toTest = TRUE, toAnnotate = FALSE, mc.cores = 1)
         S_sel <- S[,colnames(W_sel)]
 
         write.csv(W, file=ot_w)
