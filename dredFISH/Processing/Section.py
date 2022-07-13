@@ -257,17 +257,36 @@ def generate_img(data,FF=''):
                     img = FF*image_metadata.stkread(Position=posname,Channel=channel,acq=acq,Exposure=data['exposure']).max(axis=2).astype(float)
                 else:
                     img = FF*image_metadata.stkread(Position=posname,Channel=channel,acq=acq).max(axis=2).astype(float)
+                img = gaussian_filter(img.copy(),5)
+                if 'hybe' in acq:
+                    try:
+                        if data['exposure']!='':
+                            bkg = FF*image_metadata.stkread(Position=posname,Channel=channel,acq=strip,Exposure=data['exposure']).max(axis=2).astype(float)
+                        else:
+                            bkg = FF*image_metadata.stkread(Position=posname,Channel=channel,acq=strip).max(axis=2).astype(float)
+                        bkg = gaussian_filter(bkg.copy(),5)
+                        img = img-bkg
+                    except:
+                        print('No Background to Subtract',posname,channel,acq,strip)
+                        do = 'nothing'    
+                    
             else:
                 if data['exposure']!='':
                     img = image_metadata.stkread(Position=posname,Channel=channel,acq=acq,Exposure=data['exposure']).max(axis=2).astype(float)
                 else:
                     img = image_metadata.stkread(Position=posname,Channel=channel,acq=acq).max(axis=2).astype(float)
+                img = gaussian_filter(img.copy(),5)
                 if 'hybe' in acq:
-                    if data['exposure']!='':
-                        bkg = image_metadata.stkread(Position=posname,Channel=channel,acq=strip,Exposure=data['exposure']).max(axis=2).astype(float)
-                    else:
-                        bkg = image_metadata.stkread(Position=posname,Channel=channel,acq=strip).max(axis=2).astype(float)
-                    img = img-bkg
+                    try:
+                        if data['exposure']!='':
+                            bkg = image_metadata.stkread(Position=posname,Channel=channel,acq=strip,Exposure=data['exposure']).max(axis=2).astype(float)
+                        else:
+                            bkg = image_metadata.stkread(Position=posname,Channel=channel,acq=strip).max(axis=2).astype(float)
+                        bkg = gaussian_filter(bkg.copy(),5)
+                        img = img-bkg
+                    except:
+                        print('No Background to Subtract',posname,channel,acq,strip)
+                        do = 'nothing'
         return posname,img
     except Exception as e:
         print(e)
@@ -292,7 +311,7 @@ def generate_FF(image_metadata,acq,channel):
         return ''
     else:
         posnames = image_metadata.image_table[image_metadata.image_table.acq==acq].Position.unique()
-        random_posnames = posnames[0:20]
+        random_posnames = posnames#[0:20]
         FF = torch.dstack([torch.tensor(image_metadata.stkread(Position=posname,Channel=channel,acq=acq).min(2).astype(float)) for posname in random_posnames]).min(2).values
         FF = gaussian_filter(FF.numpy(),5)
         FF = FF.mean()/FF
@@ -344,6 +363,7 @@ def generate_stitched(image_metadata,
     """
     if len(posnames)==0:
         posnames = image_metadata.image_table[image_metadata.image_table.acq==acq].Position.unique()
+    FF = ''
     FF = generate_FF(image_metadata,acq,channel)
     coordinates = {}
     for posname in posnames:

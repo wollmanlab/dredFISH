@@ -157,19 +157,25 @@ class Position_Class(object):
             self.total_acq = np.array([i for i in self.metadata.acqnames if 'nucstain' in i])[-1]
             self.total_image = self.metadata.stkread(Position=self.posname,
                                                            Channel=self.parameters['total_channel'],
-                                                           acq=self.total_acq).mean(2).astype(float)
+                                                           acq=self.total_acq).max(2).astype(float)
             self.background_acq = np.array([i for i in self.metadata.acqnames if 'background' in i])[-1]
             self.background_image = self.metadata.stkread(Position=self.posname,
                                                            Channel=self.parameters['total_channel'],
-                                                           acq=self.background_acq).mean(2).astype(float)
+                                                           acq=self.background_acq).max(2).astype(float)
             self.total_image = self.total_image-self.background_image
             
         elif self.total_acq=='none':
             self.total_image = np.dstack([self.signal_dict[hybe] for readout,hybe,channel in self.bitmap]).sum(2)
         else:
-            self.total_image = self.metadata.stkread(Position=self.posname,
-                                                           Channel=self.parameters['total_channel'],
-                                                           acq=self.total_acq).mean(2).astype(float)
+            try:
+                self.total_image = self.metadata.stkread(Position=self.posname,
+                                                               Channel=self.parameters['total_channel'],
+                                                               acq=self.total_acq).max(2).astype(float)
+            except:
+                total_acq = [i for i in self.metadata.acqnames if self.total_acq+'_' in i][-1]
+                self.total_image = self.metadata.stkread(Position=self.posname,
+                                                               Channel=self.parameters['total_channel'],
+                                                               acq=self.total_acq).max(2).astype(float)
             
     def process_image(self,image):
         """
