@@ -230,7 +230,6 @@ class TopicClassifier(Classifier):
         row_sums = row_sums[:,None]
         Env = Env/row_sums
         self.Env = Env
-    
 
     def lda_fit(self, n_topics):
         """This cannot be nested inside
@@ -248,7 +247,6 @@ class TopicClassifier(Classifier):
         """fit multiple LDA models and chose the one with highest type entropy
         """
         # define function handle
-        
         if n_procs == 1: 
             logging.info("Running LDA in serial") 
             results = [self.lda_fit(n_topics) for n_topics in n_topics_list]
@@ -273,13 +271,12 @@ class TopicClassifier(Classifier):
     def classify(self,data):
         """classify based on fitted LDA"""
         topics_prob = self._lda.transform(data)
-        topics = np.argmax(topics_prob,axis=1)
+        topics = np.argmax(topics_prob, axis=1)
 
         # renumber topics 
-        unq,ix = np.unique(topics,return_inverse=True)
+        unq,ix = np.unique(topics, return_inverse=True)
         id = np.arange(len(unq))
         topics = id[ix]
-
         return topics
     
 class KnownCellTypeClassifier(Classifier): 

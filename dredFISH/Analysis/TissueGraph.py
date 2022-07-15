@@ -315,7 +315,7 @@ class TissueMultiGraph:
         Parameters
         ----------
         topics : numpy array / list
-            An array with local type environment 
+            An array with local type environment (a number for each cell) 
         region_tax : Taxonomy
             A Taxonomy object that contains the region classification scheme
         cell_layer : int (default,0)
@@ -328,12 +328,12 @@ class TissueMultiGraph:
                 return 
 
         # create region layers through graph contraction
-        CG = self.Layers[cell_layer].contract_graph(topics)
+        CG = self.Layers[cell_layer].contract_graph(topics) # contract the cell layer by topics
         
         # contraction assumes that the feature_mat and taxonomy of the contracted layers are
         # inherited from the layer used for contraction. This is not true for regions so we need to update these
         # feature_mat is updated here and tax is updated by calling add_type_information
-        Env = self.Layers[cell_layer].extract_environments(typevec = CG.Upstream)
+        Env = self.Layers[cell_layer].extract_environments(typevec=CG.Upstream)
         row_sums = Env.sum(axis=1)
         row_sums = row_sums[:,None]
         Env = Env/row_sums
@@ -346,10 +346,10 @@ class TissueMultiGraph:
 
         self.Layers.append(RegionLayer)
         current_layer_id = len(self.Layers)-1
-        self.add_type_information(current_layer_id,CG.Type,region_tax)
+        self.add_type_information(current_layer_id, CG.Type, region_tax)
 
         # update the layers graph to show that regions are created from cells
-        self.layers_graph.append((cell_layer,current_layer_id))
+        self.layers_graph.append((cell_layer, current_layer_id))
 
     def fill_holes(self,lvl_to_fill,min_node_size):
         """EXPERIMENTAL: merges small biospatial units with their neighbors. 
@@ -398,40 +398,48 @@ class TissueMultiGraph:
         if update_feature_mat_flag:
             self.Layers[lvl_to_fill].feature_mat = feature_mat[fixed,:]
 
-    def find_upstream_layer(self,layer_id):
+    def find_upstream_layer(self, layer_id):
+        """
         #TODO: remove hardcoded cell is always "root"
+        (Fangming: why not fixing a root layer (layer 0) that is always `cells`)
+        """
         upstream_layer_id=0
         return upstream_layer_id
     
-    def map_to_cell_level(self,lvl,VecToMap = None,return_ix = False):
+    def map_to_cell_level(self, lvl, VecToMap=None, return_ix=False):
         """
         Maps values to first layer of the graph, mostly used for plotting. 
         lvl is the level we want to map all the way to 
+
+        TODO: this function might have some problems
         """
         # if VecToMap is not supplied, will use the layer Type as default thing to map to lower levels
-        if VecToMap is None: 
+        if VecToMap is None: # type 
             VecToMap = self.Layers[lvl].Type.astype(np.int64)
+        if isinstance(VecToMap, str) and VecToMap == 'index': 
+            VecToMap = np.arange(self.Layers[lvl].N)
         elif len(VecToMap) != self.Layers[lvl].N:
             raise ValueError("Number of elements in VecToMap doesn't match requested Layer size")
             
         # if needed (i.e. not already at cell level) expand indexing backwards in layers following layers_graph
-        ix=self.Layers[lvl].Upstream
-        while lvl>0:
-            lvl = self.find_upstream_layer(lvl)
-            ix=ix[self.Layers[lvl].Upstream]
-        
-        VecToMap = VecToMap[ix].flatten()
-        
-        if return_ix: 
-            return (VecToMap,ix)
-        else: 
+        if lvl == 0:
             return VecToMap
+        else:  # (lvl > 0)
+            # # while lvl > 0:
+            # lvl = self.find_upstream_layer(lvl)
+            # ix=ix[self.Layers[lvl].Upstream
+
+            ix = self.Layers[lvl].Upstream
+            VecToMap = VecToMap[ix].flatten()
+            if return_ix: 
+                return (VecToMap,ix)
+            else: 
+                return VecToMap
     
     def find_regions_edge_level(self, region_layer=2):
-        """ finds cells graph edges edges that are also region edges
+        """ finds cells graph edges that are also region edges
         """
-        
-        # create edge list with sorted tuples (the geom convention)
+        # create edge list with sorted tuples (the geom convention)s
         edge_list = list()
         for e in self.Layers[0].SG.es:
             t=e.tuple
@@ -440,7 +448,7 @@ class TissueMultiGraph:
             edge_list.append(t)
         
         np_edge_list = np.asarray(edge_list)
-        region_id = self.map_to_cell_level(region_layer,np.arange(self.N[region_layer]))
+        region_id = self.map_to_cell_level(region_layer, VecToMap=np.arange(self.N[region_layer]))
         np_edge_list = np_edge_list[region_id[np_edge_list[:,0]] != region_id[np_edge_list[:,1]],:]
         region_edge_list = [(np_edge_list[i,0],np_edge_list[i,1]) for i in range(np_edge_list.shape[0])]            
         return region_edge_list
@@ -456,7 +464,7 @@ class TissueMultiGraph:
         return([L.Ntypes for L in self.Layers])
     
     def add_geoms(self):
-        """Creates the geometies needed (boundingbox, lines, points, and polygons) to be used in views to create maps. 
+        """Creates the geometries needed (boundingbox, lines, points, and polygons) to be used in views to create maps. 
         """
         
         # Bounding box geometry 
@@ -680,10 +688,10 @@ class TissueGraph:
     @property
     def Upstream(self):
         """list : mapping between current TG layer (self) and upstream layer
-        Return value has he length of upsteam level and index values of current layer""" 
+        Return value has the length of upstream level and index values of current layer""" 
         if self.is_empty():
             return None
-        # Upstream is stored as ups in adata: 
+        # Upstream is stored as uns in adata: 
         return self.adata.uns["Upstream"]
     
     @Upstream.setter
@@ -810,7 +818,8 @@ class TissueGraph:
         unqS = np.unique(self.Slice)
         return(len(unqS))
     
-    def build_feature_graph(self,X,n_neighbors = 15,metric = None,accuracy = {'prob' : 1, 'extras' : 1.5},metric_kwds = {},return_graph = False):
+    def build_feature_graph(self, 
+        X, n_neighbors=15, metric=None, accuracy={'prob':1, 'extras':1.5}, metric_kwds={}, return_graph=False):
         """construct k-graph based on feature similarity
 
         Create a kNN graph (an igraph object) based on feature similarity. The core of this method is the calculation on how to find neighbors. 
@@ -874,12 +883,12 @@ class TissueGraph:
         edgeList = np.vstack((id_from,id_to)).T
         G = igraph.Graph(n=X.shape[0], edges=edgeList)
         G.simplify()
+
+        # register
+        self.adata.obsp["FG"] = G.get_adjacency_sparse()
+        self.FG = G
         if return_graph:
             return G
-        else:
-            self.adata.obsp["FG"]=  G.get_adjacency_sparse()
-            self.FG = G
-            return self
     
     def build_spatial_graph(self,XYS,names = None):
         """construct graph based on Delauny neighbors
@@ -1151,7 +1160,7 @@ class TissueGraph:
         peaks = np.flatnonzero(is_peak)  
 
         Adj = self.SG.get_adjacency_sparse()
-        Dij_min, predecessors,ClosestPeak = dijkstra(Adj, directed=False, 
+        Dij_min, predecessors, ClosestPeak = dijkstra(Adj, directed=False, 
                                                           indices=peaks, 
                                                           return_predecessors=True, 
                                                           unweighted=False, 
@@ -1168,8 +1177,7 @@ class TissueGraph:
         CG = self.contract_graph(TypeVec = ClosestPeak)
         Id = np.arange(CG.N)
         ClosestPeak = Id[CG.Upstream]
-        
-        return (ClosestPeak,Dij_min)
+        return (ClosestPeak, Dij_min)
         
     def calc_entropy_at_different_Leiden_resolutions(self,Rvec = np.logspace(-1,2.5,100)): 
         Ent = np.zeros(Rvec.shape)
