@@ -1,5 +1,6 @@
 """
 """
+from tokenize import group
 from typing import Union
 import numpy as np
 import pandas as pd
@@ -246,23 +247,29 @@ def group_sum(mat, groups, group_order=[]):
     
     return groupmat.dot(mat), group_order
 
-def group_mean(mat, groups, group_order=[], expand=False):
+def group_mean(mat, groups, group_order=[], expand=False, clip_groupsize=False):
     """
     mat is a matrix (cell-by-feature) ; group are the labels (for each cell).
+
+    len(group_order) determines the number of clusters; will infer from `mat` if empty.
     """
-    m, n = mat.shape
-    assert m == len(groups)
+    n, p = mat.shape
+    assert n == len(groups)
     if len(group_order) == 0:
         group_order = np.unique(groups)
+    k = len(group_order)
     
-    group_idx = get_index_from_array(group_order, groups)
-    groupmat = sparse.csc_matrix(([1]*m, (group_idx, np.arange(m)))) # group by cell
-    groupmat_norm = groupmat/np.sum(groupmat, axis=1)  # row
+    group_idx = get_index_from_array(group_order, groups) # get index from `group_order` for each entry in `group` 
+    groupmat = sparse.csc_matrix(([1]*n, (group_idx, np.arange(n))), shape=(k,n)) # group by cell
+    groupsize = np.sum(groupmat, axis=1)
+    if clip_groupsize:
+        groupsize = np.clip(groupsize, 1, None) # avoid 0 
+    groupmat_norm = groupmat/groupsize  # row
     
     if not expand:
-        return np.asarray(groupmat_norm.dot(mat)), group_order
+        return np.asarray(groupmat_norm.dot(mat)), group_order # (k,p)
     else:
-        return np.asarray(groupmat.T.dot(groupmat_norm.dot(mat)))
+        return np.asarray(groupmat.T.dot(groupmat_norm.dot(mat))) # (n,p) recover the cells by coping clusters
 
 def libsize_norm(mat):
     """cell by gene matrix, norm to median library size
@@ -285,7 +292,7 @@ def sparse_libsize_norm(mat):
     matnorm = lib_size_inv.dot(mat)
     return matnorm
 
-def zscore(v, allow_nan=False, **kwargs):
+def zscore(v, allow_nan=False, ignore_zero=False, zero_threshold=1e-10, **kwargs):
     """
     v is an numpy array (any dimensional)
 
@@ -296,7 +303,10 @@ def zscore(v, allow_nan=False, **kwargs):
     axis=1 # zscore across cols for each row  (if v is 2-dimensional)
     """
     if allow_nan:
-        return (v-np.nanmean(v, **kwargs))/(np.nanstd(v, **kwargs))
+        vcopy = v.copy()
+        if ignore_zero:
+            vcopy[vcopy<zero_threshold] = np.nan # turn a number to nan (usually 0)
+        return (vcopy-np.nanmean(vcopy, **kwargs))/(np.nanstd(vcopy, **kwargs))
     else:
         return (v-np.mean(v, **kwargs))/(np.std(v, **kwargs))
 

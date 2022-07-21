@@ -21,7 +21,7 @@ The creation of TMG follows the methods to create different layers (create_cell_
 from cmath import nan
 import functools
 from textwrap import indent
-import ipyparallel as ipp
+# import ipyparallel as ipp
 from collections import Counter
 import numpy as np
 rng = np.random.default_rng()
@@ -84,7 +84,11 @@ class TissueMultiGraph:
         Stores relationship between TG layers and Taxonomies
         
  """
-    def __init__(self, basepath = None, redo = False):
+    def __init__(self, 
+        basepath=None, 
+        redo=False, 
+        quick_load_cell_obs=False,
+        ):
         """Create a TMG object
         
         There could only be a single TMG object in basepath. 
@@ -124,6 +128,18 @@ class TissueMultiGraph:
                                                  # uses which taxonomy (index into Taxonomies
                                                  # FIXME -- has to be a dictinary 
 
+        elif quick_load_cell_obs:
+            # load cell level attributes only -- faster
+            with open(os.path.join(basepath,"TMG.json")) as fh:
+                self._config = json.load(fh)
+            LayerNameList = self._config["Layers"]
+            self.Layers = [None]*len(LayerNameList)
+            self.Layers[0] = TissueGraph(basepath=basepath, 
+                                         layer_type=LayerNameList[0], 
+                                         tax=None,  
+                                         redo=False,
+                                         quick_load_cell_obs=True,
+                                         )
         else: 
             # load from drive
             with open(os.path.join(basepath,"TMG.json")) as fh:
@@ -143,10 +159,14 @@ class TissueMultiGraph:
             LayerNameList = self._config["Layers"]
             self.Layers = [None]*len(LayerNameList)
             for i in range(len(LayerNameList)): 
-                tax_ix = self.layer_taxonomy_mapping[i]
+                if i in self.layer_taxonomy_mapping.keys():
+                    tax_ix = self.layer_taxonomy_mapping[i]
+                    tax = self.Taxonomies[tax_ix]
+                else:
+                    tax = None
                 self.Layers[i] = TissueGraph(basepath=basepath, 
                                              layer_type=LayerNameList[i], 
-                                             tax=self.Taxonomies[tax_ix], 
+                                             tax=tax, 
                                              redo=False)
                 
             self.layers_graph = self._config["layers_graph"]
@@ -154,6 +174,7 @@ class TissueMultiGraph:
             # at this point, not saving geoms to file so recalculate them here:             
             self.Geoms = list()
             self.add_geoms()
+
         return None
     
     def save(self):
@@ -584,7 +605,9 @@ class TissueGraph:
 
 
     """
-    def __init__(self, feature_mat=None, feature_mat_raw=None, basepath=None, layer_type=None, tax=None, redo=False):
+    def __init__(self, feature_mat=None, feature_mat_raw=None, basepath=None, layer_type=None, tax=None, redo=False, 
+        quick_load_cell_obs=False,
+        ):
         """Create a TissueGraph object
         
         Parameters
@@ -610,9 +633,29 @@ class TissueGraph:
         self.layer_type = layer_type # label layers by their type
         self.basepath = basepath
         self.filename = os.path.join(basepath,f"{layer_type}.h5ad")
+
+        # Taxonomy object - if it exists, provides a pointer to the object, None by default: 
+        self.tax = tax
+            
+        # this dict stores the defaults field names in the anndata objects that maps to TissueGraph properties
+        # this allows storing different versions (i.e. different cell type assignment) in the anndata object 
+        # while still maintaining a "clean" interfact, i.e. i can still call for TG.Type and get a type vector without 
+        # knowing anything about anndata. 
+        # To see where in AnnData everything is stored, check comment in rows below 
+        self.adata_mapping = {"Type": "Type", #obs
+                              "node_size": "node_size", #obs
+                              "name" : "name", #obs
+                              "XY" : "XY", #obsm
+                              "Slice" : "Slice"} #obs
+        # Note: a these mapping are not used for few attributes such as SG/FG/Upstream that are "hard coded" 
+        # as much as possible, the only memory footprint is in the anndata object, the exceptions are SG/FG that 
+        # are large objects that we want to keep as iGraph in mem. 
         
         # if anndata file exists and redo is False, just read the file. 
         print(self.filename)
+        if quick_load_cell_obs:
+            self.adata = anndata.read_h5ad(self.filename, backed='r')
+
         if not redo and os.path.exists(self.filename): 
             self.adata = anndata.read_h5ad(self.filename)
             if "SG" in self.adata.obsp.keys():
@@ -641,22 +684,6 @@ class TissueGraph:
             self.SG = None # spatial graph (created by build_spatial_graph, or load)
             self.FG = None # Feature graph (created by build_feature_graph, or load)
             
-        # Taxonomy object - if it exists, provides a pointer to the object, None by default: 
-        self.tax = tax
-            
-        # this dict stores the defaults field names in the anndata objects that maps to TissueGraph properties
-        # this allows storing different versions (i.e. different cell type assignment) in the anndata object 
-        # while still maintaining a "clean" interfact, i.e. i can still call for TG.Type and get a type vector without 
-        # knowing anything about anndata. 
-        # To see where in AnnData everything is stored, check comment in rows below 
-        self.adata_mapping = {"Type": "Type", #obs
-                              "node_size": "node_size", #obs
-                              "name" : "name", #obs
-                              "XY" : "XY", #obsm
-                              "Slice" : "Slice"} #obs
-        # Note: a these mapping are not used for few attributes such as SG/FG/Upstream that are "hard coded" 
-        # as much as possible, the only memory footprint is in the anndata object, the exceptions are SG/FG that 
-        # are large objects that we want to keep as iGraph in mem. 
         return None
     
     def is_empty(self):
