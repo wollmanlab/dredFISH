@@ -35,7 +35,7 @@ import pickle
 
 import igraph
 import pynndescent 
-from scipy.spatial import Delaunay,Voronoi
+from scipy.spatial import Delaunay, Voronoi
 from scipy.sparse.csgraph import dijkstra
 
 import anndata
@@ -900,8 +900,8 @@ class TissueGraph:
             (indices,distances) = knn.neighbor_graph
 
         # take the first K values remove first self similarities    
-        indices = indices[:,1:n_neighbors+1]
-        distances = distances[:,1:n_neighbors+1]
+        indices = indices[:,1:]
+        distances = distances[:,1:]
 
         id_from = np.tile(np.arange(indices.shape[0]),indices.shape[1])
         id_to = indices.flatten(order='F')
@@ -918,7 +918,7 @@ class TissueGraph:
             return G
     
     def build_spatial_graph(self,XYS,names = None):
-        """construct graph based on Delauny neighbors
+        """construct graph based on Delaunay neighbors
         
         build_spatial_graph will create an igrah using Delaunay triangulation
 
@@ -947,14 +947,14 @@ class TissueGraph:
             # get XY for a given slice
             XY = XYS[XYS[:,2]==unqS[s],0:2]
             # start with triangulation
-            dd=Delaunay(XY)
+            dd = Delaunay(XY)
 
             # create Graph from edge list
             EL = np.zeros((dd.simplices.shape[0]*3,2),dtype=np.int64)
             for i in range(dd.simplices.shape[0]): 
-                EL[i*3,:]=[dd.simplices[i,0],dd.simplices[i,1]]
-                EL[i*3+1,:]=[dd.simplices[i,0],dd.simplices[i,2]]
-                EL[i*3+2,:]=[dd.simplices[i,1],dd.simplices[i,2]]
+                EL[i*3,  :] = [dd.simplices[i,0], dd.simplices[i,1]]
+                EL[i*3+1,:] = [dd.simplices[i,0], dd.simplices[i,2]]
+                EL[i*3+2,:] = [dd.simplices[i,1], dd.simplices[i,2]]
 
             # update vertices numbers to account for previously added nodes (cnt)
             EL = EL + cnt
@@ -964,7 +964,7 @@ class TissueGraph:
             # convert to list of tuples to make igraph happy and add them. 
             el = el + list(zip(EL[:,0], EL[:,1]))
         
-        self.SG  = igraph.Graph(n=XYS.shape[0],edges=el,directed=False).simplify()
+        self.SG = igraph.Graph(n=XYS.shape[0], edges=el, directed=False).simplify()
         logging.info("updating anndata")
         self.adata.obsp["SG"] = self.SG.get_adjacency_sparse()
         self.adata.obsm[self.adata_mapping["XY"]]=XYS[:,0:2]

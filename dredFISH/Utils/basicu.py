@@ -111,7 +111,7 @@ def diag_matrix(X, rows=np.array([]), cols=np.array([]), threshold=None):
         transposed = 1
         
     # start (di <= dj)
-    new_X = X.copy()
+    new_X = np.nan_to_num(X.copy(), 0)
     new_rows = rows.copy() 
     new_cols = cols.copy() 
     if new_rows.size == 0:
@@ -186,7 +186,7 @@ def diag_matrix_rows(X):
     """
     di, dj = X.shape
     
-    new_X = np.array(X.copy())
+    new_X = np.nan_to_num(np.array(X.copy()), 0)
     new_rows = np.arange(di) 
     new_cols = np.arange(dj) 
     
