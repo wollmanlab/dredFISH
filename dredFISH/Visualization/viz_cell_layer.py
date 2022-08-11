@@ -110,20 +110,20 @@ def preview_hemisphere(split_lines, basepth=None, XY=None, no_plot=False):
     colors = sns.color_palette("tab10", ncolors)
     for i, (key, ax) in enumerate(axs_dict.items()):
         if i == 0:
-            ax.scatter(x, y, s=0.1, color='black')
+            ax.scatter(x, y, s=1, color='black', edgecolor='none')
             ax.grid(True)
             lc = LineCollection(line_segs, linewidth=2, colors=colors) 
             ax.add_collection(lc)
         elif i == 1:
-            ax.scatter(x[cond], y[cond], s=0.1, color='black')
+            ax.scatter(x[cond], y[cond], s=1, color='black', edgecolor='none')
             ax.grid(True)
             lc = LineCollection(line_segs, linewidth=2, colors=colors) 
             ax.add_collection(lc)
         elif i == 2:
-            ax.scatter(xnew, ynew, s=0.1, color='black')
+            ax.scatter(xnew, ynew, s=1, color='black', edgecolor='none')
             ax.grid(True)
         elif i == 3:
-            ax.scatter(xnew[cond], ynew[cond], s=0.1, color='black')
+            ax.scatter(xnew[cond], ynew[cond], s=1, color='black', edgecolor='none')
             ax.grid(True)
         ax.set_aspect('equal')
     plt.show()
@@ -259,7 +259,7 @@ def main(mode,
     dataframe results goes to `basepth` `default_analysis.csv`
     """
     # House keeping
-    assert mode in ['preview', 'view', 'analysis-only', 'plot-only'] # choose from these options
+    assert mode in ['preview', 'view', 'analysis-only', 'plot-only',  'compile-only'] # choose from these options
     tmg_pth = os.path.join(basepth, 'TMG.json')
     if not os.path.isfile(tmg_pth):  
         logging.info(f"TMG does not exist, generating from scratch (cell layer only)")
@@ -301,6 +301,9 @@ def main(mode,
         generate_default_views(df, respth)
         if compile_pdf:
             compile_tex.main(basepth, **pdf_kwargs)
+        return 
+    elif mode == 'compile-only': # 
+        compile_tex.main(basepth, **pdf_kwargs)
         return 
 
 if __name__ == '__main__':

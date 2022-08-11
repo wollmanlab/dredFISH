@@ -116,30 +116,28 @@ def plot_hybrid_mat_mask(_mat, _mask, axs):
     return
     
 # For dredFISH
-def plot_basis_spatial(df, pmode='full', output=None):
+def plot_basis_spatial(df, xcol='x', ycol='y', pmode='full', vmin=-3, vmax=3, output=None):
     if pmode == 'full':
         nx, ny = 6, 4
         panel_x, panel_y = 6, 5
         wspace, hspace = 0.05, 0
         title_loc = 'left'
         title_y = 0.9
-        xcol, ycol = 'x', 'y'
     elif pmode == 'left_half':
         nx, ny = 6, 4
         panel_x, panel_y = 3, 5
         wspace, hspace = 0.05, 0
         title_loc = 'left'
         title_y = 0.9
-        xcol, ycol = 'x2', 'y2'
     elif pmode == 'right_half':
         nx, ny = 6, 4
         panel_x, panel_y = 3, 5
         wspace, hspace = 0.05, 0
         title_loc = 'right'
         title_y = 0.9
-        xcol, ycol = 'x2', 'y2'
     else:
         raise ValueError("No such mode")
+
         
     P = PlotScale(df[xcol].max()-df[xcol].min(), 
                   df[ycol].max()-df[ycol].min(),
@@ -150,9 +148,11 @@ def plot_basis_spatial(df, pmode='full', output=None):
 
     fig, axs = plt.subplots(ny, nx, figsize=(nx*panel_x, ny*panel_y))
     for i in range(24):
+        if f'b{i}' not in df.columns:
+            continue
         ax = axs.flat[i]
         aggdata = ds.Canvas(P.npxlx, P.npxly).points(df, xcol, ycol, agg=ds.mean(f'b{i}'))
-        ax.imshow(aggdata, origin='lower', aspect='equal', cmap='coolwarm', vmin=-3, vmax=3, interpolation='none')
+        ax.imshow(aggdata, origin='lower', aspect='equal', cmap='coolwarm', vmin=vmin, vmax=vmax, interpolation='none')
         ax.set_title(f'b{i}', loc=title_loc, y=title_y)
         ax.set_aspect('equal')
         ax.axis('off')
@@ -185,7 +185,12 @@ def plot_basis_umap(df, output=None):
         logging.info(f"saved: {output}")
     plt.show()
     
-def plot_type_spatial_umap(df, hue, output=None):
+def plot_type_spatial_umap(
+    df, hue, 
+    x='x', y='y', 
+    umap_x='umap_x', umap_y='umap_y', 
+    output=None
+    ):
     """
     """
     hue_order = np.sort(np.unique(df[hue]))
@@ -194,7 +199,7 @@ def plot_type_spatial_umap(df, hue, output=None):
     fig, axs = plt.subplots(1, 2, figsize=(8*2,6))
     fig.suptitle(f"{hue}; n={ntypes}")
     ax = axs[0]
-    sns.scatterplot(data=df, x='x', y='y', 
+    sns.scatterplot(data=df, x=x, y=y, 
                     hue=hue, hue_order=hue_order, 
                     s=0.5, edgecolor=None, 
                     legend=False,
@@ -205,7 +210,7 @@ def plot_type_spatial_umap(df, hue, output=None):
     ax.axis('off')
 
     ax = axs[1]
-    sns.scatterplot(data=df, x='umap_x', y='umap_y', 
+    sns.scatterplot(data=df, x=umap_x, y=umap_y, 
                     hue=hue, hue_order=hue_order, 
                     s=0.5, edgecolor=None, 
                     legend=False,
