@@ -1,5 +1,6 @@
 # untrack some large testing notebooks
 dredFISH/Processing/Notebooks/Test
+dredFISH/Design/paintshop
 
 # R packages
 packrat/

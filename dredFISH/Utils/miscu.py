@@ -2,6 +2,7 @@ import leidenalg as la
 import numpy as np
 import pynndescent
 from scipy import sparse
+from scipy.cluster import hierarchy as sch
 from dredFISH.Utils import tmgu
 
 def leiden(G, cells,
@@ -63,3 +64,12 @@ def build_feature_graph_knnlite(ftrs_mat, k=15, metric='cosine'):
     G = tmgu.adjacency_to_igraph(adj_mat, directed=False, simplify=True)
     
     return G
+
+def order_by_hc(X):
+    """
+    X - (# sample, # feature)
+    gives order to samples by hierarical clustering
+    """
+    Z = sch.linkage(X, 'ward')
+    dn = sch.dendrogram(Z, no_plot=True)['leaves']
+    return dn
