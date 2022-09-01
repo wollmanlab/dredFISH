@@ -27,8 +27,8 @@ class InstNrmSimple(nn.Module):
     """
     def __init__(self, scale=1.5e4, noise=(1e4, 1e3)):
         super().__init__()
-        self.logscale= torch.tensor(scale).log()
-        self.noise= noise
+        self.logscale = torch.tensor(scale).log()
+        self.noise = noise
 
     def forward(self, X):
         """
