@@ -243,7 +243,6 @@ def generate_default_views(
         hue = col
         output = os.path.join(respth, f'fig3-{i}_{col}.pdf')
         powerplots.plot_type_spatial_umap(df, hue, output=output)
-
     return 
 
 def main(mode, 
@@ -253,6 +252,12 @@ def main(mode,
         pdf_kwargs={'title': 'dredFISH default analysis', 
                     'author':'Fangming',
                     },
+        tmg_kwargs=dict(
+                    norm='default',
+                    norm_cell=True,
+                    norm_basis=True,
+                    ),
+        redo=False,
         ):
     """
     `respth` is for figures
@@ -261,13 +266,13 @@ def main(mode,
     # House keeping
     assert mode in ['preview', 'view', 'analysis-only', 'plot-only',  'compile-only'] # choose from these options
     tmg_pth = os.path.join(basepth, 'TMG.json')
-    if not os.path.isfile(tmg_pth):  
+    if redo or not os.path.isfile(tmg_pth):  
         logging.info(f"TMG does not exist, generating from scratch (cell layer only)")
         TMG = TissueGraph.TissueMultiGraph(
                                 basepath=basepth, 
                                 redo=True, # create an empty one
                                 ) 
-        TMG.create_cell_layer(metric='cosine')
+        TMG.create_cell_layer(metric='cosine', **tmg_kwargs)
         TMG.save()
 
     if respth is None:

@@ -271,14 +271,17 @@ def group_mean(mat, groups, group_order=[], expand=False, clip_groupsize=False):
     else:
         return np.asarray(groupmat.T.dot(groupmat_norm.dot(mat))) # (n,p) recover the cells by coping clusters
 
-def libsize_norm(mat):
+def libsize_norm(mat, scale=None):
     """cell by gene matrix, norm to median library size
     assume the matrix is in sparse format, the output will keep sparse
     """
     lib_size = mat.sum(axis=1)
-    lib_size_median = np.median(lib_size)
+    if scale is None:
+        factor = np.median(lib_size)
+    else:
+        factor = scale # most often 1e6
 
-    matnorm = (mat/lib_size.reshape(-1,1))*lib_size_median
+    matnorm = (mat/lib_size.reshape(-1,1))*factor
     return matnorm
 
 def sparse_libsize_norm(mat):
@@ -356,7 +359,6 @@ def stratified_sample_withrep(df, col, n: Union[int, dict], return_idx=False, gr
         idx = get_index_from_array(df.index.values, dfsub.index.values)
         return dfsub, idx
 
-
 def clip_by_percentile(vector, low_p=5, high_p=95):
     """
     """
@@ -392,3 +394,22 @@ def normalize_fishdata(X, norm_cell=True, norm_basis=True, allow_nan=False):
         X = zscore(X, axis=0, allow_nan=allow_nan) # 0 - across rows (cells) for each col (bit) 
 
     return X 
+
+def normalize_fishdata_logrowmedian(X, norm_basis=True, allow_nan=False):
+    """
+    X -- cell by basis raw count matrix
+    
+    0 clipping; cell normalization; bit normalization
+    """
+    # clip at 0
+    X = np.clip(X, 0, None)
+
+    # feature as the log counts removed by median per cell
+    X = np.log10(X+1)
+    X = X - np.median(X, axis=1).reshape(-1,1)
+
+    # further normalize by bit
+    if norm_basis:
+        X = zscore(X, axis=0, allow_nan=allow_nan) # 0 - across rows (cells) for each col (bit) 
+
+    return X

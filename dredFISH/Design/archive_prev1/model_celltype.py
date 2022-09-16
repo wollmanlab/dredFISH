@@ -62,8 +62,8 @@ class InstNrm(nn.Module):
         # each coarse level cell type will have a median expression value, which is the difference between the last low value
         # and the first high value 
         o= X1.sort(1)[0] # sort by bits (by col). [0] - val; [1] - indices
-        a= o[:,:o.shape[1]//2] # smaller half
-        b= o[:,o.shape[1]//2:] # bigger half
+        a= o[:,:o.shape[1]//3] # smaller half
+        b= o[:,o.shape[1]//3:] # bigger half
         l= (a[:,-1:] + b[:,:1])/2 # middle values for each cell
         
         # lower and upper are bounds on expression, we want counts within their threshold

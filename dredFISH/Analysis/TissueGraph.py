@@ -115,8 +115,7 @@ class TissueMultiGraph:
             
         self.basepath = basepath 
         
-        # check to see if a TMG.json file exists in that folder
-        # is not, create an empty TMG. 
+        # check to see if a TMG.json file exists in that folder; if not, create an empty TMG. 
         if redo or not os.path.exists(os.path.join(basepath,"TMG.json")):
             self.Layers = list() # a list of TissueGraphs
             self.layers_graph = list() # a list of tuples that keep track of the relationship between different layers 
@@ -242,7 +241,7 @@ class TissueMultiGraph:
         self.layer_taxonomy_mapping[layer_id] = tax #.append((layer_id,tax))
         return 
     
-    def create_cell_layer(self, metric='cosine'): 
+    def create_cell_layer(self, metric='cosine', norm='default', norm_cell=True, norm_basis=True): 
         """Creating cell layer from raw data. 
         TODO: Fix documentaion after finishing Taxonomy class. 
         
@@ -257,6 +256,10 @@ class TissueMultiGraph:
         
          
         """
+        allowed_options = ['default', 'logrowmedian']
+        if norm not in allowed_options:
+            raise ValueError(f"Choose from {allowed_options}")
+        
         for TG in self.Layers:
             if TG.layer_type == "cell":
                 print("!!`cell` layer already exists; return...")
@@ -286,8 +289,11 @@ class TissueMultiGraph:
         logging.info('done reading files')
         # return FISHbasis
         
-        # FISH basis is the raw count matrices from imaging; normalize data
-        FISHbasis_norm = basicu.normalize_fishdata(FISHbasis, norm_cell=True, norm_basis=True)
+        if norm == 'default':
+            # FISH basis is the raw count matrices from imaging; normalize data
+            FISHbasis_norm = basicu.normalize_fishdata(FISHbasis, norm_cell=norm_cell, norm_basis=norm_basis)
+        elif norm == 'logrowmedian':
+            FISHbasis_norm = basicu.normalize_fishdata_logrowmedian(FISHbasis, norm_basis=norm_basis)
         
         # creating first layer - cell tissue graph
         TG = TissueGraph(feature_mat=FISHbasis_norm,

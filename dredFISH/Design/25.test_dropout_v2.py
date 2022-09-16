@@ -15,7 +15,7 @@ print(f"GPU: {torch.cuda.is_available()}")
 print(f"Use: {device}")
 
     
-n_epochs = 6
+n_epochs = 6 
 n_iter = None #3 
 
 lmd0 = 1 
@@ -56,8 +56,17 @@ cnstrnts = torch.load(f)
 # for n_bit in n_bits:
 #     for scale in scales:
 n_bit = 24
-scale = 5e2
 lmd3 = 1
+
+scales = [
+    1e2,
+    2e2,
+    5e2,
+    1e3,
+    2e3,
+    5e3,
+    1e4,
+]
 
 drop_outs = [
     0.01,
@@ -65,21 +74,21 @@ drop_outs = [
     0.05,
     0.1,
 ]
-
-for drprt in drop_outs:
-    res_path = f'/bigstore/GeneralStorage/fangming/projects/dredfish/res_nn/{studybatch}_drprt{drprt:.1e}_scale{scale:.1e}_lmd0{lmd0:.2e}_lmd2{lmd2:.2e}_nbit{n_bit}_nrcn{n_rcn}_lr{lr:.1g}'
-    print(res_path)
-    train_model(trn_dataloader, tst_dataloader, 
-                res_path, 
-                gsubidx, 
-                cnstrnts_idx,
-                cnstrnts,
-                lmd0, lmd2, lmd3,
-                n_bit=n_bit, n_rcn_layers=n_rcn, 
-                drprt=drprt,
-                scale=scale, noise=noise,
-                lr=lr, n_epochs=n_epochs, n_iter=n_iter, 
-                # path_trained_model=path_trained_model,
-                disable_tqdm=disable_tqdm,
-                device=device,
-                )
+for scale in scales:
+    for drprt in drop_outs:
+        res_path = f'/bigstore/GeneralStorage/fangming/projects/dredfish/res_nn/{studybatch}_drprt{drprt:.1e}_scale{scale:.1e}_lmd0{lmd0:.2e}_lmd2{lmd2:.2e}_nbit{n_bit}_nrcn{n_rcn}_lr{lr:.1g}'
+        print(res_path)
+        train_model(trn_dataloader, tst_dataloader, 
+                    res_path, 
+                    gsubidx, 
+                    cnstrnts_idx,
+                    cnstrnts,
+                    lmd0, lmd2, lmd3,
+                    n_bit=n_bit, n_rcn_layers=n_rcn, 
+                    drprt=drprt,
+                    scale=scale, noise=noise,
+                    lr=lr, n_epochs=n_epochs, n_iter=n_iter, 
+                    # path_trained_model=path_trained_model,
+                    disable_tqdm=disable_tqdm,
+                    device=device,
+                    )
