@@ -12,7 +12,7 @@ from IPython.display import set_matplotlib_formats
 set_matplotlib_formats('retina')
 
 # #  # importing this twice in two diff scripts might cause problem
-# mpl.rcParams['pdf.fonttype'] = 42 # editable text in matplotlib
+mpl.rcParams['pdf.fonttype'] = 42 # editable text in matplotlib
 
 # mpl.rcParams['font.family'] = 'sans-serif'
 # mpl.rcParams['font.sans-serif'] = ['Arial']

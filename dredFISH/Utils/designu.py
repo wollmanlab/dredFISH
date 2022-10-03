@@ -46,7 +46,7 @@ def plot_enc(pmat, fpmat, title=""):
                     vmax=0.01, 
                     cbar_kws=dict(shrink=0.3, label='Weight prop.', ticks=[0,0.01], aspect=10,),
                    )
-        ax.set_xlabel('Bases')
+        ax.set_xlabel('Basis')
         ax.set_ylabel('Genes')
         ax.set_yticks([nmat])
         ax.set_title(f"Total #: {int(np.sum(pmat.values))}")
@@ -63,7 +63,7 @@ def plot_enc(pmat, fpmat, title=""):
         ax.set_ylabel('Weight')
         sns.despine(ax=ax)
         ax.set_title('Encoding matrix')
-        ax.legend(ncol=3, title='Bases')
+        ax.legend(ncol=3, title='Basis')
         
         ax_dict['C'].axis('off')
         fig.suptitle(title)
@@ -146,7 +146,7 @@ def plot_embx_clsts(
     ax.set_yticklabels(ax.get_yticklabels(), fontsize=10)
     ax.set_xticklabels(ax.get_xticklabels(), fontsize=10)
     ax.set_title(title1)
-    ax.set_xlabel('Bases')
+    ax.set_xlabel('Basis')
     ax.set_ylabel('Cell types')
 
     ax = axs[1]
@@ -241,7 +241,7 @@ def plot_dcdx(
     ax.set_yticklabels(ax.get_yticklabels(), fontsize=10)
     ax.set_xticklabels(ax.get_xticklabels(), fontsize=10)
     ax.set_title(title1)
-    ax.set_xlabel('Bases')
+    ax.set_xlabel('Basis')
     ax.set_ylabel('Cell types')
     fig.subplots_adjust(wspace=0.05)
     plt.show()
@@ -287,7 +287,7 @@ def plot_embx_clsts_v2(
     ax.set_yticklabels(ax.get_yticklabels(), fontsize=10)
     ax.set_xticklabels(ax.get_xticklabels(), fontsize=10)
     ax.set_title(title1)
-    ax.set_xlabel('Bases')
+    ax.set_xlabel('Basis')
     ax.set_ylabel('Cell types')
 
     ax = axs[1]
