@@ -8,7 +8,8 @@ ddir <- "/bigstore/GeneralStorage/fangming/projects/dredfish/res_dpnmf/"
 ddirout <- "/bigstore/GeneralStorage/fangming/projects/dredfish/res_dpnmf/v2/"
 name0 <- "smrt_withrep" 
 k <- 24 
-mu_range <- c(1e4, 1e2, 1, 1e-2, 1e-4)
+# mu_range <- c(1e4, 1e2, 1, 1e-2, 1e-4)
+mu_range <- c(0, 1e-4, 1e-2, 1, 1e2, 1e4)
 namex_range <- c("subL5n100")
 namey_range <- c("L5") # same length as namex_range
 
@@ -71,14 +72,16 @@ for (i in 1:length(namex_range)){
         W <- res$Weight
         S <- res$Score
 
-        # select good basis (test of corr vs library size; multimodal test)
-        W_sel <- basisSelect(W = W, S = S,
-                                X = X, toTest = TRUE, toAnnotate = FALSE, mc.cores = 1)
-        S_sel <- S[,colnames(W_sel)]
-
         write.csv(W, file=ot_w)
         write.csv(S, file=ot_s)
-        write.csv(W_sel, file=ot_wsel)
-        write.csv(S_sel, file=ot_ssel)
+
+        # # select good basis (test of corr vs library size; multimodal test)
+        # # this could cause error
+        # W_sel <- basisSelect(W = W, S = S,
+        #                         X = X, toTest = TRUE, toAnnotate = FALSE, mc.cores = 1)
+        # S_sel <- S[,colnames(W_sel)]
+
+        # write.csv(W_sel, file=ot_wsel)
+        # write.csv(S_sel, file=ot_ssel)
     }
 }

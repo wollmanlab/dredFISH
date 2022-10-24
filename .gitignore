@@ -1,3 +1,6 @@
+# untrack some large testing notebooks
+dredFISH/Processing/Notebooks/Test
+
 # R packages
 packrat/
 

@@ -90,6 +90,8 @@ def pointset_to_image(pmat, resolution=1, return_coords=False):
     xcoords = xmin + xr*(1/2 + col(x)_index) # coords represents the min-points of each bin 
     ycoords = ymin + yr*(1/2 + row(y)_index) 
     """
+    assert pmat.shape[1] == 2
+
     xmin = pmat[:,0].min()
     xmax = pmat[:,0].max()
     ymin = pmat[:,1].min()
@@ -103,6 +105,44 @@ def pointset_to_image(pmat, resolution=1, return_coords=False):
 
     data = pd.DataFrame(pmat, columns=['x', 'y'])
     aggdata = ds.Canvas(plot_width=ps.npxlx, plot_height=ps.npxly).points(data, 'x', 'y', agg=ds.count())
+    imgmat = aggdata.values
+
+    if return_coords:
+        coordmat = np.array([
+            [xmin, ymin], # origin
+            [xr, yr], # resolution
+        ])
+        return imgmat, coordmat 
+    else:
+        return imgmat
+
+def valued_pointset_to_image(pmat, resolution=1, return_coords=False):
+    """Generate heatmap based on pointset
+    pmat has 3 cols
+    
+    resolution is approximate, it was adjusted according to rounding error (number of pixels)
+    ds.Canvas rasterize the pointset by (nx, ny) equal-sized bins.
+    coordinates can be recovered by
+    
+    xcoords = xmin + xr*(1/2 + col(x)_index) # coords represents the min-points of each bin 
+    ycoords = ymin + yr*(1/2 + row(y)_index) 
+
+    """
+    assert pmat.shape[1] == 3
+
+    xmin = pmat[:,0].min()
+    xmax = pmat[:,0].max()
+    ymin = pmat[:,1].min()
+    ymax = pmat[:,1].max()
+    rangex = xmax - xmin
+    rangey = ymax - ymin
+
+    ps = powerplots.PlotScale(rangex, rangey, pxl_scale=resolution)
+    xr = ps.pxl_scale_ux
+    yr = ps.pxl_scale_uy
+
+    data = pd.DataFrame(pmat, columns=['x', 'y', 'z'])
+    aggdata = ds.Canvas(plot_width=ps.npxlx, plot_height=ps.npxly).points(data, 'x', 'y', agg=ds.mean('z'))
     imgmat = aggdata.values
 
     if return_coords:

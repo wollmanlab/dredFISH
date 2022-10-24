@@ -22,7 +22,8 @@ bitmap = [('RS0109_cy5', 'hybe2', 'FarRed'),
          ('RSN4287.0_atto565', 'hybe16', 'FarRed'),
          ('RSN1252.0_atto565', 'hybe17', 'FarRed'),
          ('RSN9535.0_atto565', 'hybe18', 'FarRed'),
-          ('RS0095_cy5', 'hybe1', 'FarRed')]
+          ('RS0095_cy5', 'hybe1', 'FarRed'),
+          ('PolyT', 'hybe25', 'FarRed')]
 
 
 nbits = len(bitmap)
@@ -41,23 +42,30 @@ parameters['pixel_size'] = 0.490 # um 490 or 330
 parameters['stitch_rotate'] = 0 # NEW 0
 parameters['stitch_flipud'] = False# NEW False
 parameters['stitch_fliplr'] = True# NEW True
-parameters['flipxy'] = True
+parameters['flipxy'] = False # OLD True
 
 parameters['segment_gpu'] = False
-parameters['fishdata']='fishdata_2022Jun21'
+parameters['fishdata']='fishdata'
 parameters['QC_pixel_size'] = 5 # um
-parameters['diameter'] = 15 # um
+parameters['diameter'] = 8 #15 # um
 parameters['segment_diameter'] = parameters['diameter']/parameters['pixel_size']
 parameters['nucstain_channel'] = 'DeepBlue'
-parameters['nucstain_acq'] = 'infer'
+parameters['nucstain_acq'] = 'hybe1'
 parameters['total_channel'] = 'FarRed'
-parameters['total_acq'] = 'infer'
-parameters['overwrite'] = True #False
+parameters['total_acq'] = 'hybe25'
+parameters['overwrite'] = False #False
+parameters['segment_overwrite'] = False #False
+parameters['non_cell_overwrite'] = False #False
+parameters['vector_overwrite'] = True #False
 parameters['batches'] = 2000 #"Number of batches"
-parameters['ncpu'] = 10 #"Number of threads"
-parameters['nregions'] = 6#4 #"Number of Regions/Sections"
+parameters['ncpu'] = 5 #"Number of threads"
+parameters['nregions'] = 16#4 #"Number of Regions/Sections"
 parameters['results'] = 'Results' #"Path to save data"
 parameters['outpath'] = '/bigstore/GeneralStorage/Data/dredFISH/' #"Path to save data"
 parameters['resolution'] = 100 #"resolution to round centroid before naming regions"
 parameters['flip'] = False #"Flip Section when centering and rotating"
-
+parameters['non_cell_percentile'] = 5 # Percentile of Image that can be assumed to be non cell
+parameters['save_processed_images'] = False
+parameters['save_stitched_images'] = False
+parameters['nuclei_size_threshold'] = parameters['segment_diameter']*2
+parameters['brain'] = '16'
