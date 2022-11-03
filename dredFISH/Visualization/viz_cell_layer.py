@@ -146,8 +146,9 @@ def generate_default_analysis(
 
     logging.info(f"Load TMG from {basepth}")
     TMG = TissueGraph.TissueMultiGraph(basepath=basepth, 
-                                    redo=False, # load existing 
-                                    )
+                                       redo=False, # load existing 
+                                       quick_load_cell_obs=True,
+                                      )
     # unpack relevant stuff
     layer = TMG.Layers[0]
     N = layer.N
