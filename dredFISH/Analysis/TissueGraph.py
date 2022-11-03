@@ -585,6 +585,7 @@ class TissueMultiGraph:
             slice_geoms['point'] = XY
 
             self.Geoms.append(slice_geoms)
+
 class TissueGraph:
     """Representation of transcriptional state of biospatial units as a graph. 
     
