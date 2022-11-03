@@ -271,10 +271,13 @@ class TissueMultiGraph:
         metadata_files = glob.glob(f"{self.basepath}//*_metadata.csv")
         metadata_files.sort()
         XYS = np.zeros((0,3))
+        dfall_meta = []
         for i in range(len(metadata_files)): 
-            df = pd.read_csv(metadata_files[i])
-            xys_i = np.array(df[["stage_x","stage_y","section_index"]])
+            meta = pd.read_csv(metadata_files[i])
+            xys_i = np.array(meta[["stage_x","stage_y","section_index"]])
             XYS = np.vstack((XYS,xys_i))
+            dfall_meta.append(meta)
+        dfall_meta = pd.concat(dfall_meta)
         
         matrix_files = glob.glob(f"{self.basepath}//*_matrix.csv")
         matrix_files.sort()
@@ -300,6 +303,7 @@ class TissueMultiGraph:
                          feature_mat_raw=FISHbasis,
                          basepath=self.basepath,
                          layer_type="cell", 
+                         obs=dfall_meta, # metadata carries over
                          redo=True)
         
         # add observations and init size to 1 for all cells
@@ -612,6 +616,7 @@ class TissueGraph:
 
     """
     def __init__(self, feature_mat=None, feature_mat_raw=None, basepath=None, layer_type=None, tax=None, redo=False, 
+        obs=None,
         quick_load_cell_obs=False,
         ):
         """Create a TissueGraph object
@@ -682,7 +687,8 @@ class TissueGraph:
                 feature_mat[:]=np.nan
 
             # The main data container is an anndata, initalize with feature_mat  
-            self.adata = anndata.AnnData(feature_mat) # the tissuegraph AnnData object
+            self.adata = anndata.AnnData(feature_mat, obs=obs) # the tissuegraph AnnData object
+
             if feature_mat_raw is not None:
                 self.adata.layers['raw'] = feature_mat_raw
             
