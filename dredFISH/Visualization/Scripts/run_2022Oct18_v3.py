@@ -14,7 +14,8 @@ mode = 'view'
 # mode = 'plot-only'
 redo = False
 basepth_s = [
-    "/bigstore/GeneralStorage/Data/dredFISH/DPNMF-R_8C_2022Oct18_v3/DPNMF-R_8C_2022Oct18_Section4",
+    # "/bigstore/GeneralStorage/Data/dredFISH/DPNMF-R_8C_2022Oct18_v3/DPNMF-R_8C_2022Oct18_Section4",
+    "/bigstore/GeneralStorage/Data/dredFISH/DPNMF-R_8C_2022Oct18_v4/DPNMF-R_8C_2022Oct18_Section4",
 ]
 
 for basepth in basepth_s:

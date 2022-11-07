@@ -197,6 +197,9 @@ class TissueMultiGraph:
         #     pickle.dump(self.Geoms, pickle_file, pickle.HIGHEST_PROTOCOL)
             
         for i in range(len(self.Layers)): 
+            if i == 0:
+                _adata = self.Layers[0].adata
+                _adata.obsm['XY'] = _adata.obsm['XY'].astype(np.float32)
             self.Layers[i].save()
         
         for i in range(len(self.Taxonomies)): 
