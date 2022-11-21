@@ -11,6 +11,8 @@ import numpy as np
 import pandas as pd
 import umap
 import tqdm
+import glob
+import subprocess
 
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
@@ -132,7 +134,6 @@ def preview_hemisphere(split_lines, basepth=None, XY=None, no_plot=False):
 
 ### end split hemisphere --- 
 def generate_default_analysis(
-    split_lines,
     basepth, 
     XY=None,
     output_df="default_analysis.csv"):
@@ -145,8 +146,9 @@ def generate_default_analysis(
 
     logging.info(f"Load TMG from {basepth}")
     TMG = TissueGraph.TissueMultiGraph(basepath=basepth, 
-                                    redo=False, # load existing 
-                                    )
+                                       redo=False, # load existing 
+                                       quick_load_cell_obs=True,
+                                      )
     # unpack relevant stuff
     layer = TMG.Layers[0]
     N = layer.N
@@ -162,9 +164,9 @@ def generate_default_analysis(
     G = layer.FG
     cells = layer.adata.obs.index.values
 
-    logging.info(f"split hemisphere...")
-    # split hemisphere
-    cond, XYnew = preview_hemisphere(split_lines, XY=XY, no_plot=True)
+    # logging.info(f"split hemisphere...")
+    # # split hemisphere
+    # cond, XYnew = preview_hemisphere(split_lines, XY=XY, no_plot=True)
 
     logging.info(f"generate UMAP...")
     # UMAP
@@ -197,9 +199,7 @@ def generate_default_analysis(
     df = pd.DataFrame()
     df['x'] = x
     df['y'] = y
-    df['x2'] = XYnew[:,0]
-    df['y2'] = XYnew[:,1]
-    df['hemi'] = cond.astype(int)
+    df['hemi'] = layer.adata.obs['hemi'].values # important because the index doesn't match
 
     # basis
     for i in range(24):
@@ -246,7 +246,8 @@ def generate_default_views(
     return 
 
 def main(mode, 
-        basepth, split_lines, 
+        basepth, 
+        split_lines=None, 
         respth=None,
         compile_pdf=True,
         pdf_kwargs={'title': 'dredFISH default analysis', 
@@ -263,8 +264,33 @@ def main(mode,
     `respth` is for figures
     dataframe results goes to `basepth` `default_analysis.csv`
     """
-    # House keeping
-    assert mode in ['preview', 'view', 'analysis-only', 'plot-only',  'compile-only'] # choose from these options
+    assert mode in ['preview', 'preview-save', 
+                    'view', 'analysis-only', 'plot-only',  'compile-only'] # choose from these options
+    logging.info(f"mode = {mode}")
+    # bypassing TMG
+    if mode.startswith('preview'): # 
+        logging.info(f"entering {mode} mode")
+        assert split_lines is not None
+        # search for metadata files
+        fs = glob.glob(os.path.join(basepth, f"*_metadata.csv"))
+        assert len(fs) == 1
+        meta_file = fs[0]
+        df = pd.read_csv(meta_file)
+        XY = df[['tmp_x', 'tmp_y']].values
+        cond, XYnew = preview_hemisphere(split_lines, basepth=basepth, XY=XY)
+
+        if mode.endswith('save'):
+            subprocess.run(['chmod', '644', meta_file])
+            # save it -- 
+            df[['stage_x', 'stage_y']] = XYnew
+            df['hemi'] = cond.astype(int)
+            df.to_csv(meta_file, index=False)
+            logging.info(f"Updated {meta_file}")
+            logging.info(f"{df.head()}")
+            subprocess.run(['chmod', '444', meta_file])
+        return cond, XYnew
+
+    # house keeping - TMGs 
     tmg_pth = os.path.join(basepth, 'TMG.json')
     if redo or not os.path.isfile(tmg_pth):  
         logging.info(f"TMG does not exist, generating from scratch (cell layer only)")
@@ -280,27 +306,22 @@ def main(mode,
         if not os.path.isdir(respth):
             os.mkdir(respth)
 
-    # MAIN
-    if mode == 'preview': # 
-        cond, XYnew = preview_hemisphere(split_lines, basepth=basepth, XY=None)
-        return cond, XYnew
-
-    elif mode == 'view': # analysis + plot
-        cond, XYnew = preview_hemisphere(split_lines, basepth=basepth, XY=None)
-        df = generate_default_analysis(split_lines, basepth, XY=None,
+    # branching off
+    if mode == 'view': # analysis + plot
+        logging.info(f"entering {mode} mode")
+        df = generate_default_analysis(basepth, XY=None,
                 output_df="default_analysis.csv")
         generate_default_views(df, respth)
         if compile_pdf:
             compile_tex.main(basepth, **pdf_kwargs)
         return df
-
     elif mode == 'analysis-only': # 
-        cond, XYnew = preview_hemisphere(split_lines, basepth=basepth, XY=None)
-        df = generate_default_analysis(split_lines, basepth, XY=None,
+        logging.info(f"entering {mode} mode")
+        df = generate_default_analysis(basepth, XY=None,
                 output_df="default_analysis.csv")
         return df
-
     elif mode == 'plot-only': # 
+        logging.info(f"entering {mode} mode")
         dfpth = os.path.join(basepth, 'default_analysis.csv')
         df = pd.read_csv(dfpth, index_col=0)
         generate_default_views(df, respth)
@@ -308,6 +329,7 @@ def main(mode,
             compile_tex.main(basepth, **pdf_kwargs)
         return 
     elif mode == 'compile-only': # 
+        logging.info(f"entering {mode} mode")
         compile_tex.main(basepth, **pdf_kwargs)
         return 
 

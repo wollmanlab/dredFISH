@@ -180,30 +180,35 @@ def plot_embx_clsts(
     fig.subplots_adjust(wspace=0.05)
     plt.show()
 
-def plot_heatcorr(embx_clsts_corr, vmin=0.5, title=''): 
+def plot_heatcorr(embx_clsts_corr, vmin=0.5, vmax=1, title='', ax=None, cbar_ax=None, label=True, 
+    cmap='rocket_r', metric_label='Pearson corr.',
+    ): 
     """clst-clst corr
     """
-    fig, ax = plt.subplots(1,1,figsize=(5,4))
-    cbar_ax = fig.add_axes([0.9, 0.3, 0.01, 0.4])
+    if ax is None:
+        fig, ax = plt.subplots(1,1,figsize=(5,4))
+        cbar_ax = fig.add_axes([0.9, 0.3, 0.01, 0.4])
+
     sns.heatmap(embx_clsts_corr, 
                 xticklabels=False, 
                 yticklabels=False, 
                 cbar_ax=cbar_ax,
-                cbar_kws=dict(label='Pearson corr.', 
+                cbar_kws=dict(label=metric_label, 
                               # ticks=[0.5, 0.75, 1],
                               aspect=5,
                              ),
-                cmap='rocket_r',
+                cmap=cmap,
                 ax=ax, 
                 vmin=vmin,
+                vmax=vmax,
                )
-    ax.set_xlabel('Known cell types')
-    ax.set_ylabel('Known cell types')
+    if label:
+        ax.set_xlabel(f'Known cell types\n(n={len(embx_clsts_corr)})')
+        ax.set_ylabel(f'Known cell types\n(n={len(embx_clsts_corr)})')
     ax.set_aspect('equal')
     ax.set_title(title)
 
     # powerplots.savefig_autodate(fig, os.path.join(fig_dir, "NN_DPNMF_correlation_matrix.pdf"))
-    plt.show()
 
 def plot_dcdx(
     prjx_clsts,

@@ -138,11 +138,10 @@ def plot_basis_spatial(df, xcol='x', ycol='y', pmode='full', vmin=-3, vmax=3, ou
     else:
         raise ValueError("No such mode")
 
-        
     P = PlotScale(df[xcol].max()-df[xcol].min(), 
                   df[ycol].max()-df[ycol].min(),
-                  # npxlx=300,
-                  pxl_scale=20,
+                  npxlx=300,
+                #   pxl_scale=20,
                 )
     logging.info(f"Num pixels: {(P.npxlx, P.npxly)}")
 
