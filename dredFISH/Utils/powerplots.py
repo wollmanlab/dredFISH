@@ -7,7 +7,12 @@ import json
 import logging
 from datetime import datetime
 
+from scipy.spatial import Voronoi
+from matplotlib.collections import PolyCollection
+from matplotlib.colors import ListedColormap
+
 from .__init__plots import *
+from dredFISH.Utils import geomu
 
 class PlotScale:
     """
@@ -116,7 +121,9 @@ def plot_hybrid_mat_mask(_mat, _mask, axs):
     return
     
 # For dredFISH
-def plot_basis_spatial(df, xcol='x', ycol='y', pmode='full', vmin=-3, vmax=3, output=None):
+def plot_basis_spatial(df, xcol='x', ycol='y', pmode='full', vmin=-3, vmax=3, 
+    title=None,
+    output=None):
     if pmode == 'full':
         nx, ny = 6, 4
         panel_x, panel_y = 6, 5
@@ -156,12 +163,16 @@ def plot_basis_spatial(df, xcol='x', ycol='y', pmode='full', vmin=-3, vmax=3, ou
         ax.set_aspect('equal')
         ax.axis('off')
     fig.subplots_adjust(wspace=wspace, hspace=hspace)
+    if title is not None:
+        fig.suptitle(title)
     if output is not None:
         savefig_autodate(fig, output)
         logging.info(f"saved: {output}")
     plt.show()
 
-def plot_basis_umap(df, output=None):
+def plot_basis_umap(df, 
+    title=None,
+    output=None):
     x, y = 'umap_x', 'umap_y'
     P = PlotScale(df[x].max()-df[x].min(), 
                   df[y].max()-df[y].min(),
@@ -179,6 +190,8 @@ def plot_basis_umap(df, output=None):
         ax.set_aspect('equal')
         ax.axis('off')
     fig.subplots_adjust(wspace=0.05, hspace=0.1)
+    if title is not None:
+        fig.suptitle(title)
     if output is not None:
         savefig_autodate(fig, output)
         logging.info(f"saved: {output}")
@@ -188,6 +201,7 @@ def plot_type_spatial_umap(
     df, hue, 
     x='x', y='y', 
     umap_x='umap_x', umap_y='umap_y', 
+    title=None,
     output=None
     ):
     """
@@ -219,6 +233,59 @@ def plot_type_spatial_umap(
     ax.set_aspect('equal')
     ax.axis('off')
     fig.subplots_adjust(wspace=0)
+    if title is not None:
+        fig.suptitle(title)
+    if output is not None:
+        savefig_autodate(fig, output)
+        logging.info(f"saved: {output}")
+    plt.show()
+
+def prep_polygons(XY, label_ids, cmap='tab20'):
+    """
+    """
+    unq_ids = np.unique(label_ids)
+    ncolors = len(unq_ids)
+    colors = sns.color_palette(cmap, ncolors)
+    cmap = ListedColormap(colors)
+    
+    xmin, ymin = np.min(XY, axis=0)
+    xmax, ymax = np.max(XY, axis=0)
+
+    vor = Voronoi(XY, furthest_site=False)
+    poly = np.array([vor.vertices[vor.regions[item]] for item in vor.point_region], dtype=object)
+
+    # filter poly by max span
+    maxspans = []
+    for item in poly:
+        if len(item) > 0:
+            maxspan = max(np.max(item, axis=0) - np.min(item, axis=0))
+        else:
+            maxspan = 0
+        maxspans.append(maxspan)
+    maxspans = np.array(maxspans)
+    th = np.percentile(maxspans, 99)
+    
+    # prep polygons
+    p = PolyCollection(poly[maxspans<th], #[:5], #geom['poly'], 
+                       cmap=cmap,
+                       edgecolors='none',
+                      )
+    p.set_array(label_ids[maxspans<th]) #[:5])
+    
+    return p, (xmin, xmax, ymin, ymax)
+
+def plot_colored_polygons(XY, c, title=None, output=None):
+    """
+    """
+    fig, ax = plt.subplots(figsize=(10,8))
+    p, bbox = prep_polygons(XY, c)
+    ax.add_collection(p) 
+    ax.set_xlim(bbox[:2])
+    ax.set_ylim(bbox[2:])
+    ax.set_aspect('equal')
+    ax.grid(False)
+    if title is not None:
+        fig.suptitle(title)
     if output is not None:
         savefig_autodate(fig, output)
         logging.info(f"saved: {output}")

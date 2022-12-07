@@ -53,12 +53,13 @@ def adjacency_to_igraph(adj_mtx, weighted=False, directed=True, simplify=True):
         G.simplify() # simplify inplace; remove duplicated and self connection (Important to avoid double counting from adj_mtx)
     return G
 
-def get_local_type_abundance(types, 
-        edgelist=None, 
-        SG=None, 
-        XY=None, 
-        k_spatial=10,
-        ):
+def get_local_type_abundance(
+    types, 
+    edgelist=None, 
+    SG=None, 
+    XY=None, 
+    k_spatial=10,
+    ):
     """
     types - type labels on the nodes
     
@@ -66,7 +67,7 @@ def get_local_type_abundance(types,
     SG - spatial neighborhood graph (undirected); Use this to generate edgelist
     XY - spatial coordinates; Use this to first generate kNN graph; then to generate edgelist
     
-    return - relative abundace of tyepes for each node
+    return - relative abundace of types for each node
     """
     N = len(types)
     ctg, ctg_idx = np.unique(types, return_inverse=True) 
