@@ -35,16 +35,20 @@ import pickle
 
 import igraph
 import pynndescent 
-from scipy.spatial import Delaunay, Voronoi
+
 from scipy.sparse.csgraph import dijkstra
 
 import anndata
 # to create geomtries
-from shapely.geometry import Polygon, MultiPolygon, LineString, MultiLineString
+from shapely.geometry import Polygon, MultiPolygon, LineString, MultiLineString, MultiPoint
+from scipy.spatial import Delaunay, Voronoi
+
 
 from dredFISH.Utils import basicu 
 from dredFISH.Utils import tmgu
-from dredFISH.Utils.geomu import voronoi_polygons, bounding_box
+from dredFISH.Utils import geomu
+
+from dredFISH.Processing.Section import *
 
 # for debuding mostly
 import warnings
@@ -277,6 +281,11 @@ class TissueMultiGraph:
         dfall_meta = []
         for i in range(len(metadata_files)): 
             meta = pd.read_csv(metadata_files[i])
+            # deals with older data that used pixel_x/y and didn't have section index
+            if 'pixel_x' in meta.columns:
+                meta = meta.rename(columns={'pixel_x': 'stage_x', 'pixel_y': 'stage_y'})
+                meta["section_index"] = np.ones((meta.shape[0],))*i
+
             xys_i = np.array(meta[["stage_x","stage_y","section_index"]])
             XYS = np.vstack((XYS,xys_i))
             dfall_meta.append(meta)
@@ -497,97 +506,73 @@ class TissueMultiGraph:
         """list : Number of types in each layer of TMG."""
         return([L.Ntypes for L in self.Layers])
     
-    def add_geoms(self):
-        """Creates the geometries needed (boundingbox, lines, points, and polygons) to be used in views to create maps. 
+    def add_geoms(self,fishdata,geom_types = ["mask","voronoi","cells"]):
+        """
+        Creates the geometries needed (mask, lines, points, and polygons) to be used in views to create maps.
+        Geometries are vectorized representations of cells using lists of Shapely objects. 
+        Supported Geoms: 
+        * voronoi
+        * points
+        * cells
+        * nuclei (not implemented yet - 12/14/22)
+        * cytoplasm (not implemented yet - 12/14/22)
+        * isozones (not implemented yet - 12/14/22)
+        * regions (not implemented yet - 12/14/22)
         """
         
-        # Bounding box geometry 
+        # XY and Slice infpormation is independent on Geoms
         allXY = self.Layers[0].XY
         Slices = self.Layers[0].Slice
         unqS = np.unique(Slices)
 
+        # Create geoms per slice: 
         for i in range(self.Layers[0].Nslices):
+
+            # Initalize an empty Geom dict for this slice
             slice_geoms = {}
-            ix = np.flatnonzero(Slices==unqS[i])
-            XY = allXY[ix,:]    
-            diameter, bb = bounding_box(XY, fill_holes=False)
-            slice_geoms['BoundingBox'] = bb
-
-            # Polygon geometry 
-            # this geom is just the voronoi polygons
-            # after intersection with the bounding box
-            # if the intersection splits a polygon into two, take the one with largest area
-            vor = Voronoi(XY)
-            vp = list(voronoi_polygons(vor, diameter))
-            vp = [p.intersection(slice_geoms['BoundingBox']) for p in vp]
-        
-            verts = list()
-            for i in range(len(vp)):
-                if isinstance(vp[i],MultiPolygon):
-                    allparts = [p.buffer(0) for p in vp[i].geoms]
-                    areas = np.array([p.area for p in vp[i].geoms])
-                    vp[i] = allparts[np.argmax(areas)]
             
-                xy = vp[i].exterior.xy
-                verts.append(np.array(xy).T)
-        
-            slice_geoms['poly'] = verts
-        
-            # Line Geometry
-            # Next section deals with edge line between any two voroni polygons. 
-            # Overall it relies on vor.ridge_* attributes, but need to deal 
-            # with bounding box and with lines that goes to infinity
-            # 
-            # This geom maps to edges so things are stored using dict with (v1,v2) tuples as keys
-            # the tuples are always sorted from low o high as a convension. 
-            mx = np.max(np.array(slice_geoms['BoundingBox'].exterior.xy).T,axis=0)
-            mn = np.min(np.array(slice_geoms['BoundingBox'].exterior.xy).T,axis=0)
-
-            mins = np.tile(mn, (vor.vertices.shape[0], 1))
-            bounded_vertices = np.max((vor.vertices, mins), axis=0)
-            maxs = np.tile(mx, (vor.vertices.shape[0], 1))
-            bounded_vertices = np.min((bounded_vertices, maxs), axis=0)
-
-            segs = list()
-            center = XY.mean(axis=0)
-            for i in range(len(vor.ridge_vertices)):
-                pointidx = vor.ridge_points[i,:]
-                simplex = np.asarray(vor.ridge_vertices[i])
-                if np.all(simplex >= 0):
-                    line=[(bounded_vertices[simplex[0], 0], bounded_vertices[simplex[0], 1]),
-                        (bounded_vertices[simplex[1], 0], bounded_vertices[simplex[1], 1])]
-                else:
-                    i = simplex[simplex >= 0][0] # finite end Voronoi vertex
-                    t = XY[pointidx[1]] - XY[pointidx[0]]  # tangent
-                    t = t / np.linalg.norm(t)
-                    n = np.array([-t[1], t[0]]) # normal
-                    midpoint = XY[pointidx].mean(axis=0)
-                    far_point = vor.vertices[i] + np.sign(np.dot(midpoint - center, n)) * n * 100
-                    line=[(vor.vertices[i,:]),(far_point)]
-        
-                LS = LineString(line)
-                LS = LS.intersection(slice_geoms['BoundingBox'])
-                if isinstance(LS,MultiLineString):
-                    allparts = list(LS.intersection(slice_geoms['BoundingBox']).geoms)
-                    lengths = [l.length for l in allparts]
-                    LS = allparts[np.argmax(lengths)]
-                    
-                xy = np.asarray(LS.xy)
-                line=xy.T
-                segs.append(line)
+            # XY points are basis for many geoms:
+            ix = np.flatnonzero(Slices==unqS[i]) 
+            XY = allXY[ix,:]
             
-            # make sure the keys for edges are always sorted, a convenstion that will make life easier. 
-            ridge_points_sorted = np.sort(vor.ridge_points,axis=1)
-            keys=list()
-            for i in range(ridge_points_sorted.shape[0]):
-                keys.append(tuple(ridge_points_sorted[i,:]))
-
-            slice_geoms['line'] = dict(zip(keys, segs))
-        
             # Geom Points are easy, just use XY, the order is correct :)
-            slice_geoms['point'] = XY
+            pnts = list(MultiPoint(XY).geoms)
+            if "points" in geom_types:
+                slice_geoms['point'] = pnts
+
+            # Create a MultiPolygon mask for each slices
+            mask_polys = geomu.create_mask(XY, fill_holes=False)
+            if "mask" in geom_types: 
+                slice_geoms['mask'] = mask_polys
+
+            # Voronoi geometry 
+            if "voronoi" in geom_types:
+                slice_geoms['voronoi'] = geomu.voronoi_polygons(XY,mask_polys)
+            
+            # Vectorize cell segmentations matrix
+            if "cells" in geom_types:
+                # TODO: load appropriate whole cell labeled matrix 
+                cell_labels_raster = self.load_stiched_labeled_image(fishdata,section = i,geom_type="total")
+                polygons =  geomu.vectorize_labeled_matrix_to_polygons(cell_labels_raster)
 
             self.Geoms.append(slice_geoms)
+
+    def load_stiched_labeled_image(self,fishdata,section=0,geom_type = 'total'):
+        metadata_path = self.basepath
+        if metadata_path[-1]=='/':
+            dataset = metadata_path.split('/')[-2]
+        else:
+            dataset = metadata_path.split('/')[-1]
+
+        section = str(section)
+        cword_config = 'dredfish_processing_config'
+        fishdata = 'fishdata_2022Dec09'
+
+        SC = Section_Class(metadata_path,dataset,section,cword_config,verbose=True)
+        SC.config.parameters['fishdata'] = fishdata 
+        fname = SC.generate_fname('',geom_type +'_mask','stitched')
+        mask = self.load_tensor(fname)
+        return(mask)
 
 class TissueGraph:
     """Representation of transcriptional state of biospatial units as a graph. 

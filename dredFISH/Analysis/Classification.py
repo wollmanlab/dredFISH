@@ -116,6 +116,7 @@ class KNNClassifier(Classifier):
             kids = self._ref_label_id[indices]
             ids = mode(kids,axis=1)
         return ids.flatten()
+    
 class OptimalLeidenKNNClassifier(KNNClassifier):
     """Classifiy cells based on unsupervized Leiden 
     
