@@ -121,7 +121,8 @@ def plot_hybrid_mat_mask(_mat, _mask, axs):
     return
     
 # For dredFISH
-def plot_basis_spatial(df, xcol='x', ycol='y', pmode='full', vmin=-3, vmax=3, 
+def plot_basis_spatial(df, xcol='x', ycol='y', pmode='full', 
+    vmin=None, vmax=None, 
     title=None,
     output=None):
     if pmode == 'full':
@@ -157,20 +158,28 @@ def plot_basis_spatial(df, xcol='x', ycol='y', pmode='full', vmin=-3, vmax=3,
         if f'b{i}' not in df.columns:
             continue
         ax = axs.flat[i]
-        aggdata = ds.Canvas(P.npxlx, P.npxly).points(df, xcol, ycol, agg=ds.mean(f'b{i}'))
+        ccol = f'b{i}'
+        aggdata = ds.Canvas(P.npxlx, P.npxly).points(df, xcol, ycol, agg=ds.mean(ccol))
+
+        if vmin is None:
+            vmin = np.percentile(df[ccol], 5)
+        if vmax is None:
+            vmax = np.percentile(df[ccol], 95)
         ax.imshow(aggdata, origin='lower', aspect='equal', cmap='coolwarm', vmin=vmin, vmax=vmax, interpolation='none')
         ax.set_title(f'b{i}', loc=title_loc, y=title_y)
         ax.set_aspect('equal')
         ax.axis('off')
     fig.subplots_adjust(wspace=wspace, hspace=hspace)
     if title is not None:
-        fig.suptitle(title)
+        fig.suptitle(title, y=0.92)
     if output is not None:
         savefig_autodate(fig, output)
         logging.info(f"saved: {output}")
     plt.show()
 
 def plot_basis_umap(df, 
+    vmin=None,
+    vmax=None,
     title=None,
     output=None):
     x, y = 'umap_x', 'umap_y'
@@ -184,18 +193,68 @@ def plot_basis_umap(df,
     fig, axs = plt.subplots(ny, nx, figsize=(nx*5, ny*4))
     for i in range(24):
         ax = axs.flat[i]
-        aggdata = ds.Canvas(P.npxlx, P.npxly).points(df, x, y, agg=ds.mean(f'b{i}'))
-        ax.imshow(aggdata, origin='lower', aspect='equal', cmap='coolwarm', vmin=-3, vmax=3, interpolation='none')
+        ccol = f'b{i}'
+        aggdata = ds.Canvas(P.npxlx, P.npxly).points(df, x, y, agg=ds.mean(ccol))
+        if vmin is None:
+            vmin = np.percentile(df[ccol], 5)
+        if vmax is None:
+            vmax = np.percentile(df[ccol], 95)
+        ax.imshow(aggdata, origin='lower', aspect='equal', cmap='coolwarm', vmin=vmin, vmax=vmax, interpolation='none')
         ax.set_title(f'b{i}', loc='left', y=0.9)
         ax.set_aspect('equal')
         ax.axis('off')
     fig.subplots_adjust(wspace=0.05, hspace=0.1)
     if title is not None:
-        fig.suptitle(title)
+        fig.suptitle(title, y=0.92)
     if output is not None:
         savefig_autodate(fig, output)
         logging.info(f"saved: {output}")
     plt.show()
+
+def plot_basis_spatial_lean(fig, ax, df, xcol='x', ycol='y', ccol='b0',
+    vmin=None, vmax=None, 
+    title=None,
+    output=None,
+    ):
+    # if pmode == 'full':
+    #     nx, ny = 6, 4
+    #     panel_x, panel_y = 6, 5
+    #     wspace, hspace = 0.05, 0
+    #     title_loc = 'left'
+    #     title_y = 0.9
+
+    P = PlotScale(df[xcol].max()-df[xcol].min(), 
+                  df[ycol].max()-df[ycol].min(),
+                  npxlx=300,
+                #   pxl_scale=20,
+                )
+    # logging.info(f"Num pixels: {(P.npxlx, P.npxly)}")
+    if vmin is None:
+        vmin = np.percentile(df[ccol], 5)
+    if vmax is None:
+        vmax = np.percentile(df[ccol], 95)
+
+    # fig, axs = plt.subplots(ny, nx, figsize=(nx*panel_x, ny*panel_y))
+    # for i in range(24):
+    #     if f'b{i}' not in df.columns:
+    #         continue
+    #     ax = axs.flat[i]
+
+    aggdata = ds.Canvas(P.npxlx, P.npxly).points(df, xcol, ycol, agg=ds.mean(ccol))
+    g = ax.imshow(aggdata, origin='lower', aspect='equal', cmap='coolwarm', vmin=vmin, vmax=vmax, interpolation='none')
+    fig.colorbar(g, ax=ax, location='bottom', shrink=0.3, pad=0.05)
+
+    # ax.set_title(f'b{i}', loc=title_loc, y=title_y)
+    ax.set_aspect('equal')
+    ax.axis('off')
+
+    # fig.subplots_adjust(wspace=wspace, hspace=hspace)
+    # if title is not None:
+    #     fig.suptitle(title, y=0.92)
+    # if output is not None:
+    #     savefig_autodate(fig, output)
+    #     logging.info(f"saved: {output}")
+
     
 def plot_type_spatial_umap(
     df, hue, 
@@ -210,7 +269,7 @@ def plot_type_spatial_umap(
     ntypes = len(hue_order)
 
     fig, axs = plt.subplots(1, 2, figsize=(8*2,6))
-    fig.suptitle(f"{hue}; n={ntypes}")
+    fig.suptitle(f"{hue}; n={ntypes}", y=0.92)
     ax = axs[0]
     sns.scatterplot(data=df, x=x, y=y, 
                     hue=hue, hue_order=hue_order, 
@@ -234,7 +293,7 @@ def plot_type_spatial_umap(
     ax.axis('off')
     fig.subplots_adjust(wspace=0)
     if title is not None:
-        fig.suptitle(title)
+        fig.suptitle(title, y=0.92)
     if output is not None:
         savefig_autodate(fig, output)
         logging.info(f"saved: {output}")
@@ -285,7 +344,7 @@ def plot_colored_polygons(XY, c, title=None, output=None):
     ax.set_aspect('equal')
     ax.grid(False)
     if title is not None:
-        fig.suptitle(title)
+        fig.suptitle(title, y=0.92)
     if output is not None:
         savefig_autodate(fig, output)
         logging.info(f"saved: {output}")

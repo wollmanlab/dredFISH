@@ -4,16 +4,14 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 
     <title>Visualization package &#8212; dredFISH  documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
     <link rel="stylesheet" type="text/css" href="_static/sphinxdoc.css" />
     <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-    <script src="_static/jquery.js"></script>
-    <script src="_static/underscore.js"></script>
-    <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
     <script src="_static/doctools.js"></script>
+    <script src="_static/sphinx_highlight.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="prev" title="Analysis module" href="Analysis.html" /> 
@@ -24,9 +22,6 @@
         <li class="right" style="margin-right: 10px">
           <a href="genindex.html" title="General Index"
              accesskey="I">index</a></li>
-        <li class="right" >
-          <a href="py-modindex.html" title="Python Module Index"
-             >modules</a> |</li>
         <li class="right" >
           <a href="Analysis.html" title="Analysis module"
              accesskey="P">previous</a> |</li>
@@ -42,244 +37,8 @@
             
   <section id="visualization-package">
 <h1>Visualization package<a class="headerlink" href="#visualization-package" title="Permalink to this heading">¶</a></h1>
-<section id="module-Visualization.Viz">
-<span id="visualization-viz-module"></span><h2>Visualization.Viz module<a class="headerlink" href="#module-Visualization.Viz" title="Permalink to this heading">¶</a></h2>
-<p>Module Viz deals with all TissueMultiGraph vizualization needs.</p>
-<p>Module has few accessory function and the View class hierarchy.</p>
-<dl class="py class">
-<dt class="sig sig-object py" id="Visualization.Viz.Colorpleth">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">Visualization.Viz.</span></span><span class="sig-name descname"><span class="pre">Colorpleth</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">values_to_map</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pos</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(0,</span> <span class="pre">0,</span> <span class="pre">1,</span> <span class="pre">1)</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#Colorpleth"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.Colorpleth" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="#Visualization.Viz.Map" title="Visualization.Viz.Map"><code class="xref py py-class docutils literal notranslate"><span class="pre">Map</span></code></a></p>
-<p>Show a user-provided vector color coded on whatever geo-units requested (cells, iso-zones, heterozones, neighborhoods)
-It will guess which level is needed from the size of the use provided values_to_map vector.</p>
-<dl class="py method">
-<dt class="sig sig-object py" id="Visualization.Viz.Colorpleth.set_view">
-<span class="sig-name descname"><span class="pre">set_view</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#Colorpleth.set_view"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.Colorpleth.set_view" title="Permalink to this definition">¶</a></dt>
-<dd><p>Key abstract method - has to be implemented in the subclass
-signature should always include the TMG (and other stuff if needed)</p>
-</dd></dl>
-
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="Visualization.Viz.Histogram">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">Visualization.Viz.</span></span><span class="sig-name descname"><span class="pre">Histogram</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">values_to_count</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'hist'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pos</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(0,</span> <span class="pre">0,</span> <span class="pre">1,</span> <span class="pre">1)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_bins</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">50</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#Histogram"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.Histogram" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="#Visualization.Viz.Panel" title="Visualization.Viz.Panel"><code class="xref py py-class docutils literal notranslate"><span class="pre">Panel</span></code></a></p>
-<dl class="py method">
-<dt class="sig sig-object py" id="Visualization.Viz.Histogram.plot">
-<span class="sig-name descname"><span class="pre">plot</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#Histogram.plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.Histogram.plot" title="Permalink to this definition">¶</a></dt>
-<dd><p>actual plotting happens here, overload in subclasses!</p>
-</dd></dl>
-
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="Visualization.Viz.IsoZones">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">Visualization.Viz.</span></span><span class="sig-name descname"><span class="pre">IsoZones</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'isozones'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pos</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(0,</span> <span class="pre">0,</span> <span class="pre">1,</span> <span class="pre">1)</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#IsoZones"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.IsoZones" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="#Visualization.Viz.Colorpleth" title="Visualization.Viz.Colorpleth"><code class="xref py py-class docutils literal notranslate"><span class="pre">Colorpleth</span></code></a></p>
-<p>simple overloading of colorpleth, only different is that we’re getting values from TMG
-since TMG is only defined after init we pass the Data during set_view instead.</p>
-<dl class="py method">
-<dt class="sig sig-object py" id="Visualization.Viz.IsoZones.set_view">
-<span class="sig-name descname"><span class="pre">set_view</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#IsoZones.set_view"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.IsoZones.set_view" title="Permalink to this definition">¶</a></dt>
-<dd><p>Key abstract method - has to be implemented in the subclass
-signature should always include the TMG (and other stuff if needed)</p>
-</dd></dl>
-
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="Visualization.Viz.LegendWithCircles">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">Visualization.Viz.</span></span><span class="sig-name descname"><span class="pre">LegendWithCircles</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">map_panel</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pos</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(0,</span> <span class="pre">0,</span> <span class="pre">1,</span> <span class="pre">1)</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#LegendWithCircles"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.LegendWithCircles" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="#Visualization.Viz.Panel" title="Visualization.Viz.Panel"><code class="xref py py-class docutils literal notranslate"><span class="pre">Panel</span></code></a></p>
-<dl class="py method">
-<dt class="sig sig-object py" id="Visualization.Viz.LegendWithCircles.plot">
-<span class="sig-name descname"><span class="pre">plot</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#LegendWithCircles.plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.LegendWithCircles.plot" title="Permalink to this definition">¶</a></dt>
-<dd><p>actual plotting happens here, overload in subclasses!</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="Visualization.Viz.LegendWithCircles.set_view">
-<span class="sig-name descname"><span class="pre">set_view</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#LegendWithCircles.set_view"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.LegendWithCircles.set_view" title="Permalink to this definition">¶</a></dt>
-<dd><p>Key abstract method - has to be implemented in the subclass
-signature should always include the TMG (and other stuff if needed)</p>
-</dd></dl>
-
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="Visualization.Viz.LegendWithCirclesAndWedges">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">Visualization.Viz.</span></span><span class="sig-name descname"><span class="pre">LegendWithCirclesAndWedges</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">map_panel</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cell_map_panel</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pos</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(0,</span> <span class="pre">0,</span> <span class="pre">1,</span> <span class="pre">1)</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#LegendWithCirclesAndWedges"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.LegendWithCirclesAndWedges" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="#Visualization.Viz.LegendWithCircles" title="Visualization.Viz.LegendWithCircles"><code class="xref py py-class docutils literal notranslate"><span class="pre">LegendWithCircles</span></code></a></p>
-<dl class="py method">
-<dt class="sig sig-object py" id="Visualization.Viz.LegendWithCirclesAndWedges.plot">
-<span class="sig-name descname"><span class="pre">plot</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#LegendWithCirclesAndWedges.plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.LegendWithCirclesAndWedges.plot" title="Permalink to this definition">¶</a></dt>
-<dd><p>actual plotting happens here, overload in subclasses!</p>
-</dd></dl>
-
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="Visualization.Viz.LogLogPlot">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">Visualization.Viz.</span></span><span class="sig-name descname"><span class="pre">LogLogPlot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">values_to_count</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'loglog'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pos</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(0,</span> <span class="pre">0,</span> <span class="pre">1,</span> <span class="pre">1)</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#LogLogPlot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.LogLogPlot" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="#Visualization.Viz.Histogram" title="Visualization.Viz.Histogram"><code class="xref py py-class docutils literal notranslate"><span class="pre">Histogram</span></code></a></p>
-<dl class="py method">
-<dt class="sig sig-object py" id="Visualization.Viz.LogLogPlot.plot">
-<span class="sig-name descname"><span class="pre">plot</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#LogLogPlot.plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.LogLogPlot.plot" title="Permalink to this definition">¶</a></dt>
-<dd><p>actual plotting happens here, overload in subclasses!</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="Visualization.Viz.LogLogPlot.set_view">
-<span class="sig-name descname"><span class="pre">set_view</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#LogLogPlot.set_view"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.LogLogPlot.set_view" title="Permalink to this definition">¶</a></dt>
-<dd><p>Key abstract method - has to be implemented in the subclass
-signature should always include the TMG (and other stuff if needed)</p>
-</dd></dl>
-
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="Visualization.Viz.Map">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">Visualization.Viz.</span></span><span class="sig-name descname"><span class="pre">Map</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pos</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(0,</span> <span class="pre">0,</span> <span class="pre">1,</span> <span class="pre">1)</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#Map"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.Map" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="#Visualization.Viz.Panel" title="Visualization.Viz.Panel"><code class="xref py py-class docutils literal notranslate"><span class="pre">Panel</span></code></a></p>
-<dl class="simple">
-<dt>Map extends Panel to allow plotting of maps, it adds the methods:</dt><dd><p>plot_points
-plot_lines
-plot_bounding_box
-plot_polys
-plot_map</p>
-</dd>
-</dl>
-<dl class="py method">
-<dt class="sig sig-object py" id="Visualization.Viz.Map.plot">
-<span class="sig-name descname"><span class="pre">plot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#Map.plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.Map.plot" title="Permalink to this definition">¶</a></dt>
-<dd><p>plot a map.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="Visualization.Viz.Map.plot_boundingbox">
-<span class="sig-name descname"><span class="pre">plot_boundingbox</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#Map.plot_boundingbox"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.Map.plot_boundingbox" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="Visualization.Viz.Map.plot_lines">
-<span class="sig-name descname"><span class="pre">plot_lines</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#Map.plot_lines"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.Map.plot_lines" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="Visualization.Viz.Map.plot_points">
-<span class="sig-name descname"><span class="pre">plot_points</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#Map.plot_points"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.Map.plot_points" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="Visualization.Viz.Map.plot_polys">
-<span class="sig-name descname"><span class="pre">plot_polys</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#Map.plot_polys"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.Map.plot_polys" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="Visualization.Viz.Map.set_view">
-<span class="sig-name descname"><span class="pre">set_view</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#Map.set_view"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.Map.set_view" title="Permalink to this definition">¶</a></dt>
-<dd><p>Key abstract method - has to be implemented in the subclass
-signature should always include the TMG (and other stuff if needed)</p>
-</dd></dl>
-
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="Visualization.Viz.Panel">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">Visualization.Viz.</span></span><span class="sig-name descname"><span class="pre">Panel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pos</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(0,</span> <span class="pre">0,</span> <span class="pre">1,</span> <span class="pre">1)</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#Panel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.Panel" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
-<dl class="py method">
-<dt class="sig sig-object py" id="Visualization.Viz.Panel.plot">
-<span class="sig-name descname"><span class="pre">plot</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#Panel.plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.Panel.plot" title="Permalink to this definition">¶</a></dt>
-<dd><p>actual plotting happens here, overload in subclasses!</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="Visualization.Viz.Panel.set_view">
-<span class="sig-name descname"><span class="pre">set_view</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#Panel.set_view"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.Panel.set_view" title="Permalink to this definition">¶</a></dt>
-<dd><p>Key abstract method - has to be implemented in the subclass
-signature should always include the TMG (and other stuff if needed)</p>
-</dd></dl>
-
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="Visualization.Viz.RandomColorpleth">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">Visualization.Viz.</span></span><span class="sig-name descname"><span class="pre">RandomColorpleth</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id_vec</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'Random</span> <span class="pre">Colorpleth'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pos</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(0,</span> <span class="pre">0,</span> <span class="pre">1,</span> <span class="pre">1)</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#RandomColorpleth"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.RandomColorpleth" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="#Visualization.Viz.Colorpleth" title="Visualization.Viz.Colorpleth"><code class="xref py py-class docutils literal notranslate"><span class="pre">Colorpleth</span></code></a></p>
-<p>Show geo-units (cells, iso-zones, heterozones, neighborhoods) each colored randomly.</p>
-<dl class="py method">
-<dt class="sig sig-object py" id="Visualization.Viz.RandomColorpleth.set_view">
-<span class="sig-name descname"><span class="pre">set_view</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#RandomColorpleth.set_view"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.RandomColorpleth.set_view" title="Permalink to this definition">¶</a></dt>
-<dd><p>Key abstract method - has to be implemented in the subclass
-signature should always include the TMG (and other stuff if needed)</p>
-</dd></dl>
-
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="Visualization.Viz.TypeMap">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">Visualization.Viz.</span></span><span class="sig-name descname"><span class="pre">TypeMap</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lvl</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cell</span> <span class="pre">map'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pos</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(0,</span> <span class="pre">0,</span> <span class="pre">1,</span> <span class="pre">1)</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#TypeMap"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.TypeMap" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="#Visualization.Viz.Map" title="Visualization.Viz.Map"><code class="xref py py-class docutils literal notranslate"><span class="pre">Map</span></code></a></p>
-<dl class="py method">
-<dt class="sig sig-object py" id="Visualization.Viz.TypeMap.set_view">
-<span class="sig-name descname"><span class="pre">set_view</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#TypeMap.set_view"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.TypeMap.set_view" title="Permalink to this definition">¶</a></dt>
-<dd><p>Key abstract method - has to be implemented in the subclass
-signature should always include the TMG (and other stuff if needed)</p>
-</dd></dl>
-
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="Visualization.Viz.TypeMapWithLines">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">Visualization.Viz.</span></span><span class="sig-name descname"><span class="pre">TypeMapWithLines</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lvl</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pos</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(0,</span> <span class="pre">0,</span> <span class="pre">1,</span> <span class="pre">1)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'neighborhood</span> <span class="pre">map'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#TypeMapWithLines"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.TypeMapWithLines" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="#Visualization.Viz.TypeMap" title="Visualization.Viz.TypeMap"><code class="xref py py-class docutils literal notranslate"><span class="pre">TypeMap</span></code></a></p>
-<dl class="py method">
-<dt class="sig sig-object py" id="Visualization.Viz.TypeMapWithLines.plot">
-<span class="sig-name descname"><span class="pre">plot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">Vcellmap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#TypeMapWithLines.plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.TypeMapWithLines.plot" title="Permalink to this definition">¶</a></dt>
-<dd><p>plot a map.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="Visualization.Viz.TypeMapWithLines.set_view">
-<span class="sig-name descname"><span class="pre">set_view</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#TypeMapWithLines.set_view"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.TypeMapWithLines.set_view" title="Permalink to this definition">¶</a></dt>
-<dd><p>Key abstract method - has to be implemented in the subclass
-signature should always include the TMG (and other stuff if needed)</p>
-</dd></dl>
-
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="Visualization.Viz.View">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">Visualization.Viz.</span></span><span class="sig-name descname"><span class="pre">View</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">TMG</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">figsize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(11,</span> <span class="pre">11)</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#View"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.View" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
-<dl class="py method">
-<dt class="sig sig-object py" id="Visualization.Viz.View.add_panel">
-<span class="sig-name descname"><span class="pre">add_panel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">P</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#View.add_panel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.View.add_panel" title="Permalink to this definition">¶</a></dt>
-<dd><p>add a panel to the view and initialized it by calling Panel’s method set_view()</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="Visualization.Viz.View.show">
-<span class="sig-name descname"><span class="pre">show</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#View.show"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.View.show" title="Permalink to this definition">¶</a></dt>
-<dd><p>plot all panels.</p>
-</dd></dl>
-
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="Visualization.Viz.Zoom">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">Visualization.Viz.</span></span><span class="sig-name descname"><span class="pre">Zoom</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">panel_to_zoom</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">zoom_coords</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">array([0,</span> <span class="pre">0,</span> <span class="pre">1,</span> <span class="pre">1])</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pos</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(0,</span> <span class="pre">0,</span> <span class="pre">1,</span> <span class="pre">1)</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#Zoom"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.Zoom" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="#Visualization.Viz.Panel" title="Visualization.Viz.Panel"><code class="xref py py-class docutils literal notranslate"><span class="pre">Panel</span></code></a></p>
-<dl class="py method">
-<dt class="sig sig-object py" id="Visualization.Viz.Zoom.plot">
-<span class="sig-name descname"><span class="pre">plot</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/Visualization/Viz.html#Zoom.plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Visualization.Viz.Zoom.plot" title="Permalink to this definition">¶</a></dt>
-<dd><p>actual plotting happens here, overload in subclasses!</p>
-</dd></dl>
-
-</dd></dl>
-
+<section id="visualization-viz-module">
+<h2>Visualization.Viz module<a class="headerlink" href="#visualization-viz-module" title="Permalink to this heading">¶</a></h2>
 </section>
 </section>
 
@@ -294,7 +53,7 @@ signature should always include the TMG (and other stuff if needed)</p>
     <h3><a href="index.html">Table of Contents</a></h3>
     <ul>
 <li><a class="reference internal" href="#">Visualization package</a><ul>
-<li><a class="reference internal" href="#module-Visualization.Viz">Visualization.Viz module</a></li>
+<li><a class="reference internal" href="#visualization-viz-module">Visualization.Viz module</a></li>
 </ul>
 </li>
 </ul>
@@ -333,9 +92,6 @@ signature should always include the TMG (and other stuff if needed)</p>
           <a href="genindex.html" title="General Index"
              >index</a></li>
         <li class="right" >
-          <a href="py-modindex.html" title="Python Module Index"
-             >modules</a> |</li>
-        <li class="right" >
           <a href="Analysis.html" title="Analysis module"
              >previous</a> |</li>
         <li class="nav-item nav-item-0"><a href="index.html">dredFISH  documentation</a> &#187;</li>
@@ -344,7 +100,7 @@ signature should always include the TMG (and other stuff if needed)</p>
     </div>
     <div class="footer" role="contentinfo">
         &#169; Copyright 2022, Wollman lab.
-      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 5.0.1.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 6.0.0.
     </div>
   </body>
 </html>
