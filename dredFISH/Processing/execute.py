@@ -27,7 +27,7 @@ if __name__ == '__main__':
         image_metadata = Metadata(metadata_path)
         hybe1s = [i for i in image_metadata.acqnames if 'hybe1_' in i]
         posnames = np.unique(image_metadata.image_table[np.isin(image_metadata.image_table.acq,hybe1s)].Position)
-        sections = np.unique([i.split('-')[0] for i in posnames])
+        sections = np.unique([i.split('-Pos')[0] for i in posnames if '-Pos' in i])
     else:
         sections = [args.section]
     np.random.shuffle(sections)

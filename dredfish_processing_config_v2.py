@@ -30,22 +30,22 @@ bitmap = [('RS0109_cy5', 'hybe2', 'FarRed'),
 nbits = len(bitmap)
 parameters = {}
 # """ Old Microscope Setup"""
-# parameters['camera_direction'] = [-1,-1] # NEW [-1,1] # OLD [-1,-1]
-# parameters['pixel_size'] = 0.327 # um 490 or 330
-# parameters['stitch_rotate'] = 1 # NEW 0
-# parameters['stitch_flipud'] = False# NEW False
-# parameters['stitch_fliplr'] = True# NEW True
-# parameters['flipxy'] = True
-# parameters['register_stitch_reference'] = False
-
-""" New Microscope Setup"""
-parameters['camera_direction'] = [-1,1] # NEW [-1,1] # OLD [-1,-1]
-parameters['pixel_size'] =0.490# 0.490#0.327#0.490 # um 490 or 330
-parameters['stitch_rotate'] = 0# NEW0 # NEW 0
+parameters['camera_direction'] = [-1,-1] # NEW [-1,1] # OLD [-1,-1]
+parameters['pixel_size'] = 0.327 # um 490 or 330
+parameters['stitch_rotate'] = 1 # NEW 0
 parameters['stitch_flipud'] = False# NEW False
 parameters['stitch_fliplr'] = True# NEW True
-parameters['flipxy'] = False# NEW False # OLD True
-parameters['register_stitch_reference'] = True
+parameters['flipxy'] = True
+parameters['register_stitch_reference'] = False
+
+""" New Microscope Setup"""
+# parameters['camera_direction'] = [-1,1] # NEW [-1,1] # OLD [-1,-1]
+# parameters['pixel_size'] =0.490# 0.490#0.327#0.490 # um 490 or 330
+# parameters['stitch_rotate'] = 0# NEW0 # NEW 0
+# parameters['stitch_flipud'] = False# NEW False
+# parameters['stitch_fliplr'] = True# NEW True
+# parameters['flipxy'] = False# NEW False # OLD True
+# parameters['register_stitch_reference'] = True
 
 parameters['segment_gpu'] = False
 parameters['fishdata']='fishdata'
@@ -81,7 +81,7 @@ parameters['segment_type'] = 'cyto2'#'cyto2'
 parameters['highpass_sigma'] = 25
 parameters['highpass_function'] = 'rolling_ball'
 parameters['highpass_smooth_function'] = 'rolling_ball'
-parameters['strip'] = False
+parameters['strip'] = True
 parameters['highpass_smooth'] = 1
 parameters['FF'] = True
 parameters['model_types'] = ['total','nuclei','cytoplasm']
