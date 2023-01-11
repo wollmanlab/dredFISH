@@ -33,7 +33,6 @@ from skimage import (
 class Section_Class(object):
     def __init__(self,
                  metadata_path,
-                 dataset,
                  section,
                  cword_config,
                  verbose=False):
@@ -42,8 +41,6 @@ class Section_Class(object):
 
         :param metadata_path: Path to Raw Data
         :type metadata_path: str
-        :param dataset: Name of Dataset
-        :type dataset: str
         :param section: Name of Section
         :type section: str
         :param cword_config: Name of Config Module
@@ -52,10 +49,7 @@ class Section_Class(object):
         :type verbose: bool, optional
         """
         self.metadata_path = metadata_path
-        if dataset == '':
-            self.dataset = [i for i in self.metadata_path.split('/') if not i==''][-1]
-        else:
-            self.dataset = dataset
+        self.dataset = [i for i in self.metadata_path.split('/') if not i==''][-1]
         self.section = str(section)
         self.cword_config = cword_config
         self.config = importlib.import_module(self.cword_config)

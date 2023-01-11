@@ -22,7 +22,6 @@ if __name__ == '__main__':
     else:
         fishdata = args.fishdata
     print(args)
-    dataset = [i for i in metadata_path.split('/') if not i==''][-1]
     if args.section=='all':
         image_metadata = Metadata(metadata_path)
         hybe1s = [i for i in image_metadata.acqnames if 'hybe1_' in i]
@@ -33,7 +32,7 @@ if __name__ == '__main__':
     np.random.shuffle(sections)
     for section in sections:
         print('Processing Section ',section)
-        self = Section_Class(metadata_path,dataset,section,cword_config,verbose=True)
+        self = Section_Class(metadata_path,section,cword_config,verbose=True)
         self.config.parameters['fishdata'] = fishdata
         self.out_path = os.path.join(self.metadata_path,self.config.parameters['fishdata'])
         if not os.path.exists(self.out_path):
