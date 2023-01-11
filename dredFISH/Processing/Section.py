@@ -52,7 +52,10 @@ class Section_Class(object):
         :type verbose: bool, optional
         """
         self.metadata_path = metadata_path
-        self.dataset = dataset
+        if dataset == '':
+            self.dataset = [i for i in self.metadata_path.split('/') if not i==''][-1]
+        else:
+            self.dataset = dataset
         self.section = str(section)
         self.cword_config = cword_config
         self.config = importlib.import_module(self.cword_config)
@@ -77,6 +80,7 @@ class Section_Class(object):
                 self.segment(model_type=model_type)
                 if not self.any_incomplete_hybes:
                     self.pull_vectors(model_type=model_type)
+                    self.filter_data(model_type=model_type)
                     self.save_data(model_type=model_type)
         else:
             self.update_user('No positions found for this section')
@@ -100,6 +104,20 @@ class Section_Class(object):
         else:
             return iterable
 
+    def filter_data(self,model_type='nuclei'):
+        """
+        filter_data Remove called cells that are likely not cells
+
+        :param model_type: _description_, defaults to 'nuclei'
+        :type model_type: str, optional
+        """
+        mask = self.data.obs['dapi']>self.config.parameters['dapi_thresh'] 
+        bad_labels = self.data[mask==False].obs['label'].unique()
+        idxes = np.nonzero(self.mask)
+        l = self.mask[idxes[:,0],idxes[:,1]]
+        l[torch.isin(l,torch.tensor(bad_labels))] = 0 # set bad labels to 0
+        self.mask[idxes[:,0],idxes[:,1]] = l
+        self.data = self.data[mask]
 
     def save_data(self,model_type='nuclei'):
         proceed = True

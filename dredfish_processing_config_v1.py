@@ -85,3 +85,4 @@ parameters['strip'] = True
 parameters['highpass_smooth'] = 1
 parameters['FF'] = True
 parameters['model_types'] = ['total','nuclei','cytoplasm']
+parameters['dapi_thresh'] = 5000
