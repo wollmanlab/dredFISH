@@ -23,10 +23,16 @@ from skimage import (
     data, restoration, util
 )
 
+""" TO DO LIST
+ 1. Add blocking so multiple computers could work on one dataset
+ 2. Check onfly processing
+ 3. 
+
+"""
+
 class Section_Class(object):
     def __init__(self,
                  metadata_path,
-                 dataset,
                  section,
                  cword_config,
                  verbose=False):
@@ -35,8 +41,6 @@ class Section_Class(object):
 
         :param metadata_path: Path to Raw Data
         :type metadata_path: str
-        :param dataset: Name of Dataset
-        :type dataset: str
         :param section: Name of Section
         :type section: str
         :param cword_config: Name of Config Module
@@ -45,7 +49,7 @@ class Section_Class(object):
         :type verbose: bool, optional
         """
         self.metadata_path = metadata_path
-        self.dataset = dataset
+        self.dataset = [i for i in self.metadata_path.split('/') if not i==''][-1]
         self.section = str(section)
         self.cword_config = cword_config
         self.config = importlib.import_module(self.cword_config)
@@ -68,8 +72,10 @@ class Section_Class(object):
             self.stitch()
             for model_type in self.config.parameters['model_types']:
                 self.segment(model_type=model_type)
-                self.pull_vectors(model_type=model_type)
-                self.save_data(model_type=model_type)
+                if not self.any_incomplete_hybes:
+                    self.pull_vectors(model_type=model_type)
+                    self.filter_data(model_type=model_type)
+                    self.save_data(model_type=model_type)
         else:
             self.update_user('No positions found for this section')
     
@@ -92,6 +98,20 @@ class Section_Class(object):
         else:
             return iterable
 
+    def filter_data(self,model_type='nuclei'):
+        """
+        filter_data Remove called cells that are likely not cells
+
+        :param model_type: _description_, defaults to 'nuclei'
+        :type model_type: str, optional
+        """
+        mask = self.data.obs['dapi']>self.config.parameters['dapi_thresh'] 
+        bad_labels = self.data[mask==False].obs['label'].unique()
+        idxes = np.nonzero(self.mask)
+        l = self.mask[idxes[:,0],idxes[:,1]]
+        l[torch.isin(l,torch.tensor(bad_labels))] = 0 # set bad labels to 0
+        self.mask[idxes[:,0],idxes[:,1]] = l
+        self.data = self.data[mask]
 
     def save_data(self,model_type='nuclei'):
         proceed = True
@@ -117,8 +137,17 @@ class Section_Class(object):
         if isinstance(self.image_metadata,str):
             self.update_user('Loading Metadata')
             self.image_metadata = Metadata(self.metadata_path)
+
+        hybe1s = [i for i in self.image_metadata.acqnames if 'hybe1_' in i]
+        posnames = np.unique(self.image_metadata.image_table[np.isin(self.image_metadata.image_table.acq,hybe1s)].Position)
+        sections = np.unique([i.split('-Pos')[0] for i in posnames if '-Pos' in i])
         
-        self.posnames = np.array([i for i in self.image_metadata.posnames if i.split('-')[0]==self.section])
+        if sections.shape[0] == 0:
+            hybe1 = [i for i in self.image_metadata.acqnames if 'hybe1_' in i][-1]
+            self.posnames = np.array(self.image_metadata.image_table[self.image_metadata.image_table.acq==hybe1].Position.unique())
+        else:
+            self.posnames = np.array([i for i in self.image_metadata.posnames if i.split('-Pos')[0]==self.section])
+
         # if len(self.posnames)==0:
         #     hybe1 = [i for i in self.image_metadata.acqnames if 'hybe1_' in i][-1]
         #     self.posnames = np.array(self.image_metadata.image_table[self.image_metadata.image_table.acq==hybe1].Position.unique())
@@ -127,7 +156,7 @@ class Section_Class(object):
             self.coordinates = {}
             for posname in self.posnames:
                 self.coordinates[posname] = (self.image_metadata.image_table[(self.image_metadata.image_table.Position==posname)].XY.iloc[0]/self.config.parameters['pixel_size']).astype(int)
-        
+
     def find_acq(self,hybe,protocol='hybe'):
         return [i for i in self.acqs if protocol+hybe+'_' in i][-1]
 
@@ -153,177 +182,192 @@ class Section_Class(object):
                 bkg_acq = self.find_acq(hybe,protocol='strip')
         else:
             hybe = acq.split('_')[0]
-        nuc_fname = self.generate_fname(hybe,self.config.parameters['nucstain_channel'],'stitched')
-        signal_fname = self.generate_fname(hybe,channel,'stitched')
-        if (os.path.exists(nuc_fname))&(os.path.exists(signal_fname))&(self.config.parameters['overwrite']==False):
-            self.update_user('Found Existing Hybe'+hybe+' Stitched')
-            if (hybe==self.config.parameters['nucstain_acq'].split('hybe')[-1])&(self.reference_stitched==''):
-                stitched = torch.dstack([self.load_tensor(nuc_fname),self.load_tensor(signal_fname)])
-            else:
-                stitched = 0
-            return stitched,0,0,0,0# nuclei,nuclei_down,signal,signal_down
-        else:
-            if isinstance(self.FF,str):
-                self.FF=1
-                # self.FF = generate_FF(self.image_metadata,acq,channel,bkg_acq=bkg_acq,verbose=self.verbose)
-            if isinstance(self.nuc_FF,str):
-                self.nuc_FF = 1
-                # self.nuc_FF = generate_FF(self.image_metadata,acq,self.config.parameters['nucstain_channel'],bkg_acq='',verbose=self.verbose)
 
-            xy = np.stack([pxy for i,pxy in self.coordinates.items()])
-            if (self.config.parameters['stitch_rotate'] % 2) == 0:
-                img_shape = np.flip(self.config.parameters['n_pixels'])
+        """ Check if hybe is finished"""
+        acq_posnames = np.unique(self.image_metadata.image_table[self.image_metadata.image_table.acq==acq].Position)
+        bad_acq_positions = [pos for pos in self.posnames if not np.isin(pos,acq_posnames)]
+        if bkg_acq!='':
+            bkg_acq_posnames = np.unique(self.image_metadata.image_table[self.image_metadata.image_table.acq==bkg_acq].Position)
+            bad_bkg_acq_positions = [pos for pos in self.posnames if not np.isin(pos,bkg_acq_posnames)]
+        else:
+            bad_bkg_acq_positions = []
+        if len(bad_acq_positions)>0|len(bad_bkg_acq_positions)>0:
+            """ Imaging isnt finished"""
+            return None,None,None,None,None
+        else:
+
+
+            nuc_fname = self.generate_fname(hybe,self.config.parameters['nucstain_channel'],'stitched')
+            signal_fname = self.generate_fname(hybe,channel,'stitched')
+            if (os.path.exists(nuc_fname))&(os.path.exists(signal_fname))&(self.config.parameters['overwrite']==False):
+                self.update_user('Found Existing Hybe'+hybe+' Stitched')
+                if (hybe==self.config.parameters['nucstain_acq'].split('hybe')[-1])&(self.reference_stitched==''):
+                    stitched = torch.dstack([self.load_tensor(nuc_fname),self.load_tensor(signal_fname)])
+                else:
+                    stitched = 0
+                return stitched,0,0,0,0# nuclei,nuclei_down,signal,signal_down
             else:
-                img_shape = self.config.parameters['n_pixels']
-            y_min,x_min = xy.min(0)-self.config.parameters['border']
-            y_max,x_max = xy.max(0)+img_shape+self.config.parameters['border']
-            x_range = np.array(range(x_min,x_max+1))
-            y_range = np.array(range(y_min,y_max+1))
-            stitched = torch.zeros([len(x_range),len(y_range),2],dtype=torch.int32)
-            Input = []
-            for posname in self.posnames:
-                data = {}
-                data['acq'] = acq
-                data['bkg_acq'] = bkg_acq
-                data['posname'] = posname
-                data['image_metadata'] = self.image_metadata
-                data['channel'] = channel
-                data['parameters'] = self.config.parameters
-                # If not Reference Then pass destination through and do registration in parrallel
-                if not isinstance(self.reference_stitched,str):
+                if isinstance(self.FF,str):
+                    self.FF=1
+                    # self.FF = generate_FF(self.image_metadata,acq,channel,bkg_acq=bkg_acq,verbose=self.verbose)
+                if isinstance(self.nuc_FF,str):
+                    self.nuc_FF = 1
+                    # self.nuc_FF = generate_FF(self.image_metadata,acq,self.config.parameters['nucstain_channel'],bkg_acq='',verbose=self.verbose)
+
+                xy = np.stack([pxy for i,pxy in self.coordinates.items()])
+                if (self.config.parameters['stitch_rotate'] % 2) == 0:
+                    img_shape = np.flip(self.config.parameters['n_pixels'])
+                else:
+                    img_shape = self.config.parameters['n_pixels']
+                y_min,x_min = xy.min(0)-self.config.parameters['border']
+                y_max,x_max = xy.max(0)+img_shape+self.config.parameters['border']
+                x_range = np.array(range(x_min,x_max+1))
+                y_range = np.array(range(y_min,y_max+1))
+                stitched = torch.zeros([len(x_range),len(y_range),2],dtype=torch.int32)
+                Input = []
+                for posname in self.posnames:
+                    data = {}
+                    data['acq'] = acq
+                    data['bkg_acq'] = bkg_acq
+                    data['posname'] = posname
+                    data['image_metadata'] = self.image_metadata
+                    data['channel'] = channel
+                    data['parameters'] = self.config.parameters
+                    # If not Reference Then pass destination through and do registration in parrallel
+                    if not isinstance(self.reference_stitched,str):
+                        position_y,position_x = self.coordinates[posname].astype(int)
+                        img_x_min = position_x-x_min
+                        img_x_max = (position_x-x_min)+img_shape[0]
+                        img_y_min = position_y-y_min
+                        img_y_max = (position_y-y_min)+img_shape[1]
+                        destination = self.reference_stitched[img_x_min:img_x_max,img_y_min:img_y_max,0]
+                        data['destination'] = destination
+                    Input.append(data)
+                pfunc = partial(preprocess_images,FF=self.FF,nuc_FF=self.nuc_FF)
+                translation_y_list = []
+                translation_x_list = []
+                redo_posnames = []
+                if (not self.config.parameters['register_stitch_reference'])&(isinstance(self.reference_stitched,str)):
+                    redo_posnames = list(self.posnames)
+                    # Input = []
+                    translation_y_list = [0,0,0]
+                    translation_x_list = [0,0,0]
+                results = {}
+                with multiprocessing.Pool(60) as p:
+                    for posname,nuc,signal,translation_x,translation_y in self.generate_iterable(p.imap(pfunc,Input),'Processing '+acq+'_'+channel,length=len(Input)):
+                        results[posname] = {}
+                        results[posname]['nuc'] = nuc
+                        results[posname]['signal'] = signal
+                        results[posname]['translation_x'] = translation_x
+                        results[posname]['translation_y'] = translation_y
+                # nuc_FF = torch.stack([results[posname]['nuc'].float() for posname in results.keys()]).mean(0)
+                # nuc_FF = nuc_FF.mean()/nuc_FF
+
+                # FF = torch.stack([results[posname]['signal'].float() for posname in results.keys()]).mean(0)
+                # FF = FF.mean()/FF
+                
+                for posname in self.generate_iterable(results.keys(),'Stitching '+acq+'_'+channel,length=len(results.keys())):
+                    nuc = results[posname]['nuc']#*nuc_FF
+                    signal = results[posname]['signal']#*FF
+                    translation_x = results[posname]['translation_x']
+                    translation_y = results[posname]['translation_y']
+                    if isinstance(translation_x,str):
+                        redo_posnames.append(posname)
+                        continue
                     position_y,position_x = self.coordinates[posname].astype(int)
                     img_x_min = position_x-x_min
-                    img_x_max = (position_x-x_min)+img_shape[0]
+                    img_x_max = (position_x-x_min)+img_shape[0] # maybe flipped 1,0
                     img_y_min = position_y-y_min
-                    img_y_max = (position_y-y_min)+img_shape[1]
-                    destination = self.reference_stitched[img_x_min:img_x_max,img_y_min:img_y_max,0]
-                    data['destination'] = destination
-                Input.append(data)
-            pfunc = partial(preprocess_images,FF=self.FF,nuc_FF=self.nuc_FF)
-            translation_y_list = []
-            translation_x_list = []
-            redo_posnames = []
-            if (not self.config.parameters['register_stitch_reference'])&(isinstance(self.reference_stitched,str)):
-                redo_posnames = list(self.posnames)
-                Input = []
-                translation_y_list = [0,0,0]
-                translation_x_list = [0,0,0]
-            results = {}
-            with multiprocessing.Pool(60) as p:
-                for posname,nuc,signal,translation_x,translation_y in self.generate_iterable(p.imap(pfunc,Input),'Processing '+acq+'_'+channel,length=len(Input)):
-                    results[posname] = {}
-                    results[posname]['nuc'] = nuc
-                    results[posname]['signal'] = signal
-                    results[posname]['translation_x'] = translation_x
-                    results[posname]['translation_y'] = translation_y
-            # nuc_FF = torch.stack([results[posname]['nuc'].float() for posname in results.keys()]).mean(0)
-            # nuc_FF = nuc_FF.mean()/nuc_FF
+                    img_y_max = (position_y-y_min)+img_shape[1]# maybe flipped 1,0
+                    if isinstance(self.reference_stitched,str):
+                        translation_x = 0
+                        translation_y = 0
+                        destination = stitched[img_x_min:img_x_max,img_y_min:img_y_max,0]
+                        mask = destination!=0
+                        overlap =  mask.sum()/destination.ravel().shape[0]
+                        if overlap>0.02: # atleast 2% of overlap???
+                            mask_x = destination.max(1).values!=0
+                            ref = destination[mask_x,:]
+                            mask_y = ref.max(0).values!=0
+                            ref = destination[mask_x,:]
+                            ref = ref[:,mask_y]
+                            non_ref = nuc[mask_x,:]
+                            non_ref = non_ref[:,mask_y]
+                            shift, error = register(ref.numpy(), non_ref.numpy(),10)
+                            if (error!=np.inf)&(np.max(np.abs(shift))<=self.config.parameters['border']):
+                                translation_y = int(shift[1])
+                                translation_x = int(shift[0])
+                                translation_y_list.append(translation_y)
+                                translation_x_list.append(translation_x)
+                            else: # Save for end and use median of good ones
+                                redo_posnames.append(posname)
+                                continue
+                    else:
+                        translation_y_list.append(translation_y)
+                        translation_x_list.append(translation_x)
+                    try:
+                        stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),0] = nuc
+                        stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),1] = signal
+                    except Exception as e:
+                        print(posname,'Placing Image in Stitch with registration failed')
+                        print(e)
+                        translation_x = 0
+                        translation_y = 0
+                        stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),0] = nuc
+                        stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),1] = signal
 
-            # FF = torch.stack([results[posname]['signal'].float() for posname in results.keys()]).mean(0)
-            # FF = FF.mean()/FF
-            
-            for posname in self.generate_iterable(results.keys(),'Stitching '+acq+'_'+channel,length=len(results.keys())):
-                nuc = results[posname]['nuc']#*nuc_FF
-                signal = results[posname]['signal']#*FF
-                translation_x = results[posname]['translation_x']
-                translation_y = results[posname]['translation_y']
-                if isinstance(translation_x,str):
-                    redo_posnames.append(posname)
-                    continue
-                position_y,position_x = self.coordinates[posname].astype(int)
-                img_x_min = position_x-x_min
-                img_x_max = (position_x-x_min)+img_shape[0] # maybe flipped 1,0
-                img_y_min = position_y-y_min
-                img_y_max = (position_y-y_min)+img_shape[1]# maybe flipped 1,0
-                if isinstance(self.reference_stitched,str):
-                    translation_x = 0
-                    translation_y = 0
-                    destination = stitched[img_x_min:img_x_max,img_y_min:img_y_max,0]
-                    mask = destination!=0
-                    overlap =  mask.sum()/destination.ravel().shape[0]
-                    if overlap>0.02: # atleast 2% of overlap???
-                        mask_x = destination.max(1).values!=0
-                        ref = destination[mask_x,:]
-                        mask_y = ref.max(0).values!=0
-                        ref = destination[mask_x,:]
-                        ref = ref[:,mask_y]
-                        non_ref = nuc[mask_x,:]
-                        non_ref = non_ref[:,mask_y]
-                        shift, error = register(ref.numpy(), non_ref.numpy(),10)
-                        if (error!=np.inf)&(np.max(np.abs(shift))<=self.config.parameters['border']):
-                            translation_y = int(shift[1])
-                            translation_x = int(shift[0])
-                            translation_y_list.append(translation_y)
-                            translation_x_list.append(translation_x)
-                        else: # Save for end and use median of good ones
-                            redo_posnames.append(posname)
-                            continue
-                else:
-                    translation_y_list.append(translation_y)
-                    translation_x_list.append(translation_x)
-                try:
-                    stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),0] = nuc
-                    stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),1] = signal
-                except Exception as e:
-                    print(posname,'Placing Image in Stitch with registration failed')
-                    print(e)
-                    translation_x = 0
-                    translation_y = 0
-                    stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),0] = nuc
-                    stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),1] = signal
-
-            # Input = []
-            # for posname in redo_posnames:
-            #     data = {}
-            #     data['acq'] = acq
-            #     data['bkg_acq'] = bkg_acq
-            #     data['posname'] = posname
-            #     data['image_metadata'] = self.image_metadata
-            #     data['channel'] = channel
-            #     data['parameters'] = self.config.parameters
-            #     Input.append(data)
-            # with multiprocessing.Pool(60) as p:
-            #     for posname,nuc,signal,translation_x,translation_y in self.generate_iterable(p.imap(pfunc,Input),'Redoing Failed Positions '+acq+'_'+channel,length=len(Input)):
-
-            for posname in self.generate_iterable(redo_posnames,'Redoing Failed Positions '+acq+'_'+channel,length=len(redo_posnames)):
-                nuc = results[posname]['nuc']#*nuc_FF
-                signal = results[posname]['signal']#*FF
-                translation_x = results[posname]['translation_x']
-                translation_y = results[posname]['translation_y']
+                # Input = []
+                # for posname in redo_posnames:
+                #     data = {}
+                #     data['acq'] = acq
+                #     data['bkg_acq'] = bkg_acq
+                #     data['posname'] = posname
+                #     data['image_metadata'] = self.image_metadata
+                #     data['channel'] = channel
+                #     data['parameters'] = self.config.parameters
+                #     Input.append(data)
+                # with multiprocessing.Pool(60) as p:
+                #     for posname,nuc,signal,translation_x,translation_y in self.generate_iterable(p.imap(pfunc,Input),'Redoing Failed Positions '+acq+'_'+channel,length=len(Input)):
+                if len(redo_posnames)>0:
+                    for posname in self.generate_iterable(redo_posnames,'Redoing Failed Positions '+acq+'_'+channel,length=len(redo_posnames)):
+                        nuc = results[posname]['nuc']#*nuc_FF
+                        signal = results[posname]['signal']#*FF
+                        translation_x = results[posname]['translation_x']
+                        translation_y = results[posname]['translation_y']
 
 
-                position_y,position_x = self.coordinates[posname].astype(int)
+                        position_y,position_x = self.coordinates[posname].astype(int)
 
-                img_x_min = position_x-x_min
-                img_x_max = (position_x-x_min)+img_shape[0] # maybe flipped 1,0
-                img_y_min = position_y-y_min
-                img_y_max = (position_y-y_min)+img_shape[1] # maybe flipped 1,0
-                translation_x = 0
-                translation_y = 0
-                if not isinstance(self.reference_stitched,str):
-                    if len(translation_y_list)>0:
-                        translation_y = int(np.median(translation_y_list))
-                        translation_x = int(np.median(translation_x_list))
+                        img_x_min = position_x-x_min
+                        img_x_max = (position_x-x_min)+img_shape[0] # maybe flipped 1,0
+                        img_y_min = position_y-y_min
+                        img_y_max = (position_y-y_min)+img_shape[1] # maybe flipped 1,0
+                        translation_x = 0
+                        translation_y = 0
+                        if not isinstance(self.reference_stitched,str):
+                            if len(translation_y_list)>0:
+                                translation_y = int(np.median(translation_y_list))
+                                translation_x = int(np.median(translation_x_list))
 
-                stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),0] = nuc
-                stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),1] = signal
-        
-            self.save_tensor(stitched[:,:,0],nuc_fname)
-            self.save_tensor(stitched[:,:,1],signal_fname)
-            
-            nuclei = stitched[self.config.parameters['border']:-self.config.parameters['border'],
-                            self.config.parameters['border']:-self.config.parameters['border'],0].numpy()
-            scale = (np.array(nuclei.shape)*self.config.parameters['ratio']).astype(int)
-            nuclei_down = np.array(Image.fromarray(nuclei.astype(float)).resize((scale[1],scale[0]), Image.BICUBIC))
-            self.save_image(nuclei_down,self.generate_fname(hybe,self.config.parameters['nucstain_channel'],'stitched',dtype='tif'))
+                        stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),0] = nuc
+                        stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),1] = signal
+                
+                self.save_tensor(stitched[:,:,0],nuc_fname)
+                self.save_tensor(stitched[:,:,1],signal_fname)
+                
+                nuclei = stitched[self.config.parameters['border']:-self.config.parameters['border'],
+                                self.config.parameters['border']:-self.config.parameters['border'],0].numpy()
+                scale = (np.array(nuclei.shape)*self.config.parameters['ratio']).astype(int)
+                nuclei_down = np.array(Image.fromarray(nuclei.astype(float)).resize((scale[1],scale[0]), Image.BICUBIC))
+                self.save_image(nuclei_down,self.generate_fname(hybe,self.config.parameters['nucstain_channel'],'stitched',dtype='tif'))
 
-            signal = stitched[self.config.parameters['border']:-self.config.parameters['border'],
-                            self.config.parameters['border']:-self.config.parameters['border'],1].numpy()
-            scale = (np.array(nuclei.shape)*self.config.parameters['ratio']).astype(int)
-            signal_down = np.array(Image.fromarray(signal.astype(float)).resize((scale[1],scale[0]), Image.BICUBIC))
-            self.save_image(signal_down,self.generate_fname(hybe,channel,'stitched',dtype='tif'))
+                signal = stitched[self.config.parameters['border']:-self.config.parameters['border'],
+                                self.config.parameters['border']:-self.config.parameters['border'],1].numpy()
+                scale = (np.array(nuclei.shape)*self.config.parameters['ratio']).astype(int)
+                signal_down = np.array(Image.fromarray(signal.astype(float)).resize((scale[1],scale[0]), Image.BICUBIC))
+                self.save_image(signal_down,self.generate_fname(hybe,channel,'stitched',dtype='tif'))
 
-            return stitched,nuclei,nuclei_down,signal,signal_down
+                return stitched,nuclei,nuclei_down,signal,signal_down
 
     def stitch(self):
         hybe = self.config.parameters['nucstain_acq'].split('hybe')[-1]
@@ -344,7 +388,6 @@ class Section_Class(object):
             #     except:
             #         pass
             if isinstance(self.FF,str) | isinstance(self.nuc_FF,str):
-                # nuc_FF,FF = generate_FFs(self.image_metadata,acq,channel,bkg_acq=bkg_acq,posnames=self.posnames,parameters=self.config.parameters,verbose=self.verbose)
                 if isinstance(self.FF,str):
                     FF = generate_FF(self.image_metadata,acq,channel,bkg_acq='',posnames=self.posnames,parameters=self.config.parameters,verbose=self.verbose)
                     self.FF = FF
@@ -353,48 +396,31 @@ class Section_Class(object):
                     self.nuc_FF = nuc_FF
                 self.save_tensor(self.nuc_FF,nuc_FF_fname)
                 self.save_tensor(self.FF,FF_fname)
-
-        # if self.FF=='':
-        #     if not self.config.parameters['FF']:
-        #         self.FF=1
-        #     else:
-        #         fname = self.generate_fname('',channel,'FF')
-        #         if os.path.exists(fname):
-        #             try:
-        #                 self.FF = self.load_tensor(fname).numpy()
-        #             except:
-        #                 self.FF = generate_FF(self.image_metadata,acq,channel,bkg_acq=bkg_acq,verbose=self.verbose)
-        #                 self.save_tensor(torch.tensor(self.FF),fname)
-        #         else:
-        #             self.FF = generate_FF(self.image_metadata,acq,channel,bkg_acq=bkg_acq,verbose=self.verbose)
-        #             self.save_tensor(torch.tensor(self.FF),fname)
-        # if self.nuc_FF == '':
-        #     fname = self.generate_fname('',self.config.parameters['nucstain_channel'],'FF')
-        #     if os.path.exists(fname):
-        #         try:
-        #             self.nuc_FF = self.load_tensor(fname).numpy()
-        #         except:
-        #             self.nuc_FF = generate_FF(self.image_metadata,acq,self.config.parameters['nucstain_channel'],bkg_acq='',verbose=self.verbose)
-        #             self.save_tensor(torch.tensor(self.nuc_FF),fname)
-        #     else:
-        #         self.nuc_FF = generate_FF(self.image_metadata,acq,self.config.parameters['nucstain_channel'],bkg_acq='',verbose=self.verbose)
-        #         self.save_tensor(torch.tensor(self.nuc_FF),fname)
         """ Generate Refernce """
+        self.any_incomplete_hybes = False
         hybe = self.config.parameters['nucstain_acq'].split('hybe')[-1]
         self.reference_stitched,self.ref_nuclei,self.ref_nuclei_down,signal,signal_down = self.stitcher(hybe,self.config.parameters['total_channel'])
-        for r,h,c in self.config.bitmap:
-            hybe = h.split('hybe')[-1]
-            stitched,nuclei,nuclei_down,signal,signal_down = self.stitcher(hybe,self.config.parameters['total_channel'])
-            if self.config.parameters['visualize']:
-                visualize_merge(self.ref_nuclei_down,signal_down,title='hybe'+hybe)
-                xy = (np.array(self.ref_nuclei.shape)/3).astype(int)
-                x_min,y_min = xy-self.config.parameters['border']
-                x_max,y_max = xy+self.config.parameters['border']
-                visualize_merge(self.ref_nuclei[x_min:x_max,y_min:y_max],signal[x_min:x_max,y_min:y_max],title='hybe'+hybe+' zoom')
-                x,y = np.array(self.ref_nuclei.shape)-(np.array(self.ref_nuclei.shape)/3).astype(int)
-                x_min,y_min = xy-self.config.parameters['border']
-                x_max,y_max = xy+self.config.parameters['border']
-                visualize_merge(self.ref_nuclei[x_min:x_max,y_min:y_max],signal[x_min:x_max,y_min:y_max],title='hybe'+hybe+' zoom')
+        if isinstance(self.reference_stitched,type(None)):
+            """ Reference Hasnt been Imaged"""
+            self.any_incomplete_hybes = True
+        else:
+            for r,h,c in self.config.bitmap:
+                hybe = h.split('hybe')[-1]
+                stitched,nuclei,nuclei_down,signal,signal_down = self.stitcher(hybe,self.config.parameters['total_channel'])
+                if isinstance(stitched,type(None)):
+                    """ Hasnt been Imaged"""
+                    self.any_incomplete_hybes = True
+                else:
+                    if self.config.parameters['visualize']:
+                        visualize_merge(self.ref_nuclei_down,signal_down,title='hybe'+hybe)
+                        xy = (np.array(self.ref_nuclei.shape)/3).astype(int)
+                        x_min,y_min = xy-self.config.parameters['border']
+                        x_max,y_max = xy+self.config.parameters['border']
+                        visualize_merge(self.ref_nuclei[x_min:x_max,y_min:y_max],signal[x_min:x_max,y_min:y_max],title='hybe'+hybe+' zoom')
+                        x,y = np.array(self.ref_nuclei.shape)-(np.array(self.ref_nuclei.shape)/3).astype(int)
+                        x_min,y_min = xy-self.config.parameters['border']
+                        x_max,y_max = xy+self.config.parameters['border']
+                        visualize_merge(self.ref_nuclei[x_min:x_max,y_min:y_max],signal[x_min:x_max,y_min:y_max],title='hybe'+hybe+' zoom')
             
     def save_image(self,img,fname):
         if not isinstance(img,np.ndarray):
@@ -449,75 +475,100 @@ class Section_Class(object):
             else:
                 """ Total & Nuclei"""
                 hybe = self.config.parameters['nucstain_acq'].split('hybe')[-1]
-                nucstain = self.load_tensor(self.generate_fname(hybe,self.config.parameters['nucstain_channel'],'stitched'))
+                fname = self.generate_fname(hybe,self.config.parameters['nucstain_channel'],'stitched')
+                if not os.path.exists(fname):
+                    """ Not processed"""
+                    nucstain = None
+                else:
+                    nucstain = self.load_tensor(fname)
                 if 'total' in model_type:
                     if self.config.parameters['total_acq'] == 'all':
                         total = ''
                         for r,h,c in self.generate_iterable(self.config.bitmap,'Loading Total by Summing All Measurements'):
                             hybe = h.split('hybe')[-1]
-                            temp = self.load_tensor(self.generate_fname(hybe,self.config.parameters['total_channel'],'stitched'))
+                            fname = self.generate_fname(hybe,self.config.parameters['total_channel'],'stitched')
+                            if not os.path.exists(fname):
+                                """ Not all rounds processed"""
+                                total = None
+                                break
+                            else:
+                                temp = self.load_tensor(fname)
                             if isinstance(total,str):
                                 total = temp
                             else:
                                 total = total+temp
                     else:
                         hybe = self.config.parameters['total_acq'].split('hybe')[-1]
-                        total = self.load_tensor(self.generate_fname(hybe,self.config.parameters['total_channel'],'stitched'))
+                        fname = self.generate_fname(hybe,self.config.parameters['total_channel'],'stitched')
+                        if not os.path.exists(fname):
+                            """ Not processed"""
+                            total = None
+                        else:
+                            temp = self.load_tensor(fname)
                 if os.path.exists(self.generate_fname('',model_type+'_mask','stitched')):
                     self.update_user('Loading Existing Segmentation')
                     self.mask = self.load_tensor(self.generate_fname('',model_type+'_mask','stitched'))
                 else:
                     if 'total' in model_type:
-                        model = models.Cellpose(model_type='cyto2',gpu=self.config.parameters['segment_gpu'])
-                        self.mask = torch.zeros_like(total)
-                    else:
-                        model = models.Cellpose(model_type='nuclei',gpu=self.config.parameters['segment_gpu'])
-                        self.mask = torch.zeros_like(nucstain)
-                    window = 2000
-                    x_step = round(nucstain.shape[0]/int(nucstain.shape[0]/window))
-                    y_step = round(nucstain.shape[1]/int(nucstain.shape[1]/window))
-                    n_x_steps = round(nucstain.shape[0]/x_step)
-                    n_y_steps = round(nucstain.shape[1]/y_step)
-                    Input = []
-                    for x in range(n_x_steps):
-                        for y in range(n_y_steps):
-                            Input.append([x,y])
-                    for (x,y) in self.generate_iterable(Input,'Segmenting Cells: '+model_type):
-                        nuc = nucstain[(x*x_step):((x+1)*x_step),(y*y_step):((y+1)*y_step)].numpy()
-                        if 'cyto' in model_type:
-                            tot = total[(x*x_step):((x+1)*x_step),(y*y_step):((y+1)*y_step)].numpy()
-                            stk = np.dstack([nuc,tot,np.zeros_like(nuc)])
-                            diameter = int(self.config.parameters['segment_diameter']*1.5)
-                            min_size = int(self.config.parameters['segment_diameter']*10*1.5)
-                            channels = [1,2]
+                        if isinstance(total,type(None))|isinstance(nucstain,type(None)):
+                            model=None
+                            self.mask = None
                         else:
-                            stk = nuc
-                            diameter = int(self.config.parameters['segment_diameter'])
-                            min_size = int(self.config.parameters['segment_diameter']*10)
-                            channels = [0,0]
-                        if stk.max()==0:
-                            continue
-                        if np.min(stk.shape)==0:
-                            continue
-                        torch.cuda.empty_cache()
-                        raw_mask_image,flows,styles,diams = model.eval(stk,
-                                                            diameter=diameter,
-                                                            channels=channels,
-                                                            flow_threshold=1,
-                                                            cellprob_threshold=0,
-                                                            min_size=min_size)
-                        mask = torch.tensor(raw_mask_image.astype(int),dtype=torch.int32)
-                        mask[mask>0] = mask[mask>0]+self.mask.max() # ensure unique labels
-                        self.mask[(x*x_step):((x+1)*x_step),(y*y_step):((y+1)*y_step)] = mask
-                        del raw_mask_image,flows,styles,diams
-                        torch.cuda.empty_cache()
-                    if 'nuclei' in model_type:
-                        fname = self.generate_fname('','total_mask','stitched')
-                        if os.path.exists(fname):
-                            total = self.load_tensor(fname) # Load Total
-                            total[self.mask==0] = 0 # Set non nuclear to 0
-                            self.mask = total # replace mask with total&nuclear
-                    self.save_tensor(self.mask,self.generate_fname('',model_type+'_mask','stitched'))
+                            model = models.Cellpose(model_type='cyto2',gpu=self.config.parameters['segment_gpu'])
+                            self.mask = torch.zeros_like(total)
+                    else:
+                        if isinstance(nucstain,type(None)):
+                            model=None
+                            self.mask = None
+                        else:
+                            model = models.Cellpose(model_type='nuclei',gpu=self.config.parameters['segment_gpu'])
+                            self.mask = torch.zeros_like(nucstain)
+                    if not isinstance(model,type(None)):
+                        window = 2000
+                        x_step = round(nucstain.shape[0]/int(nucstain.shape[0]/window))
+                        y_step = round(nucstain.shape[1]/int(nucstain.shape[1]/window))
+                        n_x_steps = round(nucstain.shape[0]/x_step)
+                        n_y_steps = round(nucstain.shape[1]/y_step)
+                        Input = []
+                        for x in range(n_x_steps):
+                            for y in range(n_y_steps):
+                                Input.append([x,y])
+                        for (x,y) in self.generate_iterable(Input,'Segmenting Cells: '+model_type):
+                            nuc = nucstain[(x*x_step):((x+1)*x_step),(y*y_step):((y+1)*y_step)].numpy()
+                            if 'cyto' in model_type:
+                                tot = total[(x*x_step):((x+1)*x_step),(y*y_step):((y+1)*y_step)].numpy()
+                                stk = np.dstack([nuc,tot,np.zeros_like(nuc)])
+                                diameter = int(self.config.parameters['segment_diameter']*1.5)
+                                min_size = int(self.config.parameters['segment_diameter']*10*1.5)
+                                channels = [1,2]
+                            else:
+                                stk = nuc
+                                diameter = int(self.config.parameters['segment_diameter'])
+                                min_size = int(self.config.parameters['segment_diameter']*10)
+                                channels = [0,0]
+                            if stk.max()==0:
+                                continue
+                            if np.min(stk.shape)==0:
+                                continue
+                            torch.cuda.empty_cache()
+                            raw_mask_image,flows,styles,diams = model.eval(stk,
+                                                                diameter=diameter,
+                                                                channels=channels,
+                                                                flow_threshold=1,
+                                                                cellprob_threshold=0,
+                                                                min_size=min_size)
+                            mask = torch.tensor(raw_mask_image.astype(int),dtype=torch.int32)
+                            mask[mask>0] = mask[mask>0]+self.mask.max() # ensure unique labels
+                            self.mask[(x*x_step):((x+1)*x_step),(y*y_step):((y+1)*y_step)] = mask
+                            del raw_mask_image,flows,styles,diams
+                            torch.cuda.empty_cache()
+                        if 'nuclei' in model_type:
+                            fname = self.generate_fname('','total_mask','stitched')
+                            if os.path.exists(fname):
+                                total = self.load_tensor(fname) # Load Total
+                                total[self.mask==0] = 0 # Set non nuclear to 0
+                                self.mask = total # replace mask with total&nuclear
+                        self.save_tensor(self.mask,self.generate_fname('',model_type+'_mask','stitched'))
 
     def pull_vectors(self,model_type='nuclei'):
         proceed = True
@@ -627,33 +678,6 @@ def generate_FFs(image_metadata,acq,channel,posnames=[],bkg_acq='',parameters={}
     :return: flat field image
     :rtype: np.array
     """
-    # if 'mask' in channel:
-    #     return ''
-    # else:
-    #     posnames = image_metadata.image_table[image_metadata.image_table.acq==acq].Position.unique()
-    #     random_posnames = posnames
-    #     FF = []
-    #     if verbose:
-    #         iterable = tqdm(random_posnames,desc=str(datetime.now().strftime("%H:%M:%S"))+' Generating FlatField '+acq+' '+channel)
-    #     else:
-    #         iterable = random_posnames
-    #     for posname in iterable:
-    #         try:
-    #             img = torch.tensor(image_metadata.stkread(Position=posname,Channel=channel,acq=acq).min(2).astype(float))
-    #             if bkg_acq!='':
-    #                 bkg = torch.tensor(image_metadata.stkread(Position=posname,Channel=channel,acq=bkg_acq).mean(2).astype(float))
-    #                 img = img-bkg
-    #             FF.append(img)
-    #         except Exception as e:
-    #             print(posname,acq,bkg_acq)
-    #             print(e)
-    #             continue
-    #     FF = torch.quantile(torch.dstack(FF),0.5,dim=2).numpy()
-    #     vmin,vmax = np.percentile(FF[np.isnan(FF)==False],[0.1,99.9])
-    #     FF[FF<vmin] = vmin
-    #     FF[FF>vmax] = vmax
-    #     FF[FF==0] = np.median(FF)
-    #     FF = np.median(FF)/FF
     if len(posnames)==0:
         posnames = image_metadata.image_table[image_metadata.image_table.acq==acq].Position.unique()
     Input = []
@@ -730,7 +754,6 @@ def preprocess_images(data,FF=1,nuc_FF=1):
                                         Channel=parameters['nucstain_channel'],
                                         acq=acq).max(axis=2).astype(float)))
         nuc = process_img(nuc,parameters,FF=nuc_FF)
-        # nuc = nuc*nuc_FF
         img = ((image_metadata.stkread(Position=posname,
                                         Channel=channel,
                                         acq=acq).max(axis=2).astype(float)))
@@ -744,7 +767,6 @@ def preprocess_images(data,FF=1,nuc_FF=1):
                                             Channel=parameters['nucstain_channel'],
                                             acq=bkg_acq).max(axis=2).astype(float)))
             bkg_nuc = process_img(bkg_nuc,parameters,FF=nuc_FF)
-            # bkg_nuc = bkg_nuc*nuc_FF
 
             shift, error = register(nuc, bkg_nuc,10)
             if error!=np.inf:
@@ -755,7 +777,6 @@ def preprocess_images(data,FF=1,nuc_FF=1):
                 i2 = interpolate.interp2d(x_correction,y_correction,bkg,fill_value=None)
                 bkg = i2(range(bkg.shape[1]), range(bkg.shape[0]))
             img = img-bkg
-        # img = img*FF
 
         dtype = 'int32'
         nuc[nuc<np.iinfo(dtype).min] = np.iinfo(dtype).min
