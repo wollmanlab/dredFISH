@@ -2,10 +2,8 @@
 # Implemented by Fangming Xie following the scPNMF (Song et al. 2021), and orignally Yang and Oja, 2010.
 # the original scPNMF is an R package wrapper of an underlying cpp code.
 
-# from distutils.ccompiler import new_compiler
 import numpy as np
 from sklearn.decomposition import PCA
-import matplotlib.pyplot as plt
 import logging
 
 # set up 
@@ -14,7 +12,7 @@ logging.basicConfig(format='%(asctime)s - %(message)s',
                     level=logging.INFO,
                     )
 
-def initialize(X, k, init='uniform'):
+def initialize(X, k, init='normal'):
     """
     Args:
         - X: a p by n non-negative matrix (2d numpy array)
@@ -51,7 +49,7 @@ def initialize(X, k, init='uniform'):
     elif init == 'uniform':
         w = np.random.rand(m, k) 
     else:
-        raise ValueError("not implemented")
+        raise ValueError("not implemented init option, chooose from: pca, pca_2x, normal, uniform")
 
     w = w/np.linalg.norm(w, ord=2) # 2-norm (largest singular value) (very useful in practice)
     return w
@@ -73,7 +71,7 @@ def get_PNMF(X, k,
         - record: recorded the error function every xxx time (m,2)
 
     ===
-    optimize ||X-WW^tX||_F^2
+    optimize 1/2||X-WW^tX||_F^2
     update with 
         w = w*ratio
         w = w/||w||_2
@@ -148,11 +146,11 @@ def get_DPNMF(X, k, s, mu,
         - record: recorded the error function every xxx time (m,2)
 
     ===
-    optimize 1/2||X-WW^tX||_F^2 + 1/2
+    optimize 1/2||X-WW^tX||_F^2 + 1/2tr(W^TSW^T) with a user provided S matrix
     update with 
         w = w*ratio
         w = w/||w||_2
-        where ratio = (2 XXt W)/(WWt XXt W + XXt WWt W)
+        where ratio = (2 XXt W + Dterm)/(WWt XXt W + XXt WWt W + Dterm)
 
     """
     np.random.seed(random_seed)
