@@ -14,7 +14,7 @@
     <script src="_static/sphinx_highlight.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Processing package" href="Processing.html" /> 
+    <link rel="next" title="Processing" href="Processing.html" /> 
   </head><body>
     <div class="related" role="navigation" aria-label="related navigation">
       <h3>Navigation</h3>
@@ -26,7 +26,7 @@
           <a href="py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
         <li class="right" >
-          <a href="Processing.html" title="Processing package"
+          <a href="Processing.html" title="Processing"
              accesskey="N">next</a> |</li>
         <li class="nav-item nav-item-0"><a href="#">dredFISH  documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">Welcome to dredFISH’s documentation!</a></li> 
@@ -43,33 +43,131 @@
 <div class="toctree-wrapper compound">
 <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="Processing.html">Processing package</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="Processing.html#module-Processing.execute">Processing.execute module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="Processing.html#module-Processing.putils">Processing.putils module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="Processing.html#module-Processing.QC">Processing.QC module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="Processing.html#module-Processing.Section">Processing.Section module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Processing.html">Processing</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="Processing.html#module-Processing.execute">Processing.execute</a></li>
+<li class="toctree-l2"><a class="reference internal" href="Processing.html#module-Processing.putils">Processing.putils</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="Processing.html#Processing.putils.colorize_segmented_image"><code class="docutils literal notranslate"><span class="pre">colorize_segmented_image()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Processing.html#Processing.putils.generate_FF"><code class="docutils literal notranslate"><span class="pre">generate_FF()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Processing.html#Processing.putils.generate_img"><code class="docutils literal notranslate"><span class="pre">generate_img()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Processing.html#Processing.putils.generate_stitched"><code class="docutils literal notranslate"><span class="pre">generate_stitched()</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="Analysis.html">Analysis module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="Processing.html#module-Processing.QC">Processing.QC</a></li>
+<li class="toctree-l2"><a class="reference internal" href="Processing.html#module-Processing.Section">Processing.Section</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="Processing.html#Processing.Section.Section_Class"><code class="docutils literal notranslate"><span class="pre">Section_Class</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Processing.html#Processing.Section.generate_FF"><code class="docutils literal notranslate"><span class="pre">generate_FF()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Processing.html#Processing.Section.generate_FFs"><code class="docutils literal notranslate"><span class="pre">generate_FFs()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Processing.html#Processing.Section.preprocess_images"><code class="docutils literal notranslate"><span class="pre">preprocess_images()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Processing.html#Processing.Section.process_img"><code class="docutils literal notranslate"><span class="pre">process_img()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Processing.html#Processing.Section.visualize_merge"><code class="docutils literal notranslate"><span class="pre">visualize_merge()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="Analysis.html">Analysis</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="Analysis.html#overview">Overview</a></li>
-<li class="toctree-l2"><a class="reference internal" href="Analysis.html#analysis-tissuegraph-submodule">Analysis.TissueGraph submodule</a></li>
-<li class="toctree-l2"><a class="reference internal" href="Analysis.html#analysis-classification-submodule">Analysis.Classification submodule</a></li>
+<li class="toctree-l2"><a class="reference internal" href="Analysis.html#analysis-tissuegraph">Analysis.TissueGraph</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="Analysis.html#Analysis.TissueGraph.Taxonomy"><code class="docutils literal notranslate"><span class="pre">Taxonomy</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Analysis.html#Analysis.TissueGraph.TissueGraph"><code class="docutils literal notranslate"><span class="pre">TissueGraph</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Analysis.html#Analysis.TissueGraph.TissueMultiGraph"><code class="docutils literal notranslate"><span class="pre">TissueMultiGraph</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="Visualization.html">Visualization package</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="Visualization.html#module-Visualization.Viz">Visualization.Viz module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="Analysis.html#analysis-classification">Analysis.Classification</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="Analysis.html#Analysis.Classification.Classifier"><code class="docutils literal notranslate"><span class="pre">Classifier</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Analysis.html#Analysis.Classification.KNNClassifier"><code class="docutils literal notranslate"><span class="pre">KNNClassifier</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Analysis.html#Analysis.Classification.KnownCellTypeClassifier"><code class="docutils literal notranslate"><span class="pre">KnownCellTypeClassifier</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Analysis.html#Analysis.Classification.OptimalLeidenKNNClassifier"><code class="docutils literal notranslate"><span class="pre">OptimalLeidenKNNClassifier</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Analysis.html#Analysis.Classification.TopicClassifier"><code class="docutils literal notranslate"><span class="pre">TopicClassifier</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="Design.html">Design package</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="Design.html#module-Design.models.model_v3p0_basic">Design.models.model_v3p0_basic module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="Design.html#module-Design.data_loaders.data_loader_scrna">Design.data_loaders.data_loader_scrna module</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="Utils.html">Utils package</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="Utils.html#module-Utils.basicu">Utils.basicu module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="Utils.html#module-Utils.celltypeu">Utils.celltypeu module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="Utils.html#module-Utils.designu">Utils.designu module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="Utils.html#module-Utils.miscu">Utils.miscu module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Visualization.html">Visualization</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="Visualization.html#module-Visualization.Viz">Visualization.Viz</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="Visualization.html#Visualization.Viz.Colorpleth"><code class="docutils literal notranslate"><span class="pre">Colorpleth</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Visualization.html#Visualization.Viz.Histogram"><code class="docutils literal notranslate"><span class="pre">Histogram</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Visualization.html#Visualization.Viz.IsoZones"><code class="docutils literal notranslate"><span class="pre">IsoZones</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Visualization.html#Visualization.Viz.LegendWithCircles"><code class="docutils literal notranslate"><span class="pre">LegendWithCircles</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Visualization.html#Visualization.Viz.LegendWithCirclesAndWedges"><code class="docutils literal notranslate"><span class="pre">LegendWithCirclesAndWedges</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Visualization.html#Visualization.Viz.LogLogPlot"><code class="docutils literal notranslate"><span class="pre">LogLogPlot</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Visualization.html#Visualization.Viz.Map"><code class="docutils literal notranslate"><span class="pre">Map</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Visualization.html#Visualization.Viz.Panel"><code class="docutils literal notranslate"><span class="pre">Panel</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Visualization.html#Visualization.Viz.RandomColorpleth"><code class="docutils literal notranslate"><span class="pre">RandomColorpleth</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Visualization.html#Visualization.Viz.TypeMap"><code class="docutils literal notranslate"><span class="pre">TypeMap</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Visualization.html#Visualization.Viz.TypeMapWithLines"><code class="docutils literal notranslate"><span class="pre">TypeMapWithLines</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Visualization.html#Visualization.Viz.View"><code class="docutils literal notranslate"><span class="pre">View</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Visualization.html#Visualization.Viz.Zoom"><code class="docutils literal notranslate"><span class="pre">Zoom</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="Design.html">Design</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="Design.html#module-Design.models.model_v3p0_basic">Design.models.model_v3p0_basic</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="Design.html#Design.models.model_v3p0_basic.CellTypeNet"><code class="docutils literal notranslate"><span class="pre">CellTypeNet</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Design.html#Design.models.model_v3p0_basic.InstNrmSimple"><code class="docutils literal notranslate"><span class="pre">InstNrmSimple</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Design.html#Design.models.model_v3p0_basic.init_weights"><code class="docutils literal notranslate"><span class="pre">init_weights()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Design.html#Design.models.model_v3p0_basic.train_model"><code class="docutils literal notranslate"><span class="pre">train_model()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="Design.html#module-Design.data_loaders.data_loader_scrna">Design.data_loaders.data_loader_scrna</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="Design.html#Design.data_loaders.data_loader_scrna.load_Allen_data"><code class="docutils literal notranslate"><span class="pre">load_Allen_data()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Design.html#Design.data_loaders.data_loader_scrna.scRNAseqDataset"><code class="docutils literal notranslate"><span class="pre">scRNAseqDataset</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="Design.html#module-Design.data_loaders.data_files">Design.data_loaders.data_files</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="Utils.html">Utils</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="Utils.html#module-Utils.basicu">Utils.basicu</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.basicu.clip_by_percentile"><code class="docutils literal notranslate"><span class="pre">clip_by_percentile()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.basicu.corr_paired_rows_fast"><code class="docutils literal notranslate"><span class="pre">corr_paired_rows_fast()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.basicu.corr_paired_rows_fast2"><code class="docutils literal notranslate"><span class="pre">corr_paired_rows_fast2()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.basicu.diag_matrix"><code class="docutils literal notranslate"><span class="pre">diag_matrix()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.basicu.diag_matrix_cols"><code class="docutils literal notranslate"><span class="pre">diag_matrix_cols()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.basicu.diag_matrix_rows"><code class="docutils literal notranslate"><span class="pre">diag_matrix_rows()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.basicu.encode_mat"><code class="docutils literal notranslate"><span class="pre">encode_mat()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.basicu.get_index_from_array"><code class="docutils literal notranslate"><span class="pre">get_index_from_array()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.basicu.group_mean"><code class="docutils literal notranslate"><span class="pre">group_mean()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.basicu.group_sum"><code class="docutils literal notranslate"><span class="pre">group_sum()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.basicu.libsize_norm"><code class="docutils literal notranslate"><span class="pre">libsize_norm()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.basicu.normalize_fishdata"><code class="docutils literal notranslate"><span class="pre">normalize_fishdata()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.basicu.normalize_fishdata_logrowmedian"><code class="docutils literal notranslate"><span class="pre">normalize_fishdata_logrowmedian()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.basicu.rank"><code class="docutils literal notranslate"><span class="pre">rank()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.basicu.rank_array"><code class="docutils literal notranslate"><span class="pre">rank_array()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.basicu.rank_rows"><code class="docutils literal notranslate"><span class="pre">rank_rows()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.basicu.reset_logging"><code class="docutils literal notranslate"><span class="pre">reset_logging()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.basicu.sparse_libsize_norm"><code class="docutils literal notranslate"><span class="pre">sparse_libsize_norm()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.basicu.spearman_corrcoef"><code class="docutils literal notranslate"><span class="pre">spearman_corrcoef()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.basicu.spearmanr_paired_rows"><code class="docutils literal notranslate"><span class="pre">spearmanr_paired_rows()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.basicu.stratified_sample"><code class="docutils literal notranslate"><span class="pre">stratified_sample()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.basicu.stratified_sample_withrep"><code class="docutils literal notranslate"><span class="pre">stratified_sample_withrep()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.basicu.swap_mask"><code class="docutils literal notranslate"><span class="pre">swap_mask()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.basicu.zscore"><code class="docutils literal notranslate"><span class="pre">zscore()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="Utils.html#module-Utils.celltypeu">Utils.celltypeu</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.celltypeu.CellTypeClassify"><code class="docutils literal notranslate"><span class="pre">CellTypeClassify</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.celltypeu.iterative_classify"><code class="docutils literal notranslate"><span class="pre">iterative_classify()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="Utils.html#module-Utils.designu">Utils.designu</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.designu.get_mse_torch"><code class="docutils literal notranslate"><span class="pre">get_mse_torch()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.designu.get_r2_torch"><code class="docutils literal notranslate"><span class="pre">get_r2_torch()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.designu.plot_dcdx"><code class="docutils literal notranslate"><span class="pre">plot_dcdx()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.designu.plot_embx_clsts"><code class="docutils literal notranslate"><span class="pre">plot_embx_clsts()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.designu.plot_embx_clsts_v2"><code class="docutils literal notranslate"><span class="pre">plot_embx_clsts_v2()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.designu.plot_enc"><code class="docutils literal notranslate"><span class="pre">plot_enc()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.designu.plot_heatcorr"><code class="docutils literal notranslate"><span class="pre">plot_heatcorr()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.designu.plot_intn"><code class="docutils literal notranslate"><span class="pre">plot_intn()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="Utils.html#module-Utils.miscu">Utils.miscu</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.miscu.build_feature_graph_knnlite"><code class="docutils literal notranslate"><span class="pre">build_feature_graph_knnlite()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.miscu.is_in_polygon"><code class="docutils literal notranslate"><span class="pre">is_in_polygon()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.miscu.leiden"><code class="docutils literal notranslate"><span class="pre">leiden()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="Utils.html#Utils.miscu.order_by_hc"><code class="docutils literal notranslate"><span class="pre">order_by_hc()</span></code></a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
@@ -102,7 +200,7 @@
   <div>
     <h4>Next topic</h4>
     <p class="topless"><a href="Processing.html"
-                          title="next chapter">Processing package</a></p>
+                          title="next chapter">Processing</a></p>
   </div>
   <div role="note" aria-label="source link">
     <h3>This Page</h3>
@@ -135,7 +233,7 @@
           <a href="py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
         <li class="right" >
-          <a href="Processing.html" title="Processing package"
+          <a href="Processing.html" title="Processing"
              >next</a> |</li>
         <li class="nav-item nav-item-0"><a href="#">dredFISH  documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">Welcome to dredFISH’s documentation!</a></li> 

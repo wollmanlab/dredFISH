@@ -6,7 +6,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 
-    <title>Analysis module &#8212; dredFISH  documentation</title>
+    <title>Analysis &#8212; dredFISH  documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
     <link rel="stylesheet" type="text/css" href="_static/sphinxdoc.css" />
     <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
@@ -14,8 +14,8 @@
     <script src="_static/sphinx_highlight.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Visualization package" href="Visualization.html" />
-    <link rel="prev" title="Processing package" href="Processing.html" /> 
+    <link rel="next" title="Visualization" href="Visualization.html" />
+    <link rel="prev" title="Processing" href="Processing.html" /> 
   </head><body>
     <div class="related" role="navigation" aria-label="related navigation">
       <h3>Navigation</h3>
@@ -27,13 +27,13 @@
           <a href="py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
         <li class="right" >
-          <a href="Visualization.html" title="Visualization package"
+          <a href="Visualization.html" title="Visualization"
              accesskey="N">next</a> |</li>
         <li class="right" >
-          <a href="Processing.html" title="Processing package"
+          <a href="Processing.html" title="Processing"
              accesskey="P">previous</a> |</li>
         <li class="nav-item nav-item-0"><a href="index.html">dredFISH  documentation</a> &#187;</li>
-        <li class="nav-item nav-item-this"><a href="">Analysis module</a></li> 
+        <li class="nav-item nav-item-this"><a href="">Analysis</a></li> 
       </ul>
     </div>  
 
@@ -42,16 +42,16 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  <section id="analysis-module">
-<h1>Analysis module<a class="headerlink" href="#analysis-module" title="Permalink to this heading">¶</a></h1>
+  <section id="analysis">
+<h1>Analysis<a class="headerlink" href="#analysis" title="Permalink to this heading">¶</a></h1>
 <section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Permalink to this heading">¶</a></h2>
 <p>The Analysis module contains two submodules: <a class="reference internal" href="#tissuegraph">TissueGraph</a> and <a class="reference internal" href="#classification">Classification</a></p>
 <p><a class="reference internal" href="#tissuegraph">TissueGraph</a> module contains the data container classes that include all the core creation methods as detailed below.
 <a class="reference internal" href="#classification">Classification</a> has all the code for classificaiton of cells / regions into types.</p>
 </section>
-<section id="analysis-tissuegraph-submodule">
-<h2>Analysis.TissueGraph submodule<a class="headerlink" href="#analysis-tissuegraph-submodule" title="Permalink to this heading">¶</a></h2>
+<section id="analysis-tissuegraph">
+<h2>Analysis.TissueGraph<a class="headerlink" href="#analysis-tissuegraph" title="Permalink to this heading">¶</a></h2>
 <p id="tissuegraph">Overall, TissueMultiGraph contains four interlinked data structures:</p>
 <ul class="simple">
 <li><p>TissueMultiGraph (TMG)</p></li>
@@ -373,7 +373,7 @@ Many are not updated in the readthedocs so check the sources code!</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="Analysis.TissueGraph.TissueGraph.calc_entropy_at_different_Leiden_resolutions">
-<span class="sig-name descname"><span class="pre">calc_entropy_at_different_Leiden_resolutions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">Rvec=&lt;Mock</span> <span class="pre">name='mock.logspace()'</span> <span class="pre">id='140651168261744'&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Analysis/TissueGraph.html#TissueGraph.calc_entropy_at_different_Leiden_resolutions"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Analysis.TissueGraph.TissueGraph.calc_entropy_at_different_Leiden_resolutions" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">calc_entropy_at_different_Leiden_resolutions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">Rvec</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">numpy.logspace</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Analysis/TissueGraph.html#TissueGraph.calc_entropy_at_different_Leiden_resolutions"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Analysis.TissueGraph.TissueGraph.calc_entropy_at_different_Leiden_resolutions" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py method">
@@ -448,7 +448,7 @@ usage 2: if typevec is not None returns local env based on typevec, will return 
 
 <dl class="py method">
 <dt class="sig sig-object py" id="Analysis.TissueGraph.TissueGraph.graph_local_avg">
-<span class="sig-name descname"><span class="pre">graph_local_avg</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">VecToSmooth</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ordr=3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kernel=&lt;Mock</span> <span class="pre">name='mock.array()'</span> <span class="pre">id='140651168226560'&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Analysis/TissueGraph.html#TissueGraph.graph_local_avg"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Analysis.TissueGraph.TissueGraph.graph_local_avg" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">graph_local_avg</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">VecToSmooth</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ordr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kernel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">numpy.array</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Analysis/TissueGraph.html#TissueGraph.graph_local_avg"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Analysis.TissueGraph.TissueGraph.graph_local_avg" title="Permalink to this definition">¶</a></dt>
 <dd><p>Simple local average of a Vec based on local neighborgood</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -726,8 +726,8 @@ mapping between layers and the names of different objects in layers (to be loade
 </dd></dl>
 
 </section>
-<section id="analysis-classification-submodule">
-<h2>Analysis.Classification submodule<a class="headerlink" href="#analysis-classification-submodule" title="Permalink to this heading">¶</a></h2>
+<section id="analysis-classification">
+<h2>Analysis.Classification<a class="headerlink" href="#analysis-classification" title="Permalink to this heading">¶</a></h2>
 <p id="classification">The goal of the classes in this module is to provide classification services to data in TMG. Any statistical classification applied
 to any biospatial units must use the Classifier hierarchy. At the top of the hierarchy is an abstract class that defines the interface
 for classificaiton. The interface has two methods: <a class="reference internal" href="#Analysis.Classification.KNNClassifier.train" title="Analysis.Classification.KNNClassifier.train"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Analysis.Classification.KNNClassifier.train()</span></code></a> and <a class="reference internal" href="#Analysis.Classification.KNNClassifier.train" title="Analysis.Classification.KNNClassifier.train"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Analysis.Classification.KNNClassifier.train()</span></code></a></p>
@@ -891,7 +891,7 @@ the conditional entropy, H(Zone|Type).</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="Analysis.Classification.TopicClassifier.train">
-<span class="sig-name descname"><span class="pre">train</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_topics_list=&lt;Mock</span> <span class="pre">name='mock.geomspace().astype()'</span> <span class="pre">id='140651165535440'&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_procs=1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Analysis/Classification.html#TopicClassifier.train"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Analysis.Classification.TopicClassifier.train" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">train</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_topics_list</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">numpy.geomspace.astype</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_procs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Analysis/Classification.html#TopicClassifier.train"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Analysis.Classification.TopicClassifier.train" title="Permalink to this definition">¶</a></dt>
 <dd><p>fit multiple LDA models and chose the one with highest type entropy</p>
 </dd></dl>
 
@@ -910,9 +910,9 @@ the conditional entropy, H(Zone|Type).</p>
   <div>
     <h3><a href="index.html">Table of Contents</a></h3>
     <ul>
-<li><a class="reference internal" href="#">Analysis module</a><ul>
+<li><a class="reference internal" href="#">Analysis</a><ul>
 <li><a class="reference internal" href="#overview">Overview</a></li>
-<li><a class="reference internal" href="#analysis-tissuegraph-submodule">Analysis.TissueGraph submodule</a><ul>
+<li><a class="reference internal" href="#analysis-tissuegraph">Analysis.TissueGraph</a><ul>
 <li><a class="reference internal" href="#Analysis.TissueGraph.Taxonomy"><code class="docutils literal notranslate"><span class="pre">Taxonomy</span></code></a><ul>
 <li><a class="reference internal" href="#Analysis.TissueGraph.Taxonomy.name"><code class="docutils literal notranslate"><span class="pre">Taxonomy.name</span></code></a></li>
 <li><a class="reference internal" href="#Analysis.TissueGraph.Taxonomy.Type"><code class="docutils literal notranslate"><span class="pre">Taxonomy.Type</span></code></a></li>
@@ -977,7 +977,7 @@ the conditional entropy, H(Zone|Type).</p>
 </li>
 </ul>
 </li>
-<li><a class="reference internal" href="#analysis-classification-submodule">Analysis.Classification submodule</a><ul>
+<li><a class="reference internal" href="#analysis-classification">Analysis.Classification</a><ul>
 <li><a class="reference internal" href="#Analysis.Classification.Classifier"><code class="docutils literal notranslate"><span class="pre">Classifier</span></code></a><ul>
 <li><a class="reference internal" href="#Analysis.Classification.Classifier.tax"><code class="docutils literal notranslate"><span class="pre">Classifier.tax</span></code></a></li>
 <li><a class="reference internal" href="#Analysis.Classification.Classifier.classify"><code class="docutils literal notranslate"><span class="pre">Classifier.classify()</span></code></a></li>
@@ -1018,12 +1018,12 @@ the conditional entropy, H(Zone|Type).</p>
   <div>
     <h4>Previous topic</h4>
     <p class="topless"><a href="Processing.html"
-                          title="previous chapter">Processing package</a></p>
+                          title="previous chapter">Processing</a></p>
   </div>
   <div>
     <h4>Next topic</h4>
     <p class="topless"><a href="Visualization.html"
-                          title="next chapter">Visualization package</a></p>
+                          title="next chapter">Visualization</a></p>
   </div>
   <div role="note" aria-label="source link">
     <h3>This Page</h3>
@@ -1056,13 +1056,13 @@ the conditional entropy, H(Zone|Type).</p>
           <a href="py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
         <li class="right" >
-          <a href="Visualization.html" title="Visualization package"
+          <a href="Visualization.html" title="Visualization"
              >next</a> |</li>
         <li class="right" >
-          <a href="Processing.html" title="Processing package"
+          <a href="Processing.html" title="Processing"
              >previous</a> |</li>
         <li class="nav-item nav-item-0"><a href="index.html">dredFISH  documentation</a> &#187;</li>
-        <li class="nav-item nav-item-this"><a href="">Analysis module</a></li> 
+        <li class="nav-item nav-item-this"><a href="">Analysis</a></li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">

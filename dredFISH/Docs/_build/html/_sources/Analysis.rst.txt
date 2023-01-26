@@ -1,4 +1,4 @@
-Analysis module
+Analysis
 ================
 
 Overview
@@ -9,7 +9,7 @@ TissueGraph_ module contains the data container classes that include all the cor
 Classification_ has all the code for classificaiton of cells / regions into types. 
 
 
-Analysis.TissueGraph submodule
+Analysis.TissueGraph
 -------------------------------
 
 .. _TissueGraph:
@@ -71,7 +71,7 @@ TODO: expand on Taxonomy attributes beyond Type name and feature vector
    :show-inheritance:
 
 
-Analysis.Classification submodule
+Analysis.Classification
 ---------------------------------
 
 .. _Classification:

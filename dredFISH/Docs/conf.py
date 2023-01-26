@@ -22,9 +22,8 @@ copyright = '2022, Wollman lab'
 author = 'Wollman lab'
 
 
-# -- Mock modules ---------------------------------------------------
-from unittest import mock
-MOCK_MODULES = [
+# -- mock imports ---------------------------------------------------
+autodoc_mock_imports = [
     'numpy', 
     'pandas', 
     'igraph', 
@@ -72,7 +71,6 @@ MOCK_MODULES = [
     'colormath.color_objects',
     'colormath.color_conversions',
 
-    'torch',
     'PIL',
     'pyemd',
     'leidenalg',
@@ -83,15 +81,12 @@ MOCK_MODULES = [
     'cv2',
     'cellpose',
     'pywt',
-    'torch.nn',
-    'torch.utils',
-    'torch.utils.data',
+    # 'torch',  # this was commented out because of class inheritance issues in sphinx
+    # 'torch.nn',
+    # 'torch.utils',
+    # 'torch.utils.data',
     'zarr',
 ]
-
-for mod_name in MOCK_MODULES:
-    sys.modules[mod_name] = mock.Mock()
-
 
 # -- General configuration ---------------------------------------------------
 

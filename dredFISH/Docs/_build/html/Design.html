@@ -6,7 +6,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 
-    <title>Design package &#8212; dredFISH  documentation</title>
+    <title>Design &#8212; dredFISH  documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
     <link rel="stylesheet" type="text/css" href="_static/sphinxdoc.css" />
     <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
@@ -14,8 +14,8 @@
     <script src="_static/sphinx_highlight.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Utils package" href="Utils.html" />
-    <link rel="prev" title="Visualization package" href="Visualization.html" /> 
+    <link rel="next" title="Utils" href="Utils.html" />
+    <link rel="prev" title="Visualization" href="Visualization.html" /> 
   </head><body>
     <div class="related" role="navigation" aria-label="related navigation">
       <h3>Navigation</h3>
@@ -27,13 +27,13 @@
           <a href="py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
         <li class="right" >
-          <a href="Utils.html" title="Utils package"
+          <a href="Utils.html" title="Utils"
              accesskey="N">next</a> |</li>
         <li class="right" >
-          <a href="Visualization.html" title="Visualization package"
+          <a href="Visualization.html" title="Visualization"
              accesskey="P">previous</a> |</li>
         <li class="nav-item nav-item-0"><a href="index.html">dredFISH  documentation</a> &#187;</li>
-        <li class="nav-item nav-item-this"><a href="">Design package</a></li> 
+        <li class="nav-item nav-item-this"><a href="">Design</a></li> 
       </ul>
     </div>  
 
@@ -42,48 +42,245 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  <section id="design-package">
-<h1>Design package<a class="headerlink" href="#design-package" title="Permalink to this heading">¶</a></h1>
+  <section id="design">
+<h1>Design<a class="headerlink" href="#design" title="Permalink to this heading">¶</a></h1>
 <section id="module-Design.models.model_v3p0_basic">
-<span id="design-models-model-v3p0-basic-module"></span><h2>Design.models.model_v3p0_basic module<a class="headerlink" href="#module-Design.models.model_v3p0_basic" title="Permalink to this heading">¶</a></h2>
+<span id="design-models-model-v3p0-basic"></span><h2>Design.models.model_v3p0_basic<a class="headerlink" href="#module-Design.models.model_v3p0_basic" title="Permalink to this heading">¶</a></h2>
 <p>NN trained on gene expression data across sources to learn cell type while separate NN trained
 so that data source outputs are indistinguishable</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="Design.models.model_v3p0_basic.CellTypeNet">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">Design.models.model_v3p0_basic.</span></span><span class="sig-name descname"><span class="pre">CellTypeNet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_gns</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_cat</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gsubidx</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cnstrnts_idx</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cnstrnts</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_rcn_layers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_bit</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">14</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mxpr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">90000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">drprt</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lmd0</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lmd1</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lmd2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lmd3</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scale</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_sgnl</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_sgnl</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">noise</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Design/models/model_v3p0_basic.html#CellTypeNet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Design.models.model_v3p0_basic.CellTypeNet" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></p>
+<p>Neural network for learning bits for encoder probes</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n_gns</strong> (<em>int</em>) – number of genes</p></li>
+<li><p><strong>n_cat</strong> (<em>int</em>) – number of categories</p></li>
+<li><p><strong>gsubidx</strong> (<em>tensor</em><em>, </em><em>optional</em>) – _description_. Defaults to None.</p></li>
+<li><p><strong>cnstrnts_idx</strong> (<em>tensor</em><em>, </em><em>optional</em>) – _description_. Defaults to None.</p></li>
+<li><p><strong>cnstrnts</strong> (<em>tensor</em><em>, </em><em>optional</em>) – _description_. Defaults to None.</p></li>
+<li><p><strong>n_rcn_layers</strong> (<em>int</em><em>, </em><em>optional</em>) – _description_. Defaults to 2.</p></li>
+<li><p><strong>n_bit</strong> (<em>int</em><em>, </em><em>optional</em>) – number of bits for probe set. Defaults to 14.</p></li>
+<li><p><strong>mxpr</strong> (<em>float</em><em>, </em><em>optional</em>) – number of categories. Defaults to 9e4.</p></li>
+<li><p><strong>drprt</strong> (<em>float</em><em>, </em><em>optional</em>) – dropout proportion. Defaults to 0.</p></li>
+<li><p><strong>lmd0</strong> (<em>float</em><em>)</em><em>, </em><em>optional</em>) – _description_. Defaults to 1e-10.</p></li>
+<li><p><strong>lmd1</strong> (<em>float</em><em>, </em><em>optional</em>) – _description_. Defaults to 0.</p></li>
+<li><p><strong>scale</strong> – normalizing factor</p></li>
+<li><p><strong>min_sgnl</strong> (<em>float</em><em>, </em><em>optional</em>) – _description_. Defaults to None.</p></li>
+<li><p><strong>max_sgnl</strong> (<em>float</em><em>, </em><em>optional</em>) – _description_. Defaults to None.</p></li>
+<li><p><strong>noise</strong> (<em>tuple</em><em>, </em><em>optional</em>) – _description_. Defaults to None</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="Design.models.model_v3p0_basic.CellTypeNet.fit">
+<span class="sig-name descname"><span class="pre">fit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataloader</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">test_dataloader</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_iter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">disable_tqdm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">libsize_norm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Design/models/model_v3p0_basic.html#CellTypeNet.fit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Design.models.model_v3p0_basic.CellTypeNet.fit" title="Permalink to this definition">¶</a></dt>
+<dd><p>Train NN on gene counts to predict cell type label at two levels for SM2 and 10X data
+where we do not want to learn features specific to one data type.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dataloader</strong> – pytorch dataloader instance</p></li>
+<li><p><strong>lr</strong> – learning rate</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>performance (many metrics) over validation set at diff. iterations.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="Design.models.model_v3p0_basic.CellTypeNet.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rnd</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Design/models/model_v3p0_basic.html#CellTypeNet.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Design.models.model_v3p0_basic.CellTypeNet.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get labels at both levels and non-linear transform</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>X</strong> – gene count matrix for some subset of cells</p></li>
+<li><p><strong>rnd</strong> – whether to round first layer gene counts</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>fine-grained cell type labels
+coarse: coarse-grained cell type labels
+emb: embedding of weights from first layer of network</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>fine</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="Design.models.model_v3p0_basic.CellTypeNet.get_emb">
+<span class="sig-name descname"><span class="pre">get_emb</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rnd</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Design/models/model_v3p0_basic.html#CellTypeNet.get_emb"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Design.models.model_v3p0_basic.CellTypeNet.get_emb" title="Permalink to this definition">¶</a></dt>
+<dd><p>X-&gt;Z-&gt;Z’ (in-situ measured; then normed)</p>
+<p>Finds tanh non-linear transform of data, essentially evaluting nodes at layer 1 and returns margin error</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>X</strong> – gene count matrix for some subset of cells</p></li>
+<li><p><strong>rnd</strong> – whether to round first layer gene counts</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>non-linear transform of normalization</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>q.tanh()</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="Design.models.model_v3p0_basic.CellTypeNet.get_encmat">
+<span class="sig-name descname"><span class="pre">get_encmat</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rnd</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Design/models/model_v3p0_basic.html#CellTypeNet.get_encmat"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Design.models.model_v3p0_basic.CellTypeNet.get_encmat" title="Permalink to this definition">¶</a></dt>
+<dd><p>_summary_</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>rnd</strong> (<em>bool</em><em>, </em><em>optional</em>) – turn on random noise or not. Defaults to False.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>encoding matrix</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tensor</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="Design.models.model_v3p0_basic.CellTypeNet.get_prj">
+<span class="sig-name descname"><span class="pre">get_prj</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rnd</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Design/models/model_v3p0_basic.html#CellTypeNet.get_prj"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Design.models.model_v3p0_basic.CellTypeNet.get_prj" title="Permalink to this definition">¶</a></dt>
+<dd><p>X-&gt;Z (in-situ measured intensity)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>X</strong> (<em>tensor</em>) – data matrix</p></li>
+<li><p><strong>rnd</strong> (<em>bool</em><em>, </em><em>optional</em>) – random noise or not. Defaults to False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>projected matrix (cell by basis)</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>_type_</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="Design.models.model_v3p0_basic.CellTypeNet.proc_batch">
+<span class="sig-name descname"><span class="pre">proc_batch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ftrs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">clsts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">libsize_norm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Design/models/model_v3p0_basic.html#CellTypeNet.proc_batch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Design.models.model_v3p0_basic.CellTypeNet.proc_batch" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get ftrs and clsts from dataloader</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ftrs</strong> (<em>_type_</em>) – _description_</p></li>
+<li><p><strong>clsts</strong> (<em>_type_</em>) – _description_</p></li>
+<li><p><strong>device</strong> (<em>_type_</em>) – _description_</p></li>
+<li><p><strong>libsize_norm</strong> (<em>bool</em><em>, </em><em>optional</em>) – _description_. Defaults to True.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>_description_</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>_type_</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="Design.models.model_v3p0_basic.CellTypeNet.training">
+<span class="sig-name descname"><span class="pre">training</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#Design.models.model_v3p0_basic.CellTypeNet.training" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="Design.models.model_v3p0_basic.InstNrmSimple">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">Design.models.model_v3p0_basic.</span></span><span class="sig-name descname"><span class="pre">InstNrmSimple</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">scale</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_sgnl</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_sgnl</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">noise</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Design/models/model_v3p0_basic.html#InstNrmSimple"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Design.models.model_v3p0_basic.InstNrmSimple" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></p>
+<p>Performs normalization on projection with thresholding by value</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>scale</strong> (<em>float</em><em>, </em><em>optional</em>) – scaling factor. Defaults to 1e4.</p></li>
+<li><p><strong>min_sgnl</strong> (<em>float</em><em>, </em><em>optional</em>) – minimum signal. Defaults to None.</p></li>
+<li><p><strong>max_sgnl</strong> (<em>float</em><em>, </em><em>optional</em>) – maximum signal. Defaults to None.</p></li>
+<li><p><strong>noise</strong> (<em>tuple</em><em>, </em><em>optional</em>) – range of noise for Poisson parameter. Defaults to None).</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="Design.models.model_v3p0_basic.InstNrmSimple.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">Z</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Design/models/model_v3p0_basic.html#InstNrmSimple.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Design.models.model_v3p0_basic.InstNrmSimple.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Forward propagation with Poisson noise added</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>Z</strong> (<em>torch.tensor</em>) – projected gene count matrix</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>(X1-l)/self.logscale: standardized input</dt><dd><p>lower + upper + median: quartile error</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>torch.tensor</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="Design.models.model_v3p0_basic.InstNrmSimple.training">
+<span class="sig-name descname"><span class="pre">training</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#Design.models.model_v3p0_basic.InstNrmSimple.training" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
 <dl class="py function">
 <dt class="sig sig-object py" id="Design.models.model_v3p0_basic.init_weights">
 <span class="sig-prename descclassname"><span class="pre">Design.models.model_v3p0_basic.</span></span><span class="sig-name descname"><span class="pre">init_weights</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">m</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Design/models/model_v3p0_basic.html#init_weights"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Design.models.model_v3p0_basic.init_weights" title="Permalink to this definition">¶</a></dt>
-<dd><p>Takes a nn.Module as input; initialize its weights depending on its type</p>
-<p>In our case, only two basic components: Linear and Embedding
+<dd><p>Takes a nn.Module as input; initialize its weights depending on its type
+In our case, only two basic components: Linear and Embedding
 Embedding layers were initialized by N(0,1)
 Linear layers (combined with ReLU) will be initialized below by He initialization (He et al. 2015)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>m</strong> (<em>nn.Module</em>) – </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="Design.models.model_v3p0_basic.train_model">
 <span class="sig-prename descclassname"><span class="pre">Design.models.model_v3p0_basic.</span></span><span class="sig-name descname"><span class="pre">train_model</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">trn_dataloader</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tst_dataloader</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">res_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gsubidx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cnstrnts_idx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cnstrnts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lmd0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lmd1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lmd2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lmd3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_bit</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">24</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_rcn_layers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">drprt</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scale</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_sgnl</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_sgnl</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">noise</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_epochs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_iter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path_trained_model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">disable_tqdm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">libsize_norm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Design/models/model_v3p0_basic.html#train_model"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Design.models.model_v3p0_basic.train_model" title="Permalink to this definition">¶</a></dt>
 <dd><p>Load some subset of data, train model, save model, performance, and encoder embedding to directory</p>
-<dl class="py attribute">
-<dt class="sig sig-object py" id="Design.models.model_v3p0_basic.res_path">
-<span class="sig-prename descclassname"><span class="pre">Design.models.model_v3p0_basic.</span></span><span class="sig-name descname"><span class="pre">res_path</span></span><a class="headerlink" href="#Design.models.model_v3p0_basic.res_path" title="Permalink to this definition">¶</a></dt>
-<dd><dl class="field-list simple">
-<dt class="field-odd">Type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>results directory path</p>
-</dd>
-</dl>
-</dd></dl>
-
 <dl class="field-list simple">
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>model.name</strong></p>
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>res_path</strong> – results directory path</p>
 </dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p>the model name with parameter specifications</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>model.name</p>
 </dd>
 </dl>
 </dd></dl>
 
 </section>
 <section id="module-Design.data_loaders.data_loader_scrna">
-<span id="design-data-loaders-data-loader-scrna-module"></span><h2>Design.data_loaders.data_loader_scrna module<a class="headerlink" href="#module-Design.data_loaders.data_loader_scrna" title="Permalink to this heading">¶</a></h2>
+<span id="design-data-loaders-data-loader-scrna"></span><h2>Design.data_loaders.data_loader_scrna<a class="headerlink" href="#module-Design.data_loaders.data_loader_scrna" title="Permalink to this heading">¶</a></h2>
 <dl class="py function">
 <dt class="sig sig-object py" id="Design.data_loaders.data_loader_scrna.load_Allen_data">
 <span class="sig-prename descclassname"><span class="pre">Design.data_loaders.data_loader_scrna.</span></span><span class="sig-name descname"><span class="pre">load_Allen_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">datasetkey</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path_zarr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keyX</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'counts'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keyY</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'l3_code'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keyYcat</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'l3_cat'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">database</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{'smrt':</span> <span class="pre">'/greendata/GeneralStorage/fangming/projects/dredfish/data/rna/scrna_ss_ctxhippo_a_exon_count_matrix_v4.zarr',</span> <span class="pre">'smrt_pshopcnst':</span> <span class="pre">'/greendata/GeneralStorage/fangming/projects/dredfish/data/rna/cnstrnts_pshop_mm10_isoflat.pt',</span> <span class="pre">'smrt_pshopcnst_geneidx':</span> <span class="pre">'/greendata/GeneralStorage/fangming/projects/dredfish/data/rna/gidx_cnstrnts_pshop_mm10_isoflat.pt',</span> <span class="pre">'smrt_sub140_geneidx':</span> <span class="pre">'/greendata/GeneralStorage/fangming/projects/dredfish/data/rna/gidx_sub140_smrt_v1.pt',</span> <span class="pre">'smrt_trn':</span> <span class="pre">'/greendata/GeneralStorage/fangming/projects/dredfish/data/rna/scrna_ss_ctxhippo_a_exon_count_matrix_v4_train.zarr',</span> <span class="pre">'smrt_tst':</span> <span class="pre">'/greendata/GeneralStorage/fangming/projects/dredfish/data/rna/scrna_ss_ctxhippo_a_exon_count_matrix_v4_test.zarr',</span> <span class="pre">'tenx':</span> <span class="pre">'/greendata/GeneralStorage/fangming/projects/dredfish/data/rna/scrna_10x_ctxhippo_a_exon_count_matrix_v2.zarr',</span> <span class="pre">'tenx_trn':</span> <span class="pre">'/greendata/GeneralStorage/fangming/projects/dredfish/data/rna/scrna_10x_ctxhippo_a_exon_count_matrix_v2_train.zarr',</span> <span class="pre">'tenx_trn_v3':</span> <span class="pre">'/greendata/GeneralStorage/fangming/projects/dredfish/data/rna/scrna_10x_ctxhippo_a_count_matrix_v3_train.zarr',</span> <span class="pre">'tenx_tst':</span> <span class="pre">'/greendata/GeneralStorage/fangming/projects/dredfish/data/rna/scrna_10x_ctxhippo_a_exon_count_matrix_v2_test.zarr',</span> <span class="pre">'tenx_tst_v3':</span> <span class="pre">'/greendata/GeneralStorage/fangming/projects/dredfish/data/rna/scrna_10x_ctxhippo_a_count_matrix_v3_test.zarr',</span> <span class="pre">'tenx_v3':</span> <span class="pre">'/greendata/GeneralStorage/fangming/projects/dredfish/data/rna/scrna_10x_ctxhippo_a_count_matrix_v3.zarr'}</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Design/data_loaders/data_loader_scrna.html#load_Allen_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Design.data_loaders.data_loader_scrna.load_Allen_data" title="Permalink to this definition">¶</a></dt>
@@ -98,6 +295,9 @@ Linear layers (combined with ReLU) will be initialized below by He initializatio
 </dd></dl>
 
 </section>
+<section id="module-Design.data_loaders.data_files">
+<span id="design-data-loaders-data-files"></span><h2>Design.data_loaders.data_files<a class="headerlink" href="#module-Design.data_loaders.data_files" title="Permalink to this heading">¶</a></h2>
+</section>
 </section>
 
 
@@ -110,18 +310,33 @@ Linear layers (combined with ReLU) will be initialized below by He initializatio
   <div>
     <h3><a href="index.html">Table of Contents</a></h3>
     <ul>
-<li><a class="reference internal" href="#">Design package</a><ul>
-<li><a class="reference internal" href="#module-Design.models.model_v3p0_basic">Design.models.model_v3p0_basic module</a><ul>
-<li><a class="reference internal" href="#Design.models.model_v3p0_basic.init_weights"><code class="docutils literal notranslate"><span class="pre">init_weights()</span></code></a></li>
-<li><a class="reference internal" href="#Design.models.model_v3p0_basic.train_model"><code class="docutils literal notranslate"><span class="pre">train_model()</span></code></a></li>
-<li><a class="reference internal" href="#Design.models.model_v3p0_basic.res_path"><code class="docutils literal notranslate"><span class="pre">res_path</span></code></a></li>
+<li><a class="reference internal" href="#">Design</a><ul>
+<li><a class="reference internal" href="#module-Design.models.model_v3p0_basic">Design.models.model_v3p0_basic</a><ul>
+<li><a class="reference internal" href="#Design.models.model_v3p0_basic.CellTypeNet"><code class="docutils literal notranslate"><span class="pre">CellTypeNet</span></code></a><ul>
+<li><a class="reference internal" href="#Design.models.model_v3p0_basic.CellTypeNet.fit"><code class="docutils literal notranslate"><span class="pre">CellTypeNet.fit()</span></code></a></li>
+<li><a class="reference internal" href="#Design.models.model_v3p0_basic.CellTypeNet.forward"><code class="docutils literal notranslate"><span class="pre">CellTypeNet.forward()</span></code></a></li>
+<li><a class="reference internal" href="#Design.models.model_v3p0_basic.CellTypeNet.get_emb"><code class="docutils literal notranslate"><span class="pre">CellTypeNet.get_emb()</span></code></a></li>
+<li><a class="reference internal" href="#Design.models.model_v3p0_basic.CellTypeNet.get_encmat"><code class="docutils literal notranslate"><span class="pre">CellTypeNet.get_encmat()</span></code></a></li>
+<li><a class="reference internal" href="#Design.models.model_v3p0_basic.CellTypeNet.get_prj"><code class="docutils literal notranslate"><span class="pre">CellTypeNet.get_prj()</span></code></a></li>
+<li><a class="reference internal" href="#Design.models.model_v3p0_basic.CellTypeNet.proc_batch"><code class="docutils literal notranslate"><span class="pre">CellTypeNet.proc_batch()</span></code></a></li>
+<li><a class="reference internal" href="#Design.models.model_v3p0_basic.CellTypeNet.training"><code class="docutils literal notranslate"><span class="pre">CellTypeNet.training</span></code></a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#module-Design.data_loaders.data_loader_scrna">Design.data_loaders.data_loader_scrna module</a><ul>
+<li><a class="reference internal" href="#Design.models.model_v3p0_basic.InstNrmSimple"><code class="docutils literal notranslate"><span class="pre">InstNrmSimple</span></code></a><ul>
+<li><a class="reference internal" href="#Design.models.model_v3p0_basic.InstNrmSimple.forward"><code class="docutils literal notranslate"><span class="pre">InstNrmSimple.forward()</span></code></a></li>
+<li><a class="reference internal" href="#Design.models.model_v3p0_basic.InstNrmSimple.training"><code class="docutils literal notranslate"><span class="pre">InstNrmSimple.training</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#Design.models.model_v3p0_basic.init_weights"><code class="docutils literal notranslate"><span class="pre">init_weights()</span></code></a></li>
+<li><a class="reference internal" href="#Design.models.model_v3p0_basic.train_model"><code class="docutils literal notranslate"><span class="pre">train_model()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-Design.data_loaders.data_loader_scrna">Design.data_loaders.data_loader_scrna</a><ul>
 <li><a class="reference internal" href="#Design.data_loaders.data_loader_scrna.load_Allen_data"><code class="docutils literal notranslate"><span class="pre">load_Allen_data()</span></code></a></li>
 <li><a class="reference internal" href="#Design.data_loaders.data_loader_scrna.scRNAseqDataset"><code class="docutils literal notranslate"><span class="pre">scRNAseqDataset</span></code></a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#module-Design.data_loaders.data_files">Design.data_loaders.data_files</a></li>
 </ul>
 </li>
 </ul>
@@ -130,12 +345,12 @@ Linear layers (combined with ReLU) will be initialized below by He initializatio
   <div>
     <h4>Previous topic</h4>
     <p class="topless"><a href="Visualization.html"
-                          title="previous chapter">Visualization package</a></p>
+                          title="previous chapter">Visualization</a></p>
   </div>
   <div>
     <h4>Next topic</h4>
     <p class="topless"><a href="Utils.html"
-                          title="next chapter">Utils package</a></p>
+                          title="next chapter">Utils</a></p>
   </div>
   <div role="note" aria-label="source link">
     <h3>This Page</h3>
@@ -168,13 +383,13 @@ Linear layers (combined with ReLU) will be initialized below by He initializatio
           <a href="py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
         <li class="right" >
-          <a href="Utils.html" title="Utils package"
+          <a href="Utils.html" title="Utils"
              >next</a> |</li>
         <li class="right" >
-          <a href="Visualization.html" title="Visualization package"
+          <a href="Visualization.html" title="Visualization"
              >previous</a> |</li>
         <li class="nav-item nav-item-0"><a href="index.html">dredFISH  documentation</a> &#187;</li>
-        <li class="nav-item nav-item-this"><a href="">Design package</a></li> 
+        <li class="nav-item nav-item-this"><a href="">Design</a></li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">

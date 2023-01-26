@@ -6,7 +6,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 
-    <title>Utils package &#8212; dredFISH  documentation</title>
+    <title>Utils &#8212; dredFISH  documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
     <link rel="stylesheet" type="text/css" href="_static/sphinxdoc.css" />
     <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
@@ -14,7 +14,7 @@
     <script src="_static/sphinx_highlight.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="prev" title="Design package" href="Design.html" /> 
+    <link rel="prev" title="Design" href="Design.html" /> 
   </head><body>
     <div class="related" role="navigation" aria-label="related navigation">
       <h3>Navigation</h3>
@@ -26,10 +26,10 @@
           <a href="py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
         <li class="right" >
-          <a href="Design.html" title="Design package"
+          <a href="Design.html" title="Design"
              accesskey="P">previous</a> |</li>
         <li class="nav-item nav-item-0"><a href="index.html">dredFISH  documentation</a> &#187;</li>
-        <li class="nav-item nav-item-this"><a href="">Utils package</a></li> 
+        <li class="nav-item nav-item-this"><a href="">Utils</a></li> 
       </ul>
     </div>  
 
@@ -38,10 +38,10 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  <section id="utils-package">
-<h1>Utils package<a class="headerlink" href="#utils-package" title="Permalink to this heading">¶</a></h1>
+  <section id="utils">
+<h1>Utils<a class="headerlink" href="#utils" title="Permalink to this heading">¶</a></h1>
 <section id="module-Utils.basicu">
-<span id="utils-basicu-module"></span><h2>Utils.basicu module<a class="headerlink" href="#module-Utils.basicu" title="Permalink to this heading">¶</a></h2>
+<span id="utils-basicu"></span><h2>Utils.basicu<a class="headerlink" href="#module-Utils.basicu" title="Permalink to this heading">¶</a></h2>
 <dl class="py function">
 <dt class="sig sig-object py" id="Utils.basicu.clip_by_percentile">
 <span class="sig-prename descclassname"><span class="pre">Utils.basicu.</span></span><span class="sig-name descname"><span class="pre">clip_by_percentile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">vector</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">low_p</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">high_p</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">95</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/basicu.html#clip_by_percentile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.basicu.clip_by_percentile" title="Permalink to this definition">¶</a></dt>
@@ -60,7 +60,7 @@
 
 <dl class="py function">
 <dt class="sig sig-object py" id="Utils.basicu.diag_matrix">
-<span class="sig-prename descclassname"><span class="pre">Utils.basicu.</span></span><span class="sig-name descname"><span class="pre">diag_matrix</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rows=&lt;Mock</span> <span class="pre">name='mock.array()'</span> <span class="pre">id='140651168226560'&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cols=&lt;Mock</span> <span class="pre">name='mock.array()'</span> <span class="pre">id='140651168226560'&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">threshold=None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/basicu.html#diag_matrix"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.basicu.diag_matrix" title="Permalink to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">Utils.basicu.</span></span><span class="sig-name descname"><span class="pre">diag_matrix</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rows</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">numpy.array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cols</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">numpy.array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/basicu.html#diag_matrix"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.basicu.diag_matrix" title="Permalink to this definition">¶</a></dt>
 <dd><p>Diagonalize a matrix as much as possible
 threshold controls the level of diagnalization
 a smaller threshold encourges more number of strict diagnal values,
@@ -205,7 +205,7 @@ axis=1 # zscore across cols for each row  (if v is 2-dimensional)</p>
 
 </section>
 <section id="module-Utils.celltypeu">
-<span id="utils-celltypeu-module"></span><h2>Utils.celltypeu module<a class="headerlink" href="#module-Utils.celltypeu" title="Permalink to this heading">¶</a></h2>
+<span id="utils-celltypeu"></span><h2>Utils.celltypeu<a class="headerlink" href="#module-Utils.celltypeu" title="Permalink to this heading">¶</a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="Utils.celltypeu.CellTypeClassify">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">Utils.celltypeu.</span></span><span class="sig-name descname"><span class="pre">CellTypeClassify</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X_refdata</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y_refdata</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">X_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/celltypeu.html#CellTypeClassify"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.celltypeu.CellTypeClassify" title="Permalink to this definition">¶</a></dt>
@@ -289,7 +289,7 @@ if n_cells &gt; cluster size, it selects <strong>all</strong> cells</p>
 
 </section>
 <section id="module-Utils.designu">
-<span id="utils-designu-module"></span><h2>Utils.designu module<a class="headerlink" href="#module-Utils.designu" title="Permalink to this heading">¶</a></h2>
+<span id="utils-designu"></span><h2>Utils.designu<a class="headerlink" href="#module-Utils.designu" title="Permalink to this heading">¶</a></h2>
 <p>Convienient functions to evaluate the neural network probe design</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="Utils.designu.get_mse_torch">
@@ -349,7 +349,7 @@ zscored</p>
 
 </section>
 <section id="module-Utils.miscu">
-<span id="utils-miscu-module"></span><h2>Utils.miscu module<a class="headerlink" href="#module-Utils.miscu" title="Permalink to this heading">¶</a></h2>
+<span id="utils-miscu"></span><h2>Utils.miscu<a class="headerlink" href="#module-Utils.miscu" title="Permalink to this heading">¶</a></h2>
 <dl class="py function">
 <dt class="sig sig-object py" id="Utils.miscu.build_feature_graph_knnlite">
 <span class="sig-prename descclassname"><span class="pre">Utils.miscu.</span></span><span class="sig-name descname"><span class="pre">build_feature_graph_knnlite</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ftrs_mat</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">15</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metric</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cosine'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/miscu.html#build_feature_graph_knnlite"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.miscu.build_feature_graph_knnlite" title="Permalink to this definition">¶</a></dt>
@@ -389,8 +389,8 @@ gives order to samples by hierarical clustering</p>
   <div>
     <h3><a href="index.html">Table of Contents</a></h3>
     <ul>
-<li><a class="reference internal" href="#">Utils package</a><ul>
-<li><a class="reference internal" href="#module-Utils.basicu">Utils.basicu module</a><ul>
+<li><a class="reference internal" href="#">Utils</a><ul>
+<li><a class="reference internal" href="#module-Utils.basicu">Utils.basicu</a><ul>
 <li><a class="reference internal" href="#Utils.basicu.clip_by_percentile"><code class="docutils literal notranslate"><span class="pre">clip_by_percentile()</span></code></a></li>
 <li><a class="reference internal" href="#Utils.basicu.corr_paired_rows_fast"><code class="docutils literal notranslate"><span class="pre">corr_paired_rows_fast()</span></code></a></li>
 <li><a class="reference internal" href="#Utils.basicu.corr_paired_rows_fast2"><code class="docutils literal notranslate"><span class="pre">corr_paired_rows_fast2()</span></code></a></li>
@@ -417,7 +417,7 @@ gives order to samples by hierarical clustering</p>
 <li><a class="reference internal" href="#Utils.basicu.zscore"><code class="docutils literal notranslate"><span class="pre">zscore()</span></code></a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#module-Utils.celltypeu">Utils.celltypeu module</a><ul>
+<li><a class="reference internal" href="#module-Utils.celltypeu">Utils.celltypeu</a><ul>
 <li><a class="reference internal" href="#Utils.celltypeu.CellTypeClassify"><code class="docutils literal notranslate"><span class="pre">CellTypeClassify</span></code></a><ul>
 <li><a class="reference internal" href="#Utils.celltypeu.CellTypeClassify.backup"><code class="docutils literal notranslate"><span class="pre">CellTypeClassify.backup()</span></code></a></li>
 <li><a class="reference internal" href="#Utils.celltypeu.CellTypeClassify.buildModel"><code class="docutils literal notranslate"><span class="pre">CellTypeClassify.buildModel()</span></code></a></li>
@@ -436,7 +436,7 @@ gives order to samples by hierarical clustering</p>
 <li><a class="reference internal" href="#Utils.celltypeu.iterative_classify"><code class="docutils literal notranslate"><span class="pre">iterative_classify()</span></code></a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#module-Utils.designu">Utils.designu module</a><ul>
+<li><a class="reference internal" href="#module-Utils.designu">Utils.designu</a><ul>
 <li><a class="reference internal" href="#Utils.designu.get_mse_torch"><code class="docutils literal notranslate"><span class="pre">get_mse_torch()</span></code></a></li>
 <li><a class="reference internal" href="#Utils.designu.get_r2_torch"><code class="docutils literal notranslate"><span class="pre">get_r2_torch()</span></code></a></li>
 <li><a class="reference internal" href="#Utils.designu.plot_dcdx"><code class="docutils literal notranslate"><span class="pre">plot_dcdx()</span></code></a></li>
@@ -447,7 +447,7 @@ gives order to samples by hierarical clustering</p>
 <li><a class="reference internal" href="#Utils.designu.plot_intn"><code class="docutils literal notranslate"><span class="pre">plot_intn()</span></code></a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#module-Utils.miscu">Utils.miscu module</a><ul>
+<li><a class="reference internal" href="#module-Utils.miscu">Utils.miscu</a><ul>
 <li><a class="reference internal" href="#Utils.miscu.build_feature_graph_knnlite"><code class="docutils literal notranslate"><span class="pre">build_feature_graph_knnlite()</span></code></a></li>
 <li><a class="reference internal" href="#Utils.miscu.is_in_polygon"><code class="docutils literal notranslate"><span class="pre">is_in_polygon()</span></code></a></li>
 <li><a class="reference internal" href="#Utils.miscu.leiden"><code class="docutils literal notranslate"><span class="pre">leiden()</span></code></a></li>
@@ -462,7 +462,7 @@ gives order to samples by hierarical clustering</p>
   <div>
     <h4>Previous topic</h4>
     <p class="topless"><a href="Design.html"
-                          title="previous chapter">Design package</a></p>
+                          title="previous chapter">Design</a></p>
   </div>
   <div role="note" aria-label="source link">
     <h3>This Page</h3>
@@ -495,10 +495,10 @@ gives order to samples by hierarical clustering</p>
           <a href="py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
         <li class="right" >
-          <a href="Design.html" title="Design package"
+          <a href="Design.html" title="Design"
              >previous</a> |</li>
         <li class="nav-item nav-item-0"><a href="index.html">dredFISH  documentation</a> &#187;</li>
-        <li class="nav-item nav-item-this"><a href="">Utils package</a></li> 
+        <li class="nav-item nav-item-this"><a href="">Utils</a></li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">

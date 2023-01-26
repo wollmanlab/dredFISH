@@ -1,28 +1,28 @@
-Utils package
+Utils
 =====================
 
-Utils.basicu module
+Utils.basicu 
 ------------------------
 .. automodule:: Utils.basicu
    :members:
    :undoc-members:
    :show-inheritance:
 
-Utils.celltypeu module
+Utils.celltypeu
 ------------------------
 .. automodule:: Utils.celltypeu
    :members:
    :undoc-members:
    :show-inheritance:
 
-Utils.designu module
+Utils.designu 
 ------------------------
 .. automodule:: Utils.designu
    :members:
    :undoc-members:
    :show-inheritance:
 
-Utils.miscu module
+Utils.miscu
 ------------------------
 .. automodule:: Utils.miscu
    :members:

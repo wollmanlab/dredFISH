@@ -1,28 +1,28 @@
-Processing package
+Processing
 =====================
 
-Processing.execute module
+Processing.execute
 --------------------------
 .. automodule:: Processing.execute 
    :members:
    :undoc-members:
    :show-inheritance:
 
-Processing.putils module
+Processing.putils
 --------------------------
 .. automodule:: Processing.putils
    :members:
    :undoc-members:
    :show-inheritance:
 
-Processing.QC module
+Processing.QC
 --------------------------
 .. automodule:: Processing.QC
    :members:
    :undoc-members:
    :show-inheritance:
 
-Processing.Section module
+Processing.Section
 --------------------------
 .. automodule:: Processing.Section
    :members:

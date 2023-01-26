@@ -6,7 +6,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 
-    <title>Processing package &#8212; dredFISH  documentation</title>
+    <title>Processing &#8212; dredFISH  documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
     <link rel="stylesheet" type="text/css" href="_static/sphinxdoc.css" />
     <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
@@ -14,7 +14,7 @@
     <script src="_static/sphinx_highlight.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Analysis module" href="Analysis.html" />
+    <link rel="next" title="Analysis" href="Analysis.html" />
     <link rel="prev" title="Welcome to dredFISH’s documentation!" href="index.html" /> 
   </head><body>
     <div class="related" role="navigation" aria-label="related navigation">
@@ -27,13 +27,13 @@
           <a href="py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
         <li class="right" >
-          <a href="Analysis.html" title="Analysis module"
+          <a href="Analysis.html" title="Analysis"
              accesskey="N">next</a> |</li>
         <li class="right" >
           <a href="index.html" title="Welcome to dredFISH’s documentation!"
              accesskey="P">previous</a> |</li>
         <li class="nav-item nav-item-0"><a href="index.html">dredFISH  documentation</a> &#187;</li>
-        <li class="nav-item nav-item-this"><a href="">Processing package</a></li> 
+        <li class="nav-item nav-item-this"><a href="">Processing</a></li> 
       </ul>
     </div>  
 
@@ -42,13 +42,13 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  <section id="processing-package">
-<h1>Processing package<a class="headerlink" href="#processing-package" title="Permalink to this heading">¶</a></h1>
+  <section id="processing">
+<h1>Processing<a class="headerlink" href="#processing" title="Permalink to this heading">¶</a></h1>
 <section id="module-Processing.execute">
-<span id="processing-execute-module"></span><h2>Processing.execute module<a class="headerlink" href="#module-Processing.execute" title="Permalink to this heading">¶</a></h2>
+<span id="processing-execute"></span><h2>Processing.execute<a class="headerlink" href="#module-Processing.execute" title="Permalink to this heading">¶</a></h2>
 </section>
 <section id="module-Processing.putils">
-<span id="processing-putils-module"></span><h2>Processing.putils module<a class="headerlink" href="#module-Processing.putils" title="Permalink to this heading">¶</a></h2>
+<span id="processing-putils"></span><h2>Processing.putils<a class="headerlink" href="#module-Processing.putils" title="Permalink to this heading">¶</a></h2>
 <p>Max Projection</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="Processing.putils.colorize_segmented_image">
@@ -71,15 +71,15 @@
 
 <dl class="py function">
 <dt class="sig sig-object py" id="Processing.putils.generate_stitched">
-<span class="sig-prename descclassname"><span class="pre">Processing.putils.</span></span><span class="sig-name descname"><span class="pre">generate_stitched</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">image_metadata</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">acq</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">channel</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pixel_size=0.495</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_pixels=&lt;Mock</span> <span class="pre">name='mock.array()'</span> <span class="pre">id='140651168226560'&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exposure=''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rotate=0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flipud=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fliplr=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype=&lt;Mock</span> <span class="pre">name='mock.int32'</span> <span class="pre">id='140651162527536'&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">posnames=[]</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Processing/putils.html#generate_stitched"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Processing.putils.generate_stitched" title="Permalink to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">Processing.putils.</span></span><span class="sig-name descname"><span class="pre">generate_stitched</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">image_metadata</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">acq</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">channel</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pixel_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.495</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_pixels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">numpy.array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exposure</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rotate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flipud</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fliplr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">torch.int32</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">posnames</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Processing/putils.html#generate_stitched"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Processing.putils.generate_stitched" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 </section>
 <section id="module-Processing.QC">
-<span id="processing-qc-module"></span><h2>Processing.QC module<a class="headerlink" href="#module-Processing.QC" title="Permalink to this heading">¶</a></h2>
+<span id="processing-qc"></span><h2>Processing.QC<a class="headerlink" href="#module-Processing.QC" title="Permalink to this heading">¶</a></h2>
 </section>
 <section id="module-Processing.Section">
-<span id="processing-section-module"></span><h2>Processing.Section module<a class="headerlink" href="#module-Processing.Section" title="Permalink to this heading">¶</a></h2>
+<span id="processing-section"></span><h2>Processing.Section<a class="headerlink" href="#module-Processing.Section" title="Permalink to this heading">¶</a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="Processing.Section.Section_Class">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">Processing.Section.</span></span><span class="sig-name descname"><span class="pre">Section_Class</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">metadata_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">section</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cword_config</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Processing/Section.html#Section_Class"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Processing.Section.Section_Class" title="Permalink to this definition">¶</a></dt>
@@ -230,7 +230,7 @@
 
 <dl class="py function">
 <dt class="sig sig-object py" id="Processing.Section.visualize_merge">
-<span class="sig-prename descclassname"><span class="pre">Processing.Section.</span></span><span class="sig-name descname"><span class="pre">visualize_merge</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">img1,</span> <span class="pre">img2,</span> <span class="pre">color1=&lt;Mock</span> <span class="pre">name='mock.array()'</span> <span class="pre">id='140651168226560'&gt;,</span> <span class="pre">color2=&lt;Mock</span> <span class="pre">name='mock.array()'</span> <span class="pre">id='140651168226560'&gt;,</span> <span class="pre">figsize=[20,</span> <span class="pre">20],</span> <span class="pre">pvmin=5,</span> <span class="pre">pvmax=95,</span> <span class="pre">title=''</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Processing/Section.html#visualize_merge"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Processing.Section.visualize_merge" title="Permalink to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">Processing.Section.</span></span><span class="sig-name descname"><span class="pre">visualize_merge</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">img1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">img2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color1</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">numpy.array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">numpy.array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">figsize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[20,</span> <span class="pre">20]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pvmin</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pvmax</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">95</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Processing/Section.html#visualize_merge"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Processing.Section.visualize_merge" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 </section>
@@ -246,17 +246,17 @@
   <div>
     <h3><a href="index.html">Table of Contents</a></h3>
     <ul>
-<li><a class="reference internal" href="#">Processing package</a><ul>
-<li><a class="reference internal" href="#module-Processing.execute">Processing.execute module</a></li>
-<li><a class="reference internal" href="#module-Processing.putils">Processing.putils module</a><ul>
+<li><a class="reference internal" href="#">Processing</a><ul>
+<li><a class="reference internal" href="#module-Processing.execute">Processing.execute</a></li>
+<li><a class="reference internal" href="#module-Processing.putils">Processing.putils</a><ul>
 <li><a class="reference internal" href="#Processing.putils.colorize_segmented_image"><code class="docutils literal notranslate"><span class="pre">colorize_segmented_image()</span></code></a></li>
 <li><a class="reference internal" href="#Processing.putils.generate_FF"><code class="docutils literal notranslate"><span class="pre">generate_FF()</span></code></a></li>
 <li><a class="reference internal" href="#Processing.putils.generate_img"><code class="docutils literal notranslate"><span class="pre">generate_img()</span></code></a></li>
 <li><a class="reference internal" href="#Processing.putils.generate_stitched"><code class="docutils literal notranslate"><span class="pre">generate_stitched()</span></code></a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#module-Processing.QC">Processing.QC module</a></li>
-<li><a class="reference internal" href="#module-Processing.Section">Processing.Section module</a><ul>
+<li><a class="reference internal" href="#module-Processing.QC">Processing.QC</a></li>
+<li><a class="reference internal" href="#module-Processing.Section">Processing.Section</a><ul>
 <li><a class="reference internal" href="#Processing.Section.Section_Class"><code class="docutils literal notranslate"><span class="pre">Section_Class</span></code></a><ul>
 <li><a class="reference internal" href="#Processing.Section.Section_Class.filter_data"><code class="docutils literal notranslate"><span class="pre">Section_Class.filter_data()</span></code></a></li>
 <li><a class="reference internal" href="#Processing.Section.Section_Class.find_acq"><code class="docutils literal notranslate"><span class="pre">Section_Class.find_acq()</span></code></a></li>
@@ -295,7 +295,7 @@
   <div>
     <h4>Next topic</h4>
     <p class="topless"><a href="Analysis.html"
-                          title="next chapter">Analysis module</a></p>
+                          title="next chapter">Analysis</a></p>
   </div>
   <div role="note" aria-label="source link">
     <h3>This Page</h3>
@@ -328,13 +328,13 @@
           <a href="py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
         <li class="right" >
-          <a href="Analysis.html" title="Analysis module"
+          <a href="Analysis.html" title="Analysis"
              >next</a> |</li>
         <li class="right" >
           <a href="index.html" title="Welcome to dredFISH’s documentation!"
              >previous</a> |</li>
         <li class="nav-item nav-item-0"><a href="index.html">dredFISH  documentation</a> &#187;</li>
-        <li class="nav-item nav-item-this"><a href="">Processing package</a></li> 
+        <li class="nav-item nav-item-this"><a href="">Processing</a></li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">

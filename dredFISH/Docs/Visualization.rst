@@ -1,7 +1,7 @@
-Visualization package
+Visualization 
 =====================
 
-Visualization.Viz module
+Visualization.Viz
 ------------------------
 
 .. automodule:: Visualization.Viz

@@ -13,16 +13,13 @@ import torch.nn as nn
 from dredFISH.Utils import basicu
 
 class InstNrmSimple(nn.Module):
-    """
-    Performs normalization on projection with thresholding by value  
-    
-    Attributes
-    ----------
-        min_pos: minimum position  
-        min_sgnl: minimum signal
-        max_sgnl: maximum signal
-        scale: scaling factors
-        noise: range of noises for Poisson parameter
+    """Performs normalization on projection with thresholding by value  
+
+    Args:
+        scale (float, optional): scaling factor. Defaults to 1e4.
+        min_sgnl (float, optional): minimum signal. Defaults to None.
+        max_sgnl (float, optional): maximum signal. Defaults to None.
+        noise (tuple, optional): range of noise for Poisson parameter. Defaults to None).
     """
     def __init__(self, 
         scale=1e4, #=1.5e4, 
@@ -30,13 +27,7 @@ class InstNrmSimple(nn.Module):
         max_sgnl=None,
         noise=None #(1e4, 1e3),
         ):
-        """_summary_
-
-        Args:
-            scale (_type_, optional): _description_. Defaults to 1e4.
-            min_sgnl (_type_, optional): _description_. Defaults to None.
-            max_sgnl (_type_, optional): _description_. Defaults to None.
-            noise (_type_, optional): _description_. Defaults to None#(1e4, 1e3).
+        """
         """
         super().__init__()
         self.logscale = torch.tensor(scale).log10()
@@ -45,17 +36,14 @@ class InstNrmSimple(nn.Module):
         self.noise = noise
 
     def forward(self, Z):
-        """
-        Forward propagation with Poisson noise added
-        
-        Attributes
-        ----------
-        X: (projected) gene count matrix
-        
-        Returns
-        -------
-        (X1-l)/self.logscale: standardized input
-        lower + upper + median: quartile error 
+        """Forward propagation with Poisson noise added
+
+        Args:
+            Z (torch.tensor): projected gene count matrix
+
+        Returns:
+            torch.tensor: (X1-l)/self.logscale: standardized input
+                          lower + upper + median: quartile error 
         """
         # Poisson noise
         if self.noise is not None:
@@ -90,19 +78,25 @@ class InstNrmSimple(nn.Module):
         # norm
         Zn = ((Zlog-self.logscale)/self.logscale).tanh()
         return Zn, bit_cnst 
-    
 class CellTypeNet(nn.Module):
-    """
-    Neural network for learning bits for encoder probes 
-    
-    Attributes
-    ----------
-        n_gns: number of genes
-        n_cat: number of categories
+    """Neural network for learning bits for encoder probes 
+
+    Args:
+        n_gns (int): number of genes
+        n_cat (int): number of categories
+        gsubidx (tensor, optional): _description_. Defaults to None.
+        cnstrnts_idx (tensor, optional): _description_. Defaults to None.
+        cnstrnts (tensor, optional): _description_. Defaults to None.
+        n_rcn_layers (int, optional): _description_. Defaults to 2.
+        n_bit (int, optional): number of bits for probe set. Defaults to 14.
+        mxpr (float, optional): number of categories. Defaults to 9e4.
+        drprt (float, optional): dropout proportion. Defaults to 0.
+        lmd0 (float), optional): _description_. Defaults to 1e-10.
+        lmd1 (float, optional): _description_. Defaults to 0.
         scale: normalizing factor
-        n_bit: number of bits for probe set 
-        mxpr: max expression
-        drprt: dropout proportion
+        min_sgnl (float, optional): _description_. Defaults to None.
+        max_sgnl (float, optional): _description_. Defaults to None.
+        noise (tuple, optional): _description_. Defaults to None
     """
     def __init__(self, n_gns, n_cat,  
                  gsubidx=None,
@@ -120,6 +114,8 @@ class CellTypeNet(nn.Module):
                  max_sgnl=None,
                  noise=None #(0,0), #(1e4, 1e3),
                  ):
+        """_summary_
+        """
         super().__init__()
         
         # filename {pooling type} {noise type} {max expression} {min position} {number of bits} {dropout} {penalty factors}
@@ -197,7 +193,13 @@ class CellTypeNet(nn.Module):
     
     
     def get_encmat(self, rnd=False):
-        """
+        """_summary_
+
+        Args:
+            rnd (bool, optional): turn on random noise or not. Defaults to False.
+
+        Returns:
+            tensor: encoding matrix 
         """
         wts= self.enc.weight.exp()
         prx= wts / wts.sum() * self.mxpr
@@ -205,9 +207,14 @@ class CellTypeNet(nn.Module):
         return prx
     
     def get_prj(self, X, rnd=False):
-        """
-        X->Z (in-situ measured intensity)
+        """X->Z (in-situ measured intensity) 
 
+        Args:
+            X (tensor): data matrix 
+            rnd (bool, optional): random noise or not. Defaults to False.
+
+        Returns:
+            _type_: projected matrix (cell by basis)
         """
         prx = self.get_encmat(rnd=rnd)
         prj = X.mm(prx)
@@ -225,15 +232,12 @@ class CellTypeNet(nn.Module):
 
         Finds tanh non-linear transform of data, essentially evaluting nodes at layer 1 and returns margin error
         
-        Attributes
-        ---------- 
+        Args:
             X: gene count matrix for some subset of cells 
             rnd: whether to round first layer gene counts 
         
-        Returns
-        -------
+        Returns:
             q.tanh(): non-linear transform of normalization
-        -------
         """
         prj = self.get_prj(X, rnd=rnd)
         q, bit_cnst = self.nrm(prj)
@@ -243,13 +247,11 @@ class CellTypeNet(nn.Module):
         """
         Get labels at both levels and non-linear transform 
         
-        Attributes
-        ---------- 
+        Args:
             X: gene count matrix for some subset of cells 
             rnd: whether to round first layer gene counts 
         
-        Returns
-        -------
+        Returns:
             fine: fine-grained cell type labels
             coarse: coarse-grained cell type labels
             emb: embedding of weights from first layer of network
@@ -263,8 +265,16 @@ class CellTypeNet(nn.Module):
         return fine, Xrcn, emb, bit_cnst 
     
     def proc_batch(self, ftrs, clsts, device, libsize_norm=True):
-        """
-        Get ftrs and clsts from dataloader
+        """Get ftrs and clsts from dataloader
+
+        Args:
+            ftrs (_type_): _description_
+            clsts (_type_): _description_
+            device (_type_): _description_
+            libsize_norm (bool, optional): _description_. Defaults to True.
+
+        Returns:
+            _type_: _description_
         """
         # get data
         if libsize_norm:
@@ -285,14 +295,12 @@ class CellTypeNet(nn.Module):
         Train NN on gene counts to predict cell type label at two levels for SM2 and 10X data
         where we do not want to learn features specific to one data type. 
         
-        Attributes
-        ---------- 
+        Args:
             dataloader: pytorch dataloader instance
             lr: learning rate
         
-        Returns
-        -------
-            learning_crvs: performance over validation set
+        Returns:
+            dict: performance (many metrics) over validation set at diff. iterations.
         """
         learning_crvs= {}
         if self.n_rcn_layers > 0: 
@@ -425,13 +433,23 @@ class CellTypeNet(nn.Module):
                 self.train()
         return learning_crvs
 
-def init_weights(m):
-    """Takes a nn.Module as input; initialize its weights depending on its type
-
+    """
+    Takes a nn.Module as input; initialize its weights depending on its type
     In our case, only two basic components: Linear and Embedding
     Embedding layers were initialized by N(0,1)
     Linear layers (combined with ReLU) will be initialized below by He initialization (He et al. 2015)
     """
+def init_weights(m):
+    """
+    Takes a nn.Module as input; initialize its weights depending on its type
+    In our case, only two basic components: Linear and Embedding
+    Embedding layers were initialized by N(0,1)
+    Linear layers (combined with ReLU) will be initialized below by He initialization (He et al. 2015)
+
+    Args:
+        m (nn.Module): 
+    """
+
     if isinstance(m, nn.Linear):
         torch.nn.init.kaiming_normal_(m.weight, nonlinearity='relu')
     return
@@ -458,12 +476,10 @@ def train_model(
     """
     Load some subset of data, train model, save model, performance, and encoder embedding to directory
     
-    Attributes
-    ----------
+    Args: 
         res_path: results directory path
     
-    Returns
-    -------
+    Returns:
         model.name: the model name with parameter specifications
     """
     # set up 
