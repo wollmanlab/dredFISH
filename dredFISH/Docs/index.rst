@@ -7,11 +7,14 @@ Welcome to dredFISH's documentation!
 ====================================
 
 .. toctree::
-   :maxdepth: 4
+   :maxdepth: 2
    :caption: Contents:
 
+   Processing
    Analysis
    Visualization
+   Design
+   Utils
 
 
 Indices and tables

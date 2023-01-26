@@ -1,0 +1,345 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+
+    <title>Processing package &#8212; dredFISH  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="_static/sphinxdoc.css" />
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/sphinx_highlight.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Analysis module" href="Analysis.html" />
+    <link rel="prev" title="Welcome to dredFISH’s documentation!" href="index.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="Analysis.html" title="Analysis module"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="Welcome to dredFISH’s documentation!"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">dredFISH  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Processing package</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="processing-package">
+<h1>Processing package<a class="headerlink" href="#processing-package" title="Permalink to this heading">¶</a></h1>
+<section id="module-Processing.execute">
+<span id="processing-execute-module"></span><h2>Processing.execute module<a class="headerlink" href="#module-Processing.execute" title="Permalink to this heading">¶</a></h2>
+</section>
+<section id="module-Processing.putils">
+<span id="processing-putils-module"></span><h2>Processing.putils module<a class="headerlink" href="#module-Processing.putils" title="Permalink to this heading">¶</a></h2>
+<p>Max Projection</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="Processing.putils.colorize_segmented_image">
+<span class="sig-prename descclassname"><span class="pre">Processing.putils.</span></span><span class="sig-name descname"><span class="pre">colorize_segmented_image</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">img</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'rgb'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Processing/putils.html#colorize_segmented_image"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Processing.putils.colorize_segmented_image" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a randomly colorized segmented image for display purposes.
+:param img: Should be a numpy array of dtype np.int and 2D shape segmented
+:param color_type: ‘rg’ for red green gradient, ‘rb’ = red blue, ‘bg’ = blue green
+:return: Randomly colorized, segmented image (shape=(n,m,3))</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Processing.putils.generate_FF">
+<span class="sig-prename descclassname"><span class="pre">Processing.putils.</span></span><span class="sig-name descname"><span class="pre">generate_FF</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">image_metadata</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">acq</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">channel</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Processing/putils.html#generate_FF"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Processing.putils.generate_FF" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Processing.putils.generate_img">
+<span class="sig-prename descclassname"><span class="pre">Processing.putils.</span></span><span class="sig-name descname"><span class="pre">generate_img</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">FF</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Processing/putils.html#generate_img"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Processing.putils.generate_img" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Processing.putils.generate_stitched">
+<span class="sig-prename descclassname"><span class="pre">Processing.putils.</span></span><span class="sig-name descname"><span class="pre">generate_stitched</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">image_metadata</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">acq</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">channel</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pixel_size=0.495</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_pixels=&lt;Mock</span> <span class="pre">name='mock.array()'</span> <span class="pre">id='140651168226560'&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exposure=''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rotate=0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flipud=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fliplr=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype=&lt;Mock</span> <span class="pre">name='mock.int32'</span> <span class="pre">id='140651162527536'&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">posnames=[]</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Processing/putils.html#generate_stitched"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Processing.putils.generate_stitched" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</section>
+<section id="module-Processing.QC">
+<span id="processing-qc-module"></span><h2>Processing.QC module<a class="headerlink" href="#module-Processing.QC" title="Permalink to this heading">¶</a></h2>
+</section>
+<section id="module-Processing.Section">
+<span id="processing-section-module"></span><h2>Processing.Section module<a class="headerlink" href="#module-Processing.Section" title="Permalink to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="Processing.Section.Section_Class">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">Processing.Section.</span></span><span class="sig-name descname"><span class="pre">Section_Class</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">metadata_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">section</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cword_config</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Processing/Section.html#Section_Class"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Processing.Section.Section_Class" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="Processing.Section.Section_Class.filter_data">
+<span class="sig-name descname"><span class="pre">filter_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'nuclei'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Processing/Section.html#Section_Class.filter_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Processing.Section.Section_Class.filter_data" title="Permalink to this definition">¶</a></dt>
+<dd><p>filter_data Remove called cells that are likely not cells</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>model_type</strong> (<em>str</em><em>, </em><em>optional</em>) – _description_, defaults to ‘nuclei’</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="Processing.Section.Section_Class.find_acq">
+<span class="sig-name descname"><span class="pre">find_acq</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hybe</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">protocol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'hybe'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Processing/Section.html#Section_Class.find_acq"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Processing.Section.Section_Class.find_acq" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="Processing.Section.Section_Class.generate_fname">
+<span class="sig-name descname"><span class="pre">generate_fname</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hybe</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">channel</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'pt'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Processing/Section.html#Section_Class.generate_fname"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Processing.Section.Section_Class.generate_fname" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="Processing.Section.Section_Class.generate_iterable">
+<span class="sig-name descname"><span class="pre">generate_iterable</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">iterable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">message</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">length</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Processing/Section.html#Section_Class.generate_iterable"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Processing.Section.Section_Class.generate_iterable" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="Processing.Section.Section_Class.load_metadata">
+<span class="sig-name descname"><span class="pre">load_metadata</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/Processing/Section.html#Section_Class.load_metadata"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Processing.Section.Section_Class.load_metadata" title="Permalink to this definition">¶</a></dt>
+<dd><p>load_data Load Previously Processed Data</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="Processing.Section.Section_Class.load_tensor">
+<span class="sig-name descname"><span class="pre">load_tensor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fname</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Processing/Section.html#Section_Class.load_tensor"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Processing.Section.Section_Class.load_tensor" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="Processing.Section.Section_Class.pull_vectors">
+<span class="sig-name descname"><span class="pre">pull_vectors</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'nuclei'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Processing/Section.html#Section_Class.pull_vectors"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Processing.Section.Section_Class.pull_vectors" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="Processing.Section.Section_Class.run">
+<span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/Processing/Section.html#Section_Class.run"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Processing.Section.Section_Class.run" title="Permalink to this definition">¶</a></dt>
+<dd><p>run Main Executable</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="Processing.Section.Section_Class.save_data">
+<span class="sig-name descname"><span class="pre">save_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'nuclei'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Processing/Section.html#Section_Class.save_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Processing.Section.Section_Class.save_data" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="Processing.Section.Section_Class.save_image">
+<span class="sig-name descname"><span class="pre">save_image</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">img</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fname</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Processing/Section.html#Section_Class.save_image"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Processing.Section.Section_Class.save_image" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="Processing.Section.Section_Class.save_tensor">
+<span class="sig-name descname"><span class="pre">save_tensor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fname</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Processing/Section.html#Section_Class.save_tensor"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Processing.Section.Section_Class.save_tensor" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="Processing.Section.Section_Class.segment">
+<span class="sig-name descname"><span class="pre">segment</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'nuclei'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Processing/Section.html#Section_Class.segment"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Processing.Section.Section_Class.segment" title="Permalink to this definition">¶</a></dt>
+<dd><p>FIGURE OUT GPU FOR SPEED</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="Processing.Section.Section_Class.stitch">
+<span class="sig-name descname"><span class="pre">stitch</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/Processing/Section.html#Section_Class.stitch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Processing.Section.Section_Class.stitch" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="Processing.Section.Section_Class.stitcher">
+<span class="sig-name descname"><span class="pre">stitcher</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hybe</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">channel</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">acq</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bkg_acq</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Processing/Section.html#Section_Class.stitcher"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Processing.Section.Section_Class.stitcher" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="Processing.Section.Section_Class.update_user">
+<span class="sig-name descname"><span class="pre">update_user</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Processing/Section.html#Section_Class.update_user"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Processing.Section.Section_Class.update_user" title="Permalink to this definition">¶</a></dt>
+<dd><p>update_user Send Message to User</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>message</strong> (<em>str</em>) – Message</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Processing.Section.generate_FF">
+<span class="sig-prename descclassname"><span class="pre">Processing.Section.</span></span><span class="sig-name descname"><span class="pre">generate_FF</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">image_metadata</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">acq</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">channel</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">posnames</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bkg_acq</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Processing/Section.html#generate_FF"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Processing.Section.generate_FF" title="Permalink to this definition">¶</a></dt>
+<dd><p>generate_FF Generate flat field to correct uneven illumination</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>image_metadata</strong> (<em>Metadata Class</em>) – Data Loader Class</p></li>
+<li><p><strong>acq</strong> (<em>str</em>) – name of acquisition</p></li>
+<li><p><strong>channel</strong> (<em>str</em>) – name of channel</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>flat field image</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.array</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Processing.Section.generate_FFs">
+<span class="sig-prename descclassname"><span class="pre">Processing.Section.</span></span><span class="sig-name descname"><span class="pre">generate_FFs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">image_metadata</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">acq</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">channel</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">posnames</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bkg_acq</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Processing/Section.html#generate_FFs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Processing.Section.generate_FFs" title="Permalink to this definition">¶</a></dt>
+<dd><p>generate_FF Generate flat field to correct uneven illumination</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>image_metadata</strong> (<em>Metadata Class</em>) – Data Loader Class</p></li>
+<li><p><strong>acq</strong> (<em>str</em>) – name of acquisition</p></li>
+<li><p><strong>channel</strong> (<em>str</em>) – name of channel</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>flat field image</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.array</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Processing.Section.preprocess_images">
+<span class="sig-prename descclassname"><span class="pre">Processing.Section.</span></span><span class="sig-name descname"><span class="pre">preprocess_images</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">FF</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nuc_FF</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Processing/Section.html#preprocess_images"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Processing.Section.preprocess_images" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Processing.Section.process_img">
+<span class="sig-prename descclassname"><span class="pre">Processing.Section.</span></span><span class="sig-name descname"><span class="pre">process_img</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">img</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">FF</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Processing/Section.html#process_img"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Processing.Section.process_img" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Processing.Section.visualize_merge">
+<span class="sig-prename descclassname"><span class="pre">Processing.Section.</span></span><span class="sig-name descname"><span class="pre">visualize_merge</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">img1,</span> <span class="pre">img2,</span> <span class="pre">color1=&lt;Mock</span> <span class="pre">name='mock.array()'</span> <span class="pre">id='140651168226560'&gt;,</span> <span class="pre">color2=&lt;Mock</span> <span class="pre">name='mock.array()'</span> <span class="pre">id='140651168226560'&gt;,</span> <span class="pre">figsize=[20,</span> <span class="pre">20],</span> <span class="pre">pvmin=5,</span> <span class="pre">pvmax=95,</span> <span class="pre">title=''</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Processing/Section.html#visualize_merge"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Processing.Section.visualize_merge" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Processing package</a><ul>
+<li><a class="reference internal" href="#module-Processing.execute">Processing.execute module</a></li>
+<li><a class="reference internal" href="#module-Processing.putils">Processing.putils module</a><ul>
+<li><a class="reference internal" href="#Processing.putils.colorize_segmented_image"><code class="docutils literal notranslate"><span class="pre">colorize_segmented_image()</span></code></a></li>
+<li><a class="reference internal" href="#Processing.putils.generate_FF"><code class="docutils literal notranslate"><span class="pre">generate_FF()</span></code></a></li>
+<li><a class="reference internal" href="#Processing.putils.generate_img"><code class="docutils literal notranslate"><span class="pre">generate_img()</span></code></a></li>
+<li><a class="reference internal" href="#Processing.putils.generate_stitched"><code class="docutils literal notranslate"><span class="pre">generate_stitched()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-Processing.QC">Processing.QC module</a></li>
+<li><a class="reference internal" href="#module-Processing.Section">Processing.Section module</a><ul>
+<li><a class="reference internal" href="#Processing.Section.Section_Class"><code class="docutils literal notranslate"><span class="pre">Section_Class</span></code></a><ul>
+<li><a class="reference internal" href="#Processing.Section.Section_Class.filter_data"><code class="docutils literal notranslate"><span class="pre">Section_Class.filter_data()</span></code></a></li>
+<li><a class="reference internal" href="#Processing.Section.Section_Class.find_acq"><code class="docutils literal notranslate"><span class="pre">Section_Class.find_acq()</span></code></a></li>
+<li><a class="reference internal" href="#Processing.Section.Section_Class.generate_fname"><code class="docutils literal notranslate"><span class="pre">Section_Class.generate_fname()</span></code></a></li>
+<li><a class="reference internal" href="#Processing.Section.Section_Class.generate_iterable"><code class="docutils literal notranslate"><span class="pre">Section_Class.generate_iterable()</span></code></a></li>
+<li><a class="reference internal" href="#Processing.Section.Section_Class.load_metadata"><code class="docutils literal notranslate"><span class="pre">Section_Class.load_metadata()</span></code></a></li>
+<li><a class="reference internal" href="#Processing.Section.Section_Class.load_tensor"><code class="docutils literal notranslate"><span class="pre">Section_Class.load_tensor()</span></code></a></li>
+<li><a class="reference internal" href="#Processing.Section.Section_Class.pull_vectors"><code class="docutils literal notranslate"><span class="pre">Section_Class.pull_vectors()</span></code></a></li>
+<li><a class="reference internal" href="#Processing.Section.Section_Class.run"><code class="docutils literal notranslate"><span class="pre">Section_Class.run()</span></code></a></li>
+<li><a class="reference internal" href="#Processing.Section.Section_Class.save_data"><code class="docutils literal notranslate"><span class="pre">Section_Class.save_data()</span></code></a></li>
+<li><a class="reference internal" href="#Processing.Section.Section_Class.save_image"><code class="docutils literal notranslate"><span class="pre">Section_Class.save_image()</span></code></a></li>
+<li><a class="reference internal" href="#Processing.Section.Section_Class.save_tensor"><code class="docutils literal notranslate"><span class="pre">Section_Class.save_tensor()</span></code></a></li>
+<li><a class="reference internal" href="#Processing.Section.Section_Class.segment"><code class="docutils literal notranslate"><span class="pre">Section_Class.segment()</span></code></a></li>
+<li><a class="reference internal" href="#Processing.Section.Section_Class.stitch"><code class="docutils literal notranslate"><span class="pre">Section_Class.stitch()</span></code></a></li>
+<li><a class="reference internal" href="#Processing.Section.Section_Class.stitcher"><code class="docutils literal notranslate"><span class="pre">Section_Class.stitcher()</span></code></a></li>
+<li><a class="reference internal" href="#Processing.Section.Section_Class.update_user"><code class="docutils literal notranslate"><span class="pre">Section_Class.update_user()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#Processing.Section.generate_FF"><code class="docutils literal notranslate"><span class="pre">generate_FF()</span></code></a></li>
+<li><a class="reference internal" href="#Processing.Section.generate_FFs"><code class="docutils literal notranslate"><span class="pre">generate_FFs()</span></code></a></li>
+<li><a class="reference internal" href="#Processing.Section.preprocess_images"><code class="docutils literal notranslate"><span class="pre">preprocess_images()</span></code></a></li>
+<li><a class="reference internal" href="#Processing.Section.process_img"><code class="docutils literal notranslate"><span class="pre">process_img()</span></code></a></li>
+<li><a class="reference internal" href="#Processing.Section.visualize_merge"><code class="docutils literal notranslate"><span class="pre">visualize_merge()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="index.html"
+                          title="previous chapter">Welcome to dredFISH’s documentation!</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="Analysis.html"
+                          title="next chapter">Analysis module</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/Processing.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="Analysis.html" title="Analysis module"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="Welcome to dredFISH’s documentation!"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">dredFISH  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Processing package</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2022, Wollman lab.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 6.0.0.
+    </div>
+  </body>
+</html>

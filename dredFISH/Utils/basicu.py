@@ -415,10 +415,9 @@ def normalize_fishdata_logrowmedian(X, norm_basis=True, allow_nan=False):
     return X
 
 def swap_mask(mat, lookup_o2n):
-    """create from the old mask matrix a new matrix with the swapped labels according to the lookup table (pd.Series)
-    Usage:
-        lookup_o2n = pd.Series(lbl, index=unq)
-        newmat = swap_mask(mat, lookup_o2n)
+    """create from the old mask matrix a new matrix with the swapped labels according to the lookup table (pd.Series) 
+    lookup_o2n = pd.Series(lbl, index=unq)
+    newmat = swap_mask(mat, lookup_o2n)
     """
     i, j = np.nonzero(mat)
     vec = mat[i,j]

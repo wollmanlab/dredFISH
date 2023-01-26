@@ -22,6 +22,77 @@ copyright = '2022, Wollman lab'
 author = 'Wollman lab'
 
 
+# -- Mock modules ---------------------------------------------------
+from unittest import mock
+MOCK_MODULES = [
+    'numpy', 
+    'pandas', 
+    'igraph', 
+    'pynndescent',
+    'scipy', 
+    'scipy.stats', 
+    'scipy.optimize',
+    'scipy.spatial', 
+    'scipy.spatial.distance',
+    'scipy.spatial.transform',
+    'scipy.sparse.csgraph', 
+    'scipy.ndimage',
+    'scipy.cluster',
+    'scipy.cluster.hierarchy',
+    'rasterio',
+    'rasterio.features',
+    'IPython',
+    'skimage',
+    'skimage.morphology',
+    'skimage.filters',
+    'shapely',
+    'shapely.geometry',
+    'shapely.ops',
+    'scanpy',
+    'anndata', 
+
+    'sklearn',
+    'sklearn.metrics',
+    'sklearn.decomposition',
+    'sklearn.neighbors',
+    'sklearn.manifold',
+
+    'matplotlib', 
+    'matplotlib.pyplot',
+    'matplotlib.gridspec',
+    'matplotlib.cm',
+    'matplotlib.colors',
+    'matplotlib.collections',
+    'matplotlib.patches',
+
+    'colorcet',
+    'seaborn',
+
+    'colormath',
+    'colormath.color_objects',
+    'colormath.color_conversions',
+
+    'torch',
+    'PIL',
+    'pyemd',
+    'leidenalg',
+    'tqdm',
+    'metadata',
+    'ashlar',
+    'ashlar.utils',
+    'cv2',
+    'cellpose',
+    'pywt',
+    'torch.nn',
+    'torch.utils',
+    'torch.utils.data',
+    'zarr',
+]
+
+for mod_name in MOCK_MODULES:
+    sys.modules[mod_name] = mock.Mock()
+
+
 # -- General configuration ---------------------------------------------------
 
 # Add any Sphinx extension module names here, as strings. They can be

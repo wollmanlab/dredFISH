@@ -30,6 +30,14 @@ class InstNrmSimple(nn.Module):
         max_sgnl=None,
         noise=None #(1e4, 1e3),
         ):
+        """_summary_
+
+        Args:
+            scale (_type_, optional): _description_. Defaults to 1e4.
+            min_sgnl (_type_, optional): _description_. Defaults to None.
+            max_sgnl (_type_, optional): _description_. Defaults to None.
+            noise (_type_, optional): _description_. Defaults to None#(1e4, 1e3).
+        """
         super().__init__()
         self.logscale = torch.tensor(scale).log10()
         self.logmin = torch.tensor(min_sgnl).log10()

@@ -1,0 +1,710 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Visualization.Viz &#8212; dredFISH  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sphinxdoc.css" />
+    <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+    <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/sphinx_highlight.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">dredFISH  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Visualization.Viz</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for Visualization.Viz</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Viz module manages all TissueMultiGraph vizualization needs</span>
+
+<span class="sd">The module contains two elements: View and the Panel class hierarchy. </span>
+<span class="sd">View acts as:</span>
+<span class="sd">#. connection to specific TMG container,</span>
+<span class="sd">#. manage figure related stuff (size, save/load, etc)  </span>
+<span class="sd">#. container of different Panels. </span>
+
+<span class="sd">The Panel hierarchy is where the specific graphics are created. </span>
+<span class="sd">The base class (Panel) is an abstract class with two abstract methods users have to overload: </span>
+<span class="sd">#. set_view : do all calculations here</span>
+<span class="sd">#. plot : actual plotting of the panel</span>
+
+<span class="sd">All Panels include a few important properties: </span>
+<span class="sd">#. V : a pointer to the View that this Panel belogs to. This also acts as the link to TMG (self.V.TMG)</span>
+<span class="sd">#. Styles : dataframes with information  </span>
+<span class="sd">#. Data : a dict container for any data required for Viz, either given as input during __init__ or calculated by the Panel in set_view()</span>
+
+<span class="sd">A specific type of Panel that is important in the hierarchy is Map which is dedicated to spatial plotting of a TMG section. </span>
+
+<span class="sd">Other panels (UMAP, Historgram, LogLogPlot) etc do what you think they do... </span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">TODO: </span>
+<span class="sd">1. Add section information everywhere. </span>
+<span class="sd">2. Map - fix xy ratio</span>
+<span class="sd">3. Map - add scalebar</span>
+<span class="sd">4. Add UMAP panels</span>
+<span class="sd">5. integrate optimal color selection (see notebook not on git yet)</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">matplotlib.gridspec</span> <span class="kn">import</span> <span class="n">GridSpec</span><span class="p">,</span> <span class="n">SubplotSpec</span>
+<span class="kn">import</span> <span class="nn">matplotlib.cm</span> <span class="k">as</span> <span class="nn">cm</span>
+<span class="kn">from</span> <span class="nn">matplotlib.colors</span> <span class="kn">import</span> <span class="n">ListedColormap</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">from</span> <span class="nn">matplotlib.collections</span> <span class="kn">import</span> <span class="n">LineCollection</span><span class="p">,</span> <span class="n">PolyCollection</span><span class="p">,</span> <span class="n">PatchCollection</span>
+<span class="kn">from</span> <span class="nn">matplotlib.patches</span> <span class="kn">import</span> <span class="n">Wedge</span><span class="p">,</span> <span class="n">Circle</span>
+<span class="kn">from</span> <span class="nn">matplotlib.patches</span> <span class="kn">import</span> <span class="n">Rectangle</span> <span class="k">as</span> <span class="n">pRectangle</span>
+<span class="kn">import</span> <span class="nn">colorcet</span> <span class="k">as</span> <span class="nn">cc</span>
+
+<span class="kn">import</span> <span class="nn">pickle</span>
+<span class="kn">import</span> <span class="nn">io</span>
+<span class="kn">import</span> <span class="nn">copy</span>
+<span class="kn">import</span> <span class="nn">abc</span>
+
+<span class="kn">import</span> <span class="nn">seaborn</span> <span class="k">as</span> <span class="nn">sns</span>
+
+<span class="kn">from</span> <span class="nn">scipy</span> <span class="kn">import</span> <span class="n">optimize</span>
+<span class="kn">from</span> <span class="nn">scipy.cluster.hierarchy</span> <span class="kn">import</span> <span class="n">linkage</span><span class="p">,</span> <span class="n">optimal_leaf_ordering</span>
+<span class="kn">from</span> <span class="nn">scipy.spatial.distance</span> <span class="kn">import</span> <span class="n">jensenshannon</span><span class="p">,</span> <span class="n">pdist</span><span class="p">,</span> <span class="n">squareform</span>
+
+<span class="kn">from</span> <span class="nn">sklearn.manifold</span> <span class="kn">import</span> <span class="n">MDS</span>
+<span class="kn">from</span> <span class="nn">rasterio.features</span> <span class="kn">import</span> <span class="n">rasterize</span>
+
+<span class="c1"># for debuding mostly</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">from</span> <span class="nn">IPython</span> <span class="kn">import</span> <span class="n">embed</span>
+
+<span class="kn">from</span> <span class="nn">dredFISH.Visualization.cell_colors</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">dredFISH.Visualization.vor</span> <span class="kn">import</span> <span class="o">*</span> 
+<span class="kn">from</span> <span class="nn">dredFISH.Analysis.TissueGraph</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span>
+
+<div class="viewcode-block" id="View"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.View">[docs]</a><span class="k">class</span> <span class="nc">View</span><span class="p">:</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">TMG</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">11</span><span class="p">,</span><span class="mi">11</span><span class="p">)):</span>
+        
+        <span class="c1"># each view needs a unique name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+        
+        <span class="c1"># link to the TMG used to create the view</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">TMG</span> <span class="o">=</span> <span class="n">TMG</span>
+        
+        <span class="c1"># list of all panels</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Panels</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">figsize</span> <span class="o">=</span> <span class="n">figsize</span>
+        
+<div class="viewcode-block" id="View.add_panel"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.View.add_panel">[docs]</a>    <span class="k">def</span> <span class="nf">add_panel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">P</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        add a panel to the view and initialized it by calling Panel&#39;s method set_view() </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">P</span><span class="o">.</span><span class="n">V</span> <span class="o">=</span> <span class="bp">self</span>
+        <span class="n">P</span><span class="o">.</span><span class="n">set_view</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Panels</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">P</span><span class="p">)</span></div>
+                
+<div class="viewcode-block" id="View.show"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.View.show">[docs]</a>    <span class="k">def</span> <span class="nf">show</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        plot all panels. </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># set figures</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">figsize</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">figsize</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">figsize</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Panels</span><span class="p">)):</span> 
+            <span class="c1"># add an axes</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Panels</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">pos</span><span class="p">,</span><span class="n">SubplotSpec</span><span class="p">):</span>
+                <span class="n">ax</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Panels</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">pos</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span> 
+                <span class="n">ax</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fig</span><span class="o">.</span><span class="n">add_axes</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Panels</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">pos</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">Panels</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">ax</span> <span class="o">=</span> <span class="n">ax</span>
+            <span class="n">plt</span><span class="o">.</span><span class="n">sca</span><span class="p">(</span><span class="n">ax</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">Panels</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span></div></div>
+
+<div class="viewcode-block" id="Panel"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.Panel">[docs]</a><span class="k">class</span> <span class="nc">Panel</span><span class="p">(</span><span class="n">metaclass</span><span class="o">=</span><span class="n">abc</span><span class="o">.</span><span class="n">ABCMeta</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">V</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pos</span> <span class="o">=</span> <span class="n">pos</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ax</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Data</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Styles</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">clrmp</span> <span class="o">=</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="Panel.set_view"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.Panel.set_view">[docs]</a>    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+    <span class="k">def</span> <span class="nf">set_view</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>  
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Key abstract method - has to be implemented in the subclass</span>
+<span class="sd">        signature should always include the TMG (and other stuff if needed)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span></div>
+    
+<div class="viewcode-block" id="Panel.plot"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.Panel.plot">[docs]</a>    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+    <span class="k">def</span> <span class="nf">plot</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        actual plotting happens here, overload in subclasses! </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span></div></div>
+        
+<div class="viewcode-block" id="Map"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.Map">[docs]</a><span class="k">class</span> <span class="nc">Map</span><span class="p">(</span><span class="n">Panel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Map extends Panel to allow plotting of maps, it adds the methods:</span>
+<span class="sd">        plot_points</span>
+<span class="sd">        plot_lines</span>
+<span class="sd">        plot_bounding_box</span>
+<span class="sd">        plot_polys</span>
+<span class="sd">        plot_map</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">),</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">pos</span><span class="p">)</span>
+        
+        <span class="c1"># Fundamentally, a map panel keeps tab of all the type for different geoms</span>
+        <span class="c1"># and a dictionary that maps these ids to color/shape etc. </span>
+        
+        <span class="c1"># types, maps each points, line, or polygon to a specific type key. </span>
+        <span class="c1"># in these dataframes, the index must match the TMG Geom and different columns store different attributes</span>
+        
+        <span class="k">if</span> <span class="n">section</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span> 
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Section can&#39;t be empty - create Maps for specific section&quot;</span><span class="p">)</span>
+
+        <span class="c1"># section information: which section in TMG are we plotting</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">section</span> <span class="o">=</span> <span class="n">section</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">Styles</span><span class="p">[</span><span class="s1">&#39;line&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Styles</span><span class="p">[</span><span class="s1">&#39;point&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Styles</span><span class="p">[</span><span class="s1">&#39;polygon&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Styles</span><span class="p">[</span><span class="s1">&#39;boundingbox&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
+        
+        <span class="c1"># colormap is avaliable in case some derived Views needs to use it (for coloring PolyCollection for example)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">clrmp</span> <span class="o">=</span> <span class="kc">None</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">xlim</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;xlim&#39;</span><span class="p">,</span><span class="kc">None</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ylim</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;ylim&#39;</span><span class="p">,</span><span class="kc">None</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Map.set_view"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.Map.set_view">[docs]</a>    <span class="k">def</span> <span class="nf">set_view</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> 
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Key abstract method - has to be implemented in the subclass</span>
+<span class="sd">        signature should always include the TMG (and other stuff if needed)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">mx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">V</span><span class="o">.</span><span class="n">TMG</span><span class="o">.</span><span class="n">Geoms</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">section</span><span class="p">][</span><span class="s1">&#39;BoundingBox&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">exterior</span><span class="o">.</span><span class="n">xy</span><span class="p">)</span><span class="o">.</span><span class="n">T</span><span class="p">,</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">mn</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">V</span><span class="o">.</span><span class="n">TMG</span><span class="o">.</span><span class="n">Geoms</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">section</span><span class="p">][</span><span class="s1">&#39;BoundingBox&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">exterior</span><span class="o">.</span><span class="n">xy</span><span class="p">)</span><span class="o">.</span><span class="n">T</span><span class="p">,</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">xlim</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span> 
+            <span class="bp">self</span><span class="o">.</span><span class="n">xlim</span> <span class="o">=</span> <span class="p">[</span><span class="n">mn</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="n">mx</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">ylim</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span> 
+            <span class="bp">self</span><span class="o">.</span><span class="n">ylim</span> <span class="o">=</span> <span class="p">[</span><span class="n">mn</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span><span class="n">mx</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>
+        <span class="k">return</span></div>
+        
+<div class="viewcode-block" id="Map.plot_boundingbox"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.Map.plot_boundingbox">[docs]</a>    <span class="k">def</span> <span class="nf">plot_boundingbox</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> 
+        <span class="n">xy</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">V</span><span class="o">.</span><span class="n">TMG</span><span class="o">.</span><span class="n">Geoms</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">section</span><span class="p">][</span><span class="s1">&#39;BoundingBox&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">exterior</span><span class="o">.</span><span class="n">xy</span><span class="p">)</span><span class="o">.</span><span class="n">T</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">xy</span><span class="p">[:,</span><span class="mi">0</span><span class="p">],</span><span class="n">xy</span><span class="p">[:,</span><span class="mi">1</span><span class="p">],</span><span class="n">color</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">Styles</span><span class="p">[</span><span class="s1">&#39;boundingbox&#39;</span><span class="p">][</span><span class="s1">&#39;color&#39;</span><span class="p">])</span></div>
+    
+<div class="viewcode-block" id="Map.plot_points"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.Map.plot_points">[docs]</a>    <span class="k">def</span> <span class="nf">plot_points</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> 
+        <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">X</span><span class="p">,</span>
+                    <span class="n">y</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">Y</span><span class="p">,</span>
+                    <span class="n">s</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">Styles</span><span class="p">[</span><span class="s1">&#39;point&#39;</span><span class="p">][</span><span class="s1">&#39;size&#39;</span><span class="p">],</span>
+                    <span class="n">c</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">Styles</span><span class="p">[</span><span class="s1">&#39;point&#39;</span><span class="p">][</span><span class="s1">&#39;color&#39;</span><span class="p">])</span></div>
+        
+<div class="viewcode-block" id="Map.plot_polys"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.Map.plot_polys">[docs]</a>    <span class="k">def</span> <span class="nf">plot_polys</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> 
+        <span class="n">p</span> <span class="o">=</span> <span class="n">PolyCollection</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">V</span><span class="o">.</span><span class="n">TMG</span><span class="o">.</span><span class="n">Geoms</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">section</span><span class="p">][</span><span class="s1">&#39;poly&#39;</span><span class="p">],</span> <span class="n">cmap</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">clrmp</span><span class="p">)</span>
+        <span class="n">p</span><span class="o">.</span><span class="n">set_array</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Styles</span><span class="p">[</span><span class="s1">&#39;polygon&#39;</span><span class="p">][</span><span class="s1">&#39;scalar&#39;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">add_collection</span><span class="p">(</span><span class="n">p</span><span class="p">)</span></div>
+        
+<div class="viewcode-block" id="Map.plot_lines"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.Map.plot_lines">[docs]</a>    <span class="k">def</span> <span class="nf">plot_lines</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> 
+        <span class="c1"># get regions lines (subset of line geom)</span>
+        <span class="n">region_edge</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">V</span><span class="o">.</span><span class="n">TMG</span><span class="o">.</span><span class="n">find_regions_edge_level</span><span class="p">()</span>
+        <span class="n">segs</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">V</span><span class="o">.</span><span class="n">TMG</span><span class="o">.</span><span class="n">Geoms</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">section</span><span class="p">][</span><span class="s1">&#39;line&#39;</span><span class="p">][</span><span class="n">edges</span><span class="p">]</span> <span class="k">for</span> <span class="n">edges</span> <span class="ow">in</span> <span class="n">region_edge</span><span class="p">]</span>
+        <span class="n">segs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">segs</span><span class="p">)</span>
+        
+        <span class="n">line_segments</span> <span class="o">=</span> <span class="n">LineCollection</span><span class="p">(</span><span class="n">segs</span><span class="p">,</span>
+                                       <span class="n">linewidths</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">Styles</span><span class="p">[</span><span class="s1">&#39;line&#39;</span><span class="p">][</span><span class="s1">&#39;width&#39;</span><span class="p">],</span>
+                                        <span class="n">colors</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">Styles</span><span class="p">[</span><span class="s1">&#39;line&#39;</span><span class="p">][</span><span class="s1">&#39;color&#39;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">add_collection</span><span class="p">(</span><span class="n">line_segments</span><span class="p">)</span></div>
+            
+<div class="viewcode-block" id="Map.plot"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.Map.plot">[docs]</a>    <span class="k">def</span> <span class="nf">plot</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        plot a map. </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">Styles</span><span class="p">[</span><span class="s1">&#39;boundingbox&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">plot_boundingbox</span><span class="p">()</span>
+        
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">Styles</span><span class="p">[</span><span class="s1">&#39;point&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span> 
+            <span class="bp">self</span><span class="o">.</span><span class="n">plot_points</span><span class="p">()</span>
+            
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">Styles</span><span class="p">[</span><span class="s1">&#39;polygon&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">plot_polys</span><span class="p">()</span>
+            
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">Styles</span><span class="p">[</span><span class="s1">&#39;line&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">plot_lines</span><span class="p">()</span>
+        
+        <span class="c1"># set up limits and remove frame</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">set_xlim</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">xlim</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="bp">self</span><span class="o">.</span><span class="n">xlim</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">set_ylim</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ylim</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="bp">self</span><span class="o">.</span><span class="n">ylim</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">set_aspect</span><span class="p">(</span><span class="s1">&#39;equal&#39;</span><span class="p">,</span> <span class="s1">&#39;box&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s1">&#39;off&#39;</span><span class="p">)</span></div></div>
+
+<div class="viewcode-block" id="Zoom"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.Zoom">[docs]</a><span class="k">class</span> <span class="nc">Zoom</span><span class="p">(</span><span class="n">Panel</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">panel_to_zoom</span><span class="p">,</span> <span class="n">zoom_coords</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">]),</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)):</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span><span class="n">panel_to_zoom</span><span class="p">)</span> <span class="c1"># Type of the Panel</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ZP</span> <span class="o">=</span> <span class="n">f</span><span class="p">()</span>
+        
+        <span class="k">for</span> <span class="n">attr</span> <span class="ow">in</span> <span class="nb">dir</span><span class="p">(</span><span class="n">panel_to_zoom</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ZP</span> <span class="p">,</span> <span class="n">attr</span><span class="p">,</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">panel_to_zoom</span><span class="p">,</span> <span class="n">attr</span><span class="p">))</span>
+            <span class="k">except</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;cannot copy attribute: </span><span class="si">{</span><span class="n">attr</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">ZP</span><span class="o">.</span><span class="n">ax</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pos</span> <span class="o">=</span> <span class="n">pos</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">zoom_coords</span> <span class="o">=</span> <span class="n">zoom_coords</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">panel_to_zoom</span> <span class="o">=</span> <span class="n">panel_to_zoom</span>
+
+<div class="viewcode-block" id="Zoom.set_view"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.Zoom.set_view">[docs]</a>    <span class="k">def</span> <span class="nf">set_view</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># return super().set_view()</span>
+        <span class="k">pass</span></div>
+        
+<div class="viewcode-block" id="Zoom.plot"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.Zoom.plot">[docs]</a>    <span class="k">def</span> <span class="nf">plot</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># add boundary around zoomed area</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">panel_to_zoom</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">add_patch</span><span class="p">(</span><span class="n">pRectangle</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">zoom_coords</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">zoom_coords</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
+                                   <span class="bp">self</span><span class="o">.</span><span class="n">zoom_coords</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">zoom_coords</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span>
+                                   <span class="n">fc</span> <span class="o">=</span><span class="s1">&#39;none&#39;</span><span class="p">,</span> 
+                                   <span class="n">ec</span> <span class="o">=</span><span class="s2">&quot;w&quot;</span><span class="p">,</span>
+                                   <span class="n">lw</span> <span class="o">=</span> <span class="mi">3</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ZP</span><span class="o">.</span><span class="n">ax</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ax</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ZP</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">set_xlim</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">zoom_coords</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="bp">self</span><span class="o">.</span><span class="n">zoom_coords</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">+</span><span class="bp">self</span><span class="o">.</span><span class="n">zoom_coords</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">set_ylim</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">zoom_coords</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span><span class="bp">self</span><span class="o">.</span><span class="n">zoom_coords</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">+</span><span class="bp">self</span><span class="o">.</span><span class="n">zoom_coords</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span></div></div>
+        
+    <span class="c1"># def plot(self):</span>
+    <span class="c1">#     super().plot()</span>
+    <span class="c1">#     if self.colorbar:</span>
+    <span class="c1">#         plt.colorbar(ax=self.ax)</span>
+
+<div class="viewcode-block" id="Colorpleth"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.Colorpleth">[docs]</a><span class="k">class</span> <span class="nc">Colorpleth</span><span class="p">(</span><span class="n">Map</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Show a user-provided vector color coded on whatever geo-units requested (cells, iso-zones, heterozones, neighborhoods) </span>
+<span class="sd">    It will guess which level is needed from the size of the use provided values_to_map vector. </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">values_to_map</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">),</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="n">pos</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Data</span><span class="p">[</span><span class="s1">&#39;values_to_map&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">values_to_map</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">clrmp</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;colormap&#39;</span><span class="p">,</span> <span class="s2">&quot;hot&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">colorbar</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;colorbar&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        
+<div class="viewcode-block" id="Colorpleth.set_view"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.Colorpleth.set_view">[docs]</a>    <span class="k">def</span> <span class="nf">set_view</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">set_view</span><span class="p">()</span>
+        <span class="c1"># check that number of items in values to map make sense valu</span>
+        <span class="n">lvlarr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">equal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">V</span><span class="o">.</span><span class="n">TMG</span><span class="o">.</span><span class="n">N</span><span class="p">,</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Data</span><span class="p">[</span><span class="s1">&#39;values_to_map&#39;</span><span class="p">])))</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">lvlarr</span><span class="p">)</span><span class="o">!=</span><span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;number of items in values_to_map doesnt match any level size&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lvl</span> <span class="o">=</span> <span class="n">lvlarr</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        
+        <span class="c1"># scalar_mapping = self.V.TMG.map_to_cell_level(self.lvl, VecToMap=self.Data[&#39;values_to_map&#39;])</span>
+        <span class="n">scalar_mapping</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Data</span><span class="p">[</span><span class="s1">&#39;values_to_map&#39;</span><span class="p">]</span>
+        <span class="n">scalar_mapping</span> <span class="o">=</span> <span class="n">scalar_mapping</span><span class="o">-</span><span class="n">scalar_mapping</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
+        <span class="n">scalar_mapping</span> <span class="o">=</span> <span class="n">scalar_mapping</span><span class="o">/</span><span class="n">scalar_mapping</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Styles</span><span class="p">[</span><span class="s1">&#39;polygon&#39;</span><span class="p">][</span><span class="s1">&#39;scalar&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">scalar_mapping</span></div></div>
+<div class="viewcode-block" id="RandomColorpleth"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.RandomColorpleth">[docs]</a><span class="k">class</span> <span class="nc">RandomColorpleth</span><span class="p">(</span><span class="n">Colorpleth</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Show geo-units (cells, iso-zones, regions) each colored randomly. </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">id_vec</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;Random Colorpleth&quot;</span> <span class="p">,</span><span class="n">pos</span> <span class="o">=</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">),</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">shape</span><span class="p">(</span><span class="n">id_vec</span><span class="p">))</span><span class="o">==</span><span class="mi">0</span><span class="p">:</span> <span class="c1"># if the id_vec is pointing to a current level, give each unit it&#39;s own color </span>
+            <span class="n">name</span> <span class="o">=</span> <span class="n">name</span> <span class="o">+</span> <span class="s2">&quot; of level: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">id_vec</span><span class="p">)</span>
+            <span class="n">id_vec</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">V</span><span class="o">.</span><span class="n">TMG</span><span class="o">.</span><span class="n">N</span><span class="p">[</span><span class="n">id_vec</span><span class="p">])</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span><span class="p">,</span> <span class="n">values_to_map</span> <span class="o">=</span> <span class="n">id_vec</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        
+<div class="viewcode-block" id="RandomColorpleth.set_view"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.RandomColorpleth.set_view">[docs]</a>    <span class="k">def</span> <span class="nf">set_view</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">set_view</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">clrmp</span> <span class="o">=</span> <span class="n">ListedColormap</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">values_to_map</span><span class="p">),</span><span class="mi">3</span><span class="p">))</span>        </div></div>
+        
+<div class="viewcode-block" id="LegendWithCircles"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.LegendWithCircles">[docs]</a><span class="k">class</span> <span class="nc">LegendWithCircles</span><span class="p">(</span><span class="n">Panel</span><span class="p">):</span> 
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">map_panel</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">),</span> <span class="n">scale</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="n">pos</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">map_panel</span> <span class="o">=</span> <span class="n">map_panel</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scale</span> <span class="o">=</span> <span class="n">scale</span>
+        
+<div class="viewcode-block" id="LegendWithCircles.set_view"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.LegendWithCircles.set_view">[docs]</a>    <span class="k">def</span> <span class="nf">set_view</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">count_type</span><span class="o">=</span><span class="s1">&#39;index&#39;</span><span class="p">):</span>
+        <span class="n">lvl</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">map_panel</span><span class="o">.</span><span class="n">lvl</span>
+        <span class="k">if</span> <span class="n">count_type</span> <span class="o">==</span> <span class="s1">&#39;index&#39;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">lvl</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">cell_mapped_index</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">V</span><span class="o">.</span><span class="n">TMG</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="n">lvl</span><span class="p">]</span><span class="o">.</span><span class="n">N</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">cell_mapped_index</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">V</span><span class="o">.</span><span class="n">TMG</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="n">lvl</span><span class="p">]</span><span class="o">.</span><span class="n">Upstream</span>
+            <span class="n">unq</span><span class="p">,</span> <span class="n">cnt</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">cell_mapped_index</span><span class="p">,</span> <span class="n">return_counts</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">count_type</span> <span class="o">==</span> <span class="s1">&#39;type&#39;</span><span class="p">:</span>
+            <span class="c1"># cell_mapped_types = self.map_panel.Data[&#39;values_to_map&#39;]</span>
+            <span class="n">cell_mapped_types</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">V</span><span class="o">.</span><span class="n">TMG</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="n">lvl</span><span class="p">]</span><span class="o">.</span><span class="n">Type</span> 
+            <span class="n">unq</span><span class="p">,</span> <span class="n">cnt</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">cell_mapped_types</span><span class="p">,</span> <span class="n">return_counts</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sz</span> <span class="o">=</span> <span class="n">cnt</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s1">&#39;float&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sz</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sz</span><span class="o">/</span><span class="bp">self</span><span class="o">.</span><span class="n">sz</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">scale</span>
+
+        <span class="k">if</span> <span class="n">count_type</span> <span class="o">==</span> <span class="s1">&#39;index&#39;</span><span class="p">:</span>
+            <span class="n">layout</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">V</span><span class="o">.</span><span class="n">TMG</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="n">lvl</span><span class="p">]</span><span class="o">.</span><span class="n">FG</span><span class="o">.</span><span class="n">layout_fruchterman_reingold</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="n">count_type</span> <span class="o">==</span> <span class="s1">&#39;type&#39;</span><span class="p">:</span>
+            <span class="c1"># groupby (not implemented yet)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;not implemented&quot;</span><span class="p">)</span>
+            <span class="n">_TG</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">V</span><span class="o">.</span><span class="n">TMG</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="n">lvl</span><span class="p">]</span>
+            <span class="n">sumTG</span> <span class="o">=</span> <span class="n">_TG</span><span class="o">.</span><span class="n">contract_graph</span><span class="p">(</span><span class="n">_TG</span><span class="o">.</span><span class="n">Type</span><span class="p">)</span> <span class="c1"># summarize the current graph by type...</span>
+            <span class="n">layout</span> <span class="o">=</span> <span class="n">sumTG</span><span class="o">.</span><span class="n">FG</span><span class="o">.</span><span class="n">layout_fruchterman_reingold</span><span class="p">()</span>
+
+        <span class="n">xy</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">layout</span><span class="o">.</span><span class="n">coords</span><span class="p">)</span>
+        <span class="n">xy</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">xy</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]</span><span class="o">-</span><span class="n">xy</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
+        <span class="n">xy</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">xy</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="n">xy</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
+        <span class="n">xy</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">xy</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]</span><span class="o">/</span><span class="n">xy</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+        <span class="n">xy</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">xy</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]</span><span class="o">/</span><span class="n">xy</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">xy</span> <span class="o">=</span> <span class="n">xy</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">clr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">map_panel</span><span class="o">.</span><span class="n">basecolors</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">V</span><span class="o">.</span><span class="n">TMG</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="n">lvl</span><span class="p">]</span><span class="o">.</span><span class="n">Type</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">clrmp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">map_panel</span><span class="o">.</span><span class="n">clrmp</span> <span class="c1"># xxx</span></div>
+    
+<div class="viewcode-block" id="LegendWithCircles.plot"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.LegendWithCircles.plot">[docs]</a>    <span class="k">def</span> <span class="nf">plot</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> 
+        <span class="c1"># plt.sca(self.ax)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span>
+                    <span class="n">x</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">xy</span><span class="p">[:,</span><span class="mi">0</span><span class="p">],</span> 
+                    <span class="n">y</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">xy</span><span class="p">[:,</span><span class="mi">1</span><span class="p">],</span>
+                    <span class="n">c</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">clr</span><span class="p">,</span>
+                    <span class="n">s</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sz</span><span class="p">,</span> 
+                    <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">set_xticks</span><span class="p">([],</span> <span class="p">[])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">set_yticks</span><span class="p">([],</span> <span class="p">[])</span></div></div>
+        
+<div class="viewcode-block" id="LegendWithCirclesAndWedges"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.LegendWithCirclesAndWedges">[docs]</a><span class="k">class</span> <span class="nc">LegendWithCirclesAndWedges</span><span class="p">(</span><span class="n">LegendWithCircles</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">map_panel</span><span class="p">,</span> <span class="n">cell_map_panel</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">),</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">map_panel</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="n">pos</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cell_map_panel</span> <span class="o">=</span> <span class="n">cell_map_panel</span>
+                               
+<div class="viewcode-block" id="LegendWithCirclesAndWedges.plot"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.LegendWithCirclesAndWedges.plot">[docs]</a>    <span class="k">def</span> <span class="nf">plot</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> 
+
+        <span class="c1"># get fractions and sort by type2</span>
+        <span class="n">feature_mat</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">V</span><span class="o">.</span><span class="n">TMG</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">map_panel</span><span class="o">.</span><span class="n">lvl</span><span class="p">]</span><span class="o">.</span><span class="n">feature_mat</span>
+        <span class="c1"># ordr = np.argsort(self.cell_map_panel.type2)</span>
+        <span class="c1"># feature_mat = feature_mat[:,ordr]</span>
+        <span class="n">sum_of_rows</span> <span class="o">=</span> <span class="n">feature_mat</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">feature_mat</span> <span class="o">=</span> <span class="n">feature_mat</span> <span class="o">/</span> <span class="n">sum_of_rows</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">]</span>
+        <span class="n">n_smpl</span><span class="p">,</span> <span class="n">n_ftrs</span> <span class="o">=</span> <span class="n">feature_mat</span><span class="o">.</span><span class="n">shape</span> 
+            
+        <span class="c1"># scale between radi in points to xy that was normed to 0-1</span>
+        <span class="n">scale_factor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">V</span><span class="o">.</span><span class="n">fig</span><span class="o">.</span><span class="n">dpi</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">V</span><span class="o">.</span><span class="n">figsize</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> 
+            
+        <span class="n">xy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">xy</span><span class="o">*</span><span class="n">scale_factor</span>
+        <span class="n">radi</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sz</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">scale</span><span class="o">/</span><span class="mi">100</span>
+        <span class="n">cdf_in_angles</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">((</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n_smpl</span><span class="p">,</span><span class="mi">1</span><span class="p">)),</span> <span class="n">feature_mat</span><span class="p">)),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="mi">360</span>
+
+        <span class="n">wedges</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+        <span class="n">wedge_width</span> <span class="o">=</span> <span class="mf">0.66</span>
+        <span class="n">region_lvl</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">map_panel</span><span class="o">.</span><span class="n">lvl</span>
+        <span class="n">region_types</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">V</span><span class="o">.</span><span class="n">TMG</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="n">region_lvl</span><span class="p">]</span><span class="o">.</span><span class="n">Type</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+        <span class="n">cell_lvl</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell_map_panel</span><span class="o">.</span><span class="n">lvl</span>
+        <span class="n">cell_types</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">V</span><span class="o">.</span><span class="n">TMG</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="n">cell_lvl</span><span class="p">]</span><span class="o">.</span><span class="n">Type</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_smpl</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_ftrs</span><span class="p">):</span>
+                <span class="n">w</span> <span class="o">=</span> <span class="n">Wedge</span><span class="p">((</span><span class="n">xy</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="mi">0</span><span class="p">],</span><span class="n">xy</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="mi">1</span><span class="p">]),</span> <span class="n">radi</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">cdf_in_angles</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="n">j</span><span class="p">],</span> 
+                           <span class="n">cdf_in_angles</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="n">j</span><span class="o">+</span><span class="mi">1</span><span class="p">],</span>
+                           <span class="n">width</span><span class="o">=</span><span class="n">wedge_width</span><span class="o">*</span><span class="n">radi</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> 
+                           <span class="n">facecolor</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">cell_map_panel</span><span class="o">.</span><span class="n">basecolors</span><span class="p">[</span><span class="n">cell_types</span><span class="p">[</span><span class="n">j</span><span class="p">]]</span>
+                           <span class="p">)</span>
+                <span class="n">c</span> <span class="o">=</span> <span class="n">Circle</span><span class="p">((</span><span class="n">xy</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="mi">0</span><span class="p">],</span><span class="n">xy</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="mi">1</span><span class="p">]),</span> <span class="n">wedge_width</span><span class="o">*</span><span class="n">radi</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> 
+                            <span class="n">facecolor</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">map_panel</span><span class="o">.</span><span class="n">basecolors</span><span class="p">[</span><span class="n">region_types</span><span class="p">[</span><span class="n">i</span><span class="p">]],</span>
+                            <span class="c1"># facecolor=self.map_panel.clr[i,:], </span>
+                            <span class="n">fill</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> 
+                <span class="n">wedges</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">w</span><span class="p">)</span>
+                <span class="n">wedges</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
+
+        <span class="n">p</span> <span class="o">=</span> <span class="n">PatchCollection</span><span class="p">(</span><span class="n">wedges</span><span class="p">,</span> <span class="n">match_original</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">add_collection</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
+
+        <span class="n">margins</span> <span class="o">=</span> <span class="mf">0.05</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">set_xlim</span><span class="p">(</span><span class="o">-</span><span class="n">margins</span><span class="o">*</span><span class="n">scale_factor</span><span class="p">,(</span><span class="mi">1</span><span class="o">+</span><span class="n">margins</span><span class="p">)</span><span class="o">*</span><span class="n">scale_factor</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">set_ylim</span><span class="p">(</span><span class="o">-</span><span class="n">margins</span><span class="o">*</span><span class="n">scale_factor</span><span class="p">,(</span><span class="mi">1</span><span class="o">+</span><span class="n">margins</span><span class="p">)</span><span class="o">*</span><span class="n">scale_factor</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">set_xticks</span><span class="p">([])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">set_yticks</span><span class="p">([])</span></div></div>
+    
+<div class="viewcode-block" id="TypeMap"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.TypeMap">[docs]</a><span class="k">class</span> <span class="nc">TypeMap</span><span class="p">(</span><span class="n">Map</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lvl</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;cell map&quot;</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">),</span> 
+                <span class="n">cmap_list</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;Purples&#39;</span><span class="p">,</span><span class="s1">&#39;Oranges&#39;</span><span class="p">,</span><span class="s1">&#39;Blues&#39;</span><span class="p">,</span><span class="s1">&#39;Greens&#39;</span><span class="p">,</span><span class="s1">&#39;Reds&#39;</span><span class="p">,</span><span class="s1">&#39;cividis&#39;</span><span class="p">],</span>
+                <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="n">pos</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">clr</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lvl</span> <span class="o">=</span> <span class="n">lvl</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cmap_list</span> <span class="o">=</span> <span class="n">cmap_list</span> 
+        
+<div class="viewcode-block" id="TypeMap.set_view"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.TypeMap.set_view">[docs]</a>    <span class="k">def</span> <span class="nf">set_view</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">set_view</span><span class="p">()</span>
+        
+        <span class="n">cell_mapped_types</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">V</span><span class="o">.</span><span class="n">TMG</span><span class="o">.</span><span class="n">map_to_cell_level</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Data</span><span class="p">[</span><span class="s1">&#39;values_to_map&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">cell_mapped_types</span>
+
+        <span class="n">ncolors</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">cell_mapped_types</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">basecolors</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">sns</span><span class="o">.</span><span class="n">color_palette</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cmap_list</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">ncolors</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">clr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">basecolors</span><span class="p">[</span><span class="n">cell_mapped_types</span><span class="p">]</span> <span class="c1"># assuming starting from zero</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">clrmp</span> <span class="o">=</span> <span class="n">ListedColormap</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">clr</span><span class="p">)</span>
+
+        <span class="c1">### This is to use multiple CMAP to generate a color scheme; rely on ``.Type2`` (Type of Types)</span>
+        <span class="c1"># # reduce number of colormaps if we have very few types</span>
+        <span class="c1"># if self.V.TMG.Ntypes[self.lvl] &lt; len(self.cmap_list):</span>
+        <span class="c1">#     self.cmap_list=self.cmap_list[:self.V.TMG.Ntypes[self.lvl]]</span>
+        
+        <span class="c1"># T2 = self.V.TMG.Layers[self.lvl].Type2</span>
+        <span class="c1"># Dsqr = self.V.TMG.Layers[self.lvl].Dtype</span>
+        <span class="c1"># clr = np.zeros((len(T2),4))</span>
+        <span class="c1"># for i in range(len(self.cmap_list)):</span>
+        <span class="c1">#     cmap = cm.get_cmap(self.cmap_list[i])</span>
+        <span class="c1">#     ix = np.flatnonzero(T2==i)</span>
+        <span class="c1">#     if len(ix)&lt;3: </span>
+        <span class="c1">#         value = np.linspace(0.2,1,len(ix))</span>
+        <span class="c1">#     else:</span>
+        <span class="c1">#         d = Dsqr[np.ix_(ix,ix)]</span>
+        <span class="c1">#         dvec = squareform(d)</span>
+        <span class="c1">#         z = linkage(dvec,method=&#39;average&#39;)</span>
+        <span class="c1">#         ordr = optimal_leaf_ordering(z,dvec)</span>
+
+        <span class="c1">#         n=len(ix)</span>
+        <span class="c1">#         shift = np.ceil(0.2*n)</span>
+        <span class="c1">#         value = (np.arange(len(ix))+shift+1)/(len(ix)+shift)</span>
+        <span class="c1">#     clr[ix,:] = cmap(value)</span>
+        <span class="c1"># self.type2 = T2</span>
+        <span class="c1">### This is to use multiple CMAP to generate a color scheme</span>
+    
+        <span class="bp">self</span><span class="o">.</span><span class="n">Styles</span><span class="p">[</span><span class="s1">&#39;polygon&#39;</span><span class="p">][</span><span class="s1">&#39;scalar&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Data</span><span class="p">[</span><span class="s1">&#39;values_to_map&#39;</span><span class="p">]</span></div></div>
+
+  <span class="c1"># commented section was used to plot Cond Entropy Vs resolution, not clear if that is a panel</span>
+    
+<span class="c1">#         # add a panel with conditional entropy</span>
+<span class="c1">#         if hasattr(self.TMG.Layers[0], &#39;cond_entropy_df&#39;) and self.lvl==1:</span>
+<span class="c1">#             EntropyCalcsL1 = self.TMG.Layers[0].cond_entropy_df</span>
+<span class="c1">#             fig = plt.figure()</span>
+         
+<span class="c1">#             ax1 = plt.gca()</span>
+<span class="c1">#             yopt = self.TMG.cond_entropy[1]</span>
+<span class="c1">#             xopt = self.TMG.Ntypes[1]</span>
+<span class="c1">#             ax1.plot(EntropyCalcsL1[&#39;Ntypes&#39;],EntropyCalcsL1[&#39;Entropy&#39;])</span>
+<span class="c1">#             ylm = ax1.get_ylim()</span>
+<span class="c1">#             ax1.plot([xopt,xopt],[ylm[0], yopt],&#39;r--&#39;,linewidth=1)</span>
+<span class="c1">#             ax1.set_xlabel(&#39;# of types&#39;,fontsize=18)</span>
+<span class="c1">#             ax1.set_ylabel(&#39;H (Map | Type)&#39;,fontsize=18)</span>
+<span class="c1">#             fig = plt.gcf()</span>
+<span class="c1">#             left, bottom, width, height = [0.6, 0.55, 0.25, 0.25]</span>
+<span class="c1">#             ax2 = fig.add_axes([left, bottom, width, height])</span>
+<span class="c1">#             ax2.semilogx(EntropyCalcsL1[&#39;Ntypes&#39;],EntropyCalcsL1[&#39;Entropy&#39;])</span>
+<span class="c1">#             ylm = ax2.get_ylim()</span>
+<span class="c1">#             ax2.plot([xopt,xopt],[ylm[0], yopt],&#39;r--&#39;,linewidth=1)</span>
+            
+<span class="c1">#             fig = plt.figure()</span>
+<span class="c1">#             unq,cnt = np.unique(self.TMG.Layers[0].Type,return_counts=True)</span>
+<span class="c1">#             plt.hist(cnt,bins=15);</span>
+<span class="c1">#             plt.title(&quot;Cells per type&quot;)</span>
+<span class="c1">#             plt.xlabel(&quot;# Cells in a type&quot;)</span>
+<span class="c1">#             plt.ylabel(&quot;# of Types&quot;)</span>
+
+
+<span class="c1"># class RegionMap(CellMap): </span>
+<span class="c1">#     def __init__(self,name = &quot;region map&quot;):</span>
+<span class="c1">#         super().__init__(TMG,name = name)</span>
+<span class="c1">#         self.lvl = 2</span>
+    
+<span class="c1">#     def set_view(self):</span>
+<span class="c1">#         super().set_view()</span>
+        
+<span class="c1">#     def plot(self,V1 = None,**kwargs):</span>
+<span class="c1">#         super().plot(**kwargs)</span>
+<span class="c1">#         if V1 is None:</span>
+<span class="c1">#             return</span>
+<span class="c1">#         # add another panel with piechart markers</span>
+<span class="c1">#         # start new figure (to calc size factor)</span>
+<span class="c1">#         fig = plt.figure(figsize = self.figsize)</span>
+<span class="c1">#         self.figs.append(fig)</span>
+<span class="c1">#         ax = plt.gca()</span>
+            
+<span class="c1">#         # get fractions and sort by type2</span>
+<span class="c1">#         feature_type_mat = self.TMG.Layers[self.lvl].feature_type_mat</span>
+<span class="c1">#         ordr = np.argsort(V1.type2)</span>
+<span class="c1">#         feature_type_mat = feature_type_mat[:,ordr]</span>
+<span class="c1">#         sum_of_rows = feature_type_mat.sum(axis=1)</span>
+<span class="c1">#         feature_type_mat = feature_type_mat / sum_of_rows[:, None]</span>
+            
+<span class="c1">#         # scale between radi in points to xy that was normed to 0-1</span>
+<span class="c1">#         scale_factor = fig.dpi * self.figsize[0]</span>
+            
+<span class="c1">#         xy = self.xy*scale_factor</span>
+<span class="c1">#         radi = np.sqrt(self.sz/np.pi)</span>
+<span class="c1">#         cdf_in_angles = np.cumsum(np.hstack((np.zeros((feature_type_mat.shape[0],1)),feature_type_mat)),axis=1)*360</span>
+
+<span class="c1">#         wedges = list()</span>
+<span class="c1">#         wedge_width = 0.66</span>
+<span class="c1">#         for i in range(feature_type_mat.shape[0]):</span>
+<span class="c1">#             for j in range(feature_type_mat.shape[1]):</span>
+<span class="c1">#                 w = Wedge((xy[i,0],xy[i,1]), radi[i], cdf_in_angles[i,j], </span>
+<span class="c1">#                            cdf_in_angles[i,j+1],width = wedge_width*radi[i], facecolor = V1.clr[ordr[j],:])</span>
+<span class="c1">#                 c = Circle((xy[i,0],xy[i,1]),wedge_width*radi[i],facecolor = self.clr[i,:],fill = True) </span>
+<span class="c1">#                 wedges.append(w)</span>
+<span class="c1">#                 wedges.append(c)</span>
+
+
+<span class="c1">#         p = PatchCollection(wedges,match_original=True)</span>
+<span class="c1">#         ax.add_collection(p)</span>
+
+<span class="c1">#         margins = 0.05</span>
+<span class="c1">#         ax.set_xlim(-margins*scale_factor,(1+margins)*scale_factor)</span>
+<span class="c1">#         ax.set_ylim(-margins*scale_factor,(1+margins)*scale_factor)</span>
+<span class="c1">#         ax.set_xticks([])</span>
+<span class="c1">#         ax.set_yticks([])</span>
+
+<span class="c1"># next section could be used to show mapping between regions and cell</span>
+        
+        <span class="c1"># fig = plt.figure(figsize=(10,10))</span>
+        <span class="c1"># self.figs.append(fig)</span>
+        <span class="c1"># region_cell_types = self.TMG.Layers[2].feature_type_mat</span>
+        <span class="c1"># row_sums = region_cell_types.sum(axis=1)</span>
+        <span class="c1"># row_sums = row_sums[:,None]</span>
+        <span class="c1"># region_cell_types_nrm=region_cell_types/row_sums</span>
+        <span class="c1"># g = sns.clustermap(region_cell_types_nrm,method=&quot;ward&quot;, cmap=&quot;mako&quot;,col_colors=V1.clr,row_colors = self.clr)</span>
+        <span class="c1"># g.ax_heatmap.set_xticks(list())</span>
+        <span class="c1"># g.ax_heatmap.set_yticks(list())</span>
+        <span class="c1"># self.figs.append(fig)</span>
+<div class="viewcode-block" id="TypeMapWithLines"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.TypeMapWithLines">[docs]</a><span class="k">class</span> <span class="nc">TypeMapWithLines</span><span class="p">(</span><span class="n">TypeMap</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+        <span class="n">lvl</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>  
+        <span class="n">section</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> 
+        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;neighborhood map&quot;</span><span class="p">,</span> 
+        <span class="n">pos</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">),</span>
+        <span class="n">cmap_list</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;Purples&#39;</span><span class="p">,</span><span class="s1">&#39;Oranges&#39;</span><span class="p">,</span><span class="s1">&#39;Blues&#39;</span><span class="p">,</span><span class="s1">&#39;Greens&#39;</span><span class="p">,</span><span class="s1">&#39;Reds&#39;</span><span class="p">,</span><span class="s1">&#39;cividis&#39;</span><span class="p">],</span>
+        <span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">lvl</span><span class="o">=</span><span class="n">lvl</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="n">pos</span><span class="p">,</span> <span class="n">cmap_list</span><span class="o">=</span><span class="n">cmap_list</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lvl</span> <span class="o">=</span> <span class="n">lvl</span>
+        
+<div class="viewcode-block" id="TypeMapWithLines.set_view"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.TypeMapWithLines.set_view">[docs]</a>    <span class="k">def</span> <span class="nf">set_view</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">set_view</span><span class="p">()</span>
+        <span class="n">region_edge</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">V</span><span class="o">.</span><span class="n">TMG</span><span class="o">.</span><span class="n">find_regions_edge_level</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Styles</span><span class="p">[</span><span class="s1">&#39;line&#39;</span><span class="p">][</span><span class="s1">&#39;width&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">region_edge</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Styles</span><span class="p">[</span><span class="s1">&#39;line&#39;</span><span class="p">][</span><span class="s1">&#39;color&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;#6e736f&quot;</span></div>
+        
+<div class="viewcode-block" id="TypeMapWithLines.plot"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.TypeMapWithLines.plot">[docs]</a>    <span class="k">def</span> <span class="nf">plot</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span></div></div>
+
+<div class="viewcode-block" id="IsoZones"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.IsoZones">[docs]</a><span class="k">class</span> <span class="nc">IsoZones</span><span class="p">(</span><span class="n">Colorpleth</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    simple overloading of colorpleth, only different is that we&#39;re getting values from TMG </span>
+<span class="sd">    since TMG is only defined after init we pass the Data during set_view instead. </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;isozones&quot;</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)):</span>
+        <span class="n">values_to_map</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">values_to_map</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="n">pos</span><span class="p">)</span>
+<div class="viewcode-block" id="IsoZones.set_view"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.IsoZones.set_view">[docs]</a>    <span class="k">def</span> <span class="nf">set_view</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Data</span><span class="p">[</span><span class="s1">&#39;values_to_map&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">V</span><span class="o">.</span><span class="n">TMG</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">node_size</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">set_view</span><span class="p">()</span></div></div>
+        
+<div class="viewcode-block" id="Histogram"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.Histogram">[docs]</a><span class="k">class</span> <span class="nc">Histogram</span><span class="p">(</span><span class="n">Panel</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">values_to_count</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;hist&#39;</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">),</span> <span class="n">n_bins</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="n">pos</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_bins</span> <span class="o">=</span> <span class="n">n_bins</span> 
+        <span class="bp">self</span><span class="o">.</span><span class="n">Data</span><span class="p">[</span><span class="s1">&#39;values_to_count&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">values_to_count</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">kwargs</span> <span class="o">=</span> <span class="n">kwargs</span>
+
+<div class="viewcode-block" id="Histogram.set_view"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.Histogram.set_view">[docs]</a>    <span class="k">def</span> <span class="nf">set_view</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">pass</span></div>
+
+<div class="viewcode-block" id="Histogram.plot"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.Histogram.plot">[docs]</a>    <span class="k">def</span> <span class="nf">plot</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> 
+        <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">hist</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Data</span><span class="p">[</span><span class="s1">&#39;values_to_count&#39;</span><span class="p">],</span> <span class="n">bins</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">n_bins</span><span class="p">,</span> <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">kwargs</span><span class="p">)</span></div></div>
+
+<div class="viewcode-block" id="LogLogPlot"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.LogLogPlot">[docs]</a><span class="k">class</span> <span class="nc">LogLogPlot</span><span class="p">(</span><span class="n">Histogram</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">values_to_count</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;loglog&quot;</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">),</span> <span class="n">n_bins</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">values_to_count</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="n">pos</span><span class="p">,</span> <span class="n">n_bins</span><span class="o">=</span><span class="n">n_bins</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        
+<div class="viewcode-block" id="LogLogPlot.set_view"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.LogLogPlot.set_view">[docs]</a>    <span class="k">def</span> <span class="nf">set_view</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">set_view</span><span class="p">()</span>
+        
+        <span class="n">mx_sz</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Data</span><span class="p">[</span><span class="s1">&#39;values_to_count&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+        <span class="n">bins</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">logspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">mx_sz</span><span class="p">)),</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_bins</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="c1"># Calculate histogram</span>
+        <span class="n">hist</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">histogram</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Data</span><span class="p">[</span><span class="s1">&#39;values_to_count&#39;</span><span class="p">],</span> <span class="n">bins</span><span class="o">=</span><span class="n">bins</span><span class="p">)</span>
+        <span class="c1"># normalize by bin width</span>
+        <span class="n">hist_norm</span> <span class="o">=</span> <span class="n">hist</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">/</span><span class="n">hist</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+
+        <span class="n">ix</span> <span class="o">=</span> <span class="n">hist_norm</span><span class="o">&gt;</span><span class="mi">0</span>
+        <span class="n">x</span><span class="o">=</span><span class="p">(</span><span class="n">bins</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">+</span><span class="n">bins</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span><span class="o">/</span><span class="mi">2</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log_size</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">x</span><span class="p">[</span><span class="n">ix</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log_freq</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">hist_norm</span><span class="p">[</span><span class="n">ix</span><span class="p">])</span>
+
+        <span class="k">def</span> <span class="nf">piecewise_linear</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">x0</span><span class="p">,</span> <span class="n">y0</span><span class="p">,</span> <span class="n">k1</span><span class="p">,</span> <span class="n">k2</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">piecewise</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="p">[</span><span class="n">x</span> <span class="o">&lt;</span> <span class="n">x0</span><span class="p">],</span> <span class="p">[</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span><span class="n">k1</span><span class="o">*</span><span class="n">x</span> <span class="o">+</span> <span class="n">y0</span><span class="o">-</span><span class="n">k1</span><span class="o">*</span><span class="n">x0</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span><span class="n">k2</span><span class="o">*</span><span class="n">x</span> <span class="o">+</span> <span class="n">y0</span><span class="o">-</span><span class="n">k2</span><span class="o">*</span><span class="n">x0</span><span class="p">])</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">p</span><span class="p">,</span> <span class="n">e</span> <span class="o">=</span> <span class="n">optimize</span><span class="o">.</span><span class="n">curve_fit</span><span class="p">(</span><span class="n">piecewise_linear</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">log_size</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">log_freq</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">exponents</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="mi">2</span><span class="p">:</span><span class="mi">4</span><span class="p">]</span></div>
+        
+<div class="viewcode-block" id="LogLogPlot.plot"><a class="viewcode-back" href="../../Visualization.html#Visualization.Viz.LogLogPlot.plot">[docs]</a>    <span class="k">def</span> <span class="nf">plot</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">def</span> <span class="nf">piecewise_linear</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">x0</span><span class="p">,</span> <span class="n">y0</span><span class="p">,</span> <span class="n">k1</span><span class="p">,</span> <span class="n">k2</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">piecewise</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="p">[</span><span class="n">x</span> <span class="o">&lt;</span> <span class="n">x0</span><span class="p">],</span> <span class="p">[</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span><span class="n">k1</span><span class="o">*</span><span class="n">x</span> <span class="o">+</span> <span class="n">y0</span><span class="o">-</span><span class="n">k1</span><span class="o">*</span><span class="n">x0</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span><span class="n">k2</span><span class="o">*</span><span class="n">x</span> <span class="o">+</span> <span class="n">y0</span><span class="o">-</span><span class="n">k2</span><span class="o">*</span><span class="n">x0</span><span class="p">])</span>
+        
+        <span class="c1"># plot it!</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="mi">10</span><span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">log_size</span><span class="p">,</span> <span class="mi">10</span><span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">log_freq</span><span class="p">,</span><span class="s1">&#39;.&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">set_xscale</span><span class="p">(</span><span class="s1">&#39;log&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">set_yscale</span><span class="p">(</span><span class="s1">&#39;log&#39;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="mi">10</span><span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">log_size</span><span class="p">,</span> <span class="mi">10</span><span class="o">**</span><span class="n">piecewise_linear</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">log_size</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">p</span><span class="p">),</span><span class="s1">&#39;r-&#39;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;Value&#39;</span><span class="p">,</span><span class="n">fontsize</span><span class="o">=</span><span class="mi">18</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;Freq&#39;</span><span class="p">,</span><span class="n">fontsize</span><span class="o">=</span><span class="mi">18</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Exponents: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">exponents</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">exponents</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div></div>
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">dredFISH  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Visualization.Viz</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2022, Wollman lab.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 6.0.0.
+    </div>
+  </body>
+</html>

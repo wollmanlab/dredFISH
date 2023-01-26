@@ -9,10 +9,8 @@
     <link rel="stylesheet" type="text/css" href="../../_static/pygments.css" />
     <link rel="stylesheet" type="text/css" href="../../_static/sphinxdoc.css" />
     <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
-    <script src="../../_static/jquery.js"></script>
-    <script src="../../_static/underscore.js"></script>
-    <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
     <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/sphinx_highlight.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" /> 
   </head><body>
@@ -56,57 +54,42 @@
 <span class="sd">The creation of TMG follows the methods to create different layers (create_cell_layer, create_zone_layer, create_region_layer) and creating Geoms using create_geoms. </span>
 <span class="sd">&quot;&quot;&quot;</span>
 
-
 <span class="c1"># dependencies</span>
 <span class="kn">from</span> <span class="nn">cmath</span> <span class="kn">import</span> <span class="n">nan</span>
 <span class="kn">import</span> <span class="nn">functools</span>
 <span class="kn">from</span> <span class="nn">textwrap</span> <span class="kn">import</span> <span class="n">indent</span>
-<span class="kn">import</span> <span class="nn">ipyparallel</span> <span class="k">as</span> <span class="nn">ipp</span>
+<span class="c1"># import ipyparallel as ipp</span>
 <span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">Counter</span>
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">()</span>
 <span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
 <span class="kn">import</span> <span class="nn">itertools</span>
 <span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">import</span> <span class="nn">os.path</span> 
 <span class="kn">import</span> <span class="nn">glob</span>
 <span class="kn">import</span> <span class="nn">json</span>
-
 <span class="kn">import</span> <span class="nn">pickle</span>
 
-<span class="kn">from</span> <span class="nn">igraph</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="kn">import</span> <span class="nn">igraph</span>
 <span class="kn">import</span> <span class="nn">pynndescent</span> 
-<span class="kn">from</span> <span class="nn">scipy.spatial</span> <span class="kn">import</span> <span class="n">Delaunay</span><span class="p">,</span><span class="n">Voronoi</span>
-<span class="kn">from</span> <span class="nn">scipy.spatial.distance</span> <span class="kn">import</span> <span class="n">jensenshannon</span><span class="p">,</span> <span class="n">pdist</span><span class="p">,</span> <span class="n">squareform</span>
+<span class="kn">from</span> <span class="nn">scipy.spatial</span> <span class="kn">import</span> <span class="n">Delaunay</span><span class="p">,</span> <span class="n">Voronoi</span>
 <span class="kn">from</span> <span class="nn">scipy.sparse.csgraph</span> <span class="kn">import</span> <span class="n">dijkstra</span>
-<span class="kn">from</span> <span class="nn">scipy.stats</span> <span class="kn">import</span> <span class="n">entropy</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span><span class="n">median_abs_deviation</span>
-<span class="kn">from</span> <span class="nn">scipy.sparse</span> <span class="kn">import</span> <span class="n">csr_matrix</span>
-
-<span class="kn">import</span> <span class="nn">sklearn</span>
-<span class="kn">from</span> <span class="nn">sklearn.preprocessing</span> <span class="kn">import</span> <span class="n">normalize</span>
-<span class="kn">import</span> <span class="nn">sklearn.decomposition</span>
-<span class="kn">from</span> <span class="nn">sklearn.decomposition</span> <span class="kn">import</span> <span class="n">LatentDirichletAllocation</span>
-<span class="kn">from</span> <span class="nn">sklearn.neighbors</span> <span class="kn">import</span> <span class="n">NearestNeighbors</span>
-
 
 <span class="kn">import</span> <span class="nn">anndata</span>
-
-<span class="kn">from</span> <span class="nn">numpy.random</span> <span class="kn">import</span> <span class="n">default_rng</span>
-<span class="n">rng</span> <span class="o">=</span> <span class="n">default_rng</span><span class="p">()</span>
-
 <span class="c1"># to create geomtries</span>
 <span class="kn">from</span> <span class="nn">shapely.geometry</span> <span class="kn">import</span> <span class="n">Polygon</span><span class="p">,</span> <span class="n">MultiPolygon</span><span class="p">,</span> <span class="n">LineString</span><span class="p">,</span> <span class="n">MultiLineString</span>
 
-<span class="kn">from</span> <span class="nn">dredFISH.Utils.basicu</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">dredFISH.Utils</span> <span class="kn">import</span> <span class="n">basicu</span> 
+<span class="kn">from</span> <span class="nn">dredFISH.Utils</span> <span class="kn">import</span> <span class="n">tmgu</span>
 <span class="kn">from</span> <span class="nn">dredFISH.Utils.geomu</span> <span class="kn">import</span> <span class="n">voronoi_polygons</span><span class="p">,</span> <span class="n">bounding_box</span>
 
 <span class="c1"># for debuding mostly</span>
 <span class="kn">import</span> <span class="nn">warnings</span>
 <span class="kn">import</span> <span class="nn">time</span>
-<span class="kn">from</span> <span class="nn">IPython</span> <span class="kn">import</span> <span class="n">embed</span>
-
+<span class="c1"># from IPython import embed</span>
 
 <div class="viewcode-block" id="TissueMultiGraph"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueMultiGraph">[docs]</a><span class="k">class</span> <span class="nc">TissueMultiGraph</span><span class="p">:</span> 
-    <span class="sd">&quot;&quot;&quot;Main class used to manage the creation of multi-layer graph representation of tissues. </span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Main class used to manage the creation of multi-layer graph representation of tissues. </span>
 <span class="sd">    </span>
 <span class="sd">    TissueMultiGraph (TMG) acts as a factory to create objects that represents the state of different biospatial units in tissue, </span>
 <span class="sd">    and their relationships. Examples of biospatial units are cells, isozones, regions. </span>
@@ -138,9 +121,12 @@
 <span class="sd">        Stores relationship between TG layers and Taxonomies</span>
 <span class="sd">        </span>
 <span class="sd"> &quot;&quot;&quot;</span>
-    
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">basepath</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">redo</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Create a TMG object</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+        <span class="n">basepath</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> 
+        <span class="n">redo</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> 
+        <span class="n">quick_load_cell_obs</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a TMG object</span>
 <span class="sd">        </span>
 <span class="sd">        There could only be a single TMG object in basepath. </span>
 <span class="sd">        if one already exists (and redo is False) it will be loaded. If not a new empty one will be created. </span>
@@ -166,46 +152,69 @@
             
         <span class="bp">self</span><span class="o">.</span><span class="n">basepath</span> <span class="o">=</span> <span class="n">basepath</span> 
         
-        <span class="c1"># check to see if a TMG.json file exists in that folder</span>
-        <span class="c1"># is not, create an empty TMG. </span>
+        <span class="c1"># check to see if a TMG.json file exists in that folder; if not, create an empty TMG. </span>
         <span class="k">if</span> <span class="n">redo</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">basepath</span><span class="p">,</span><span class="s2">&quot;TMG.json&quot;</span><span class="p">)):</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span> <span class="c1"># a list of TissueGraphs</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">layers_graph</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span> <span class="c1"># a list of tuples that keep track of the relationship between different layers </span>
             
             <span class="bp">self</span><span class="o">.</span><span class="n">Geoms</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
             
             <span class="bp">self</span><span class="o">.</span><span class="n">Taxonomies</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span> <span class="c1"># a list of Taxonomies</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">layer_taxonomy_mapping</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span> <span class="c1"># a list of tuples that keep tracks of which TissueGraph (index into Layer) </span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">layer_taxonomy_mapping</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span> <span class="c1"># list() # a list of tuples that keep tracks of which TissueGraph (index into Layer) </span>
                                                  <span class="c1"># uses which taxonomy (index into Taxonomies</span>
+                                                 <span class="c1"># FIXME -- has to be a dictinary </span>
 
+        <span class="k">elif</span> <span class="n">quick_load_cell_obs</span><span class="p">:</span>
+            <span class="c1"># load cell level attributes only -- faster</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">basepath</span><span class="p">,</span><span class="s2">&quot;TMG.json&quot;</span><span class="p">))</span> <span class="k">as</span> <span class="n">fh</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_config</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">fh</span><span class="p">)</span>
+            <span class="n">LayerNameList</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_config</span><span class="p">[</span><span class="s2">&quot;Layers&quot;</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span><span class="p">]</span><span class="o">*</span><span class="nb">len</span><span class="p">(</span><span class="n">LayerNameList</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">TissueGraph</span><span class="p">(</span><span class="n">basepath</span><span class="o">=</span><span class="n">basepath</span><span class="p">,</span> 
+                                         <span class="n">layer_type</span><span class="o">=</span><span class="n">LayerNameList</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> 
+                                         <span class="n">tax</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  
+                                         <span class="n">redo</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                                         <span class="n">quick_load_cell_obs</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                                         <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span> 
             <span class="c1"># load from drive</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_config</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">basepath</span><span class="p">,</span><span class="s2">&quot;TMG.json&quot;</span><span class="p">))</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">basepath</span><span class="p">,</span><span class="s2">&quot;TMG.json&quot;</span><span class="p">))</span> <span class="k">as</span> <span class="n">fh</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_config</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">fh</span><span class="p">)</span>
             
             <span class="c1"># start with Taxonomies: </span>
             <span class="n">TaxNameList</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_config</span><span class="p">[</span><span class="s2">&quot;Taxonomies&quot;</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">Taxonomies</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span><span class="p">]</span><span class="o">*</span><span class="nb">len</span><span class="p">(</span><span class="n">TaxNameList</span><span class="p">)</span>
             <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">TaxNameList</span><span class="p">)):</span> 
-                <span class="bp">self</span><span class="o">.</span><span class="n">Taxonomies</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">Taxonomy</span><span class="p">(</span><span class="n">basepath</span><span class="p">,</span><span class="n">TaxNameList</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">Taxonomies</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">Taxonomy</span><span class="p">(</span><span class="n">TaxNameList</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
                     
-            <span class="bp">self</span><span class="o">.</span><span class="n">layer_taxonomy_mapping</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_config</span><span class="p">[</span><span class="s2">&quot;layer_taxonomy_mapping&quot;</span><span class="p">];</span>
+            <span class="c1"># convert string key to int key (fixing an artifects of JSON dump and load)</span>
+            <span class="n">ltm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_config</span><span class="p">[</span><span class="s2">&quot;layer_taxonomy_mapping&quot;</span><span class="p">]</span>
+            <span class="n">ltm</span> <span class="o">=</span> <span class="p">{</span><span class="nb">int</span><span class="p">(</span><span class="n">layer_ix</span><span class="p">):</span> <span class="n">tax_ix</span> <span class="k">for</span> <span class="n">layer_ix</span><span class="p">,</span> <span class="n">tax_ix</span> <span class="ow">in</span> <span class="n">ltm</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">layer_taxonomy_mapping</span> <span class="o">=</span> <span class="n">ltm</span> 
             
             <span class="n">LayerNameList</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_config</span><span class="p">[</span><span class="s2">&quot;Layers&quot;</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span><span class="p">]</span><span class="o">*</span><span class="nb">len</span><span class="p">(</span><span class="n">LayerNameList</span><span class="p">)</span>
             <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">LayerNameList</span><span class="p">)):</span> 
-                <span class="n">tax_ix</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">layer_taxonomy_mapping</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">layer_taxonomy_mapping</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]</span><span class="o">==</span><span class="n">i</span><span class="p">,</span><span class="mi">1</span><span class="p">]</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">TissueGraph</span><span class="p">(</span><span class="n">basepath</span> <span class="o">=</span> <span class="n">basepath</span><span class="p">,</span> 
-                                             <span class="n">layer_type</span> <span class="o">=</span> <span class="n">LayerNameList</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> 
-                                             <span class="n">tax</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Taxonomies</span><span class="p">[</span><span class="n">tax_ix</span><span class="p">],</span> <span class="n">redo</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">layer_taxonomy_mapping</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+                    <span class="n">tax_ix</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">layer_taxonomy_mapping</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+                    <span class="n">tax</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Taxonomies</span><span class="p">[</span><span class="n">tax_ix</span><span class="p">]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">tax</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">TissueGraph</span><span class="p">(</span><span class="n">basepath</span><span class="o">=</span><span class="n">basepath</span><span class="p">,</span> 
+                                             <span class="n">layer_type</span><span class="o">=</span><span class="n">LayerNameList</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> 
+                                             <span class="n">tax</span><span class="o">=</span><span class="n">tax</span><span class="p">,</span> 
+                                             <span class="n">redo</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
                 
             <span class="bp">self</span><span class="o">.</span><span class="n">layers_graph</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_config</span><span class="p">[</span><span class="s2">&quot;layers_graph&quot;</span><span class="p">]</span>
 
             <span class="c1"># at this point, not saving geoms to file so recalculate them here:             </span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">Geoms</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">add_geoms</span><span class="p">()</span>
-
 
         <span class="k">return</span> <span class="kc">None</span>
     
 <div class="viewcode-block" id="TissueMultiGraph.save"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueMultiGraph.save">[docs]</a>    <span class="k">def</span> <span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot; create the TMG.json and save everything.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; create the TMG.json and save everything.</span>
 <span class="sd">        </span>
 <span class="sd">        Saving scheme: </span>
 <span class="sd">        TissueGraphs in Layers and Taxonomies in Taxonomies are stored in a single anndata file per object according to theor own .save() method</span>
@@ -218,31 +227,32 @@
                        <span class="s2">&quot;Taxonomies&quot;</span> <span class="p">:</span> <span class="p">[</span><span class="n">tx</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">tx</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">Taxonomies</span><span class="p">],</span> 
                        <span class="s2">&quot;Layers&quot;</span> <span class="p">:</span> <span class="p">[</span><span class="n">tg</span><span class="o">.</span><span class="n">layer_type</span> <span class="k">for</span> <span class="n">tg</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">]}</span>
         
-        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">basepath</span><span class="p">,</span><span class="s2">&quot;TMG.json&quot;</span><span class="p">),</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">json_file</span><span class="p">:</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">basepath</span><span class="p">,</span> <span class="s2">&quot;TMG.json&quot;</span><span class="p">),</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">json_file</span><span class="p">:</span>
             <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_config</span><span class="p">,</span> <span class="n">json_file</span><span class="p">)</span>
 
         <span class="c1"># with open(os.path.join(self.basepath,&quot;Geoms.pkl&quot;), &#39;w&#39;) as pickle_file:</span>
         <span class="c1">#     pickle.dump(self.Geoms, pickle_file, pickle.HIGHEST_PROTOCOL)</span>
             
-            
         <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">)):</span> 
+            <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">_adata</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">adata</span>
+                <span class="n">_adata</span><span class="o">.</span><span class="n">obsm</span><span class="p">[</span><span class="s1">&#39;XY&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_adata</span><span class="o">.</span><span class="n">obsm</span><span class="p">[</span><span class="s1">&#39;XY&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
         
         <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Taxonomies</span><span class="p">)):</span> 
             <span class="bp">self</span><span class="o">.</span><span class="n">Taxonomies</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">basepath</span><span class="p">)</span>
             
         <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;saved&quot;</span><span class="p">)</span></div>
-
         
-<div class="viewcode-block" id="TissueMultiGraph.add_type_informations"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueMultiGraph.add_type_informations">[docs]</a>    <span class="k">def</span> <span class="nf">add_type_informations</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">layer_id</span><span class="p">,</span><span class="n">type_vec</span><span class="p">,</span><span class="n">tax</span><span class="p">):</span> 
-        <span class="sd">&quot;&quot;&quot;Adds type information to TMG</span>
+<div class="viewcode-block" id="TissueMultiGraph.add_type_information"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueMultiGraph.add_type_information">[docs]</a>    <span class="k">def</span> <span class="nf">add_type_information</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">layer_id</span><span class="p">,</span> <span class="n">type_vec</span><span class="p">,</span> <span class="n">tax</span><span class="p">):</span> 
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Adds type information to TMG</span>
 <span class="sd">        </span>
 <span class="sd">        Bookeeping method to add type information and update taxonomies etc. </span>
 <span class="sd">        </span>
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
 <span class="sd">        layer_id : int </span>
-<span class="sd">            what layers are we adding type info to? </span>
+<span class="sd">            what layers are we adding type info to? should be a `cell` layer </span>
 <span class="sd">        type_vec : numpy 1D array / list</span>
 <span class="sd">            the integer codes of type </span>
 <span class="sd">        tax : int / Taxonomy</span>
@@ -251,21 +261,28 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">layer_id</span> <span class="ow">or</span> <span class="n">layer_id</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">layer_id</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span> 
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;requested layer id: </span><span class="si">{</span><span class="n">layer_id</span><span class="si">}</span><span class="s2"> doesn&#39;t exist&quot;</span><span class="p">)</span>
-            
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="n">layer_id</span><span class="p">]</span><span class="o">.</span><span class="n">Type</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;!! .Type already exists in that layer; return ...&quot;</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="c1"># update .Type  </span>
         <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="n">layer_id</span><span class="p">]</span><span class="o">.</span><span class="n">Type</span> <span class="o">=</span> <span class="n">type_vec</span>
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tax</span><span class="p">,</span><span class="n">Taxonomy</span><span class="p">):</span>
+
+        <span class="c1"># add Tax</span>
+        <span class="c1"># add a reference of which taxonomy index belongs to this TG</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tax</span><span class="p">,</span> <span class="n">Taxonomy</span><span class="p">):</span> <span class="c1"># add to the pool and use an index to represent it</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">Taxonomies</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">tax</span><span class="p">)</span>
             <span class="n">tax</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Taxonomies</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span>
-        
-        <span class="c1"># add a reference of which taxonomy index belongs to this TG</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="n">layer_id</span><span class="p">]</span><span class="o">.</span><span class="n">tax</span> <span class="o">=</span> <span class="n">tax</span>
 
-        <span class="c1"># add mapping between layers and taxonomies to TMG (self)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">layer_taxonomy_mapping</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">layer_id</span><span class="p">,</span><span class="n">tax</span><span class="p">))</span>
+        <span class="c1"># update mapping between layers and taxonomies to TMG (self)</span>
+        <span class="c1"># this decides on which type to move on next...</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">layer_taxonomy_mapping</span><span class="p">[</span><span class="n">layer_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">tax</span> <span class="c1">#.append((layer_id,tax))</span>
         <span class="k">return</span> </div>
     
-<div class="viewcode-block" id="TissueMultiGraph.create_cell_layer"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueMultiGraph.create_cell_layer">[docs]</a>    <span class="k">def</span> <span class="nf">create_cell_layer</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">metric</span> <span class="o">=</span> <span class="s1">&#39;cosine&#39;</span><span class="p">):</span> 
-        <span class="sd">&quot;&quot;&quot;Creating cell layer from raw data. </span>
+<div class="viewcode-block" id="TissueMultiGraph.create_cell_layer"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueMultiGraph.create_cell_layer">[docs]</a>    <span class="k">def</span> <span class="nf">create_cell_layer</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">metric</span><span class="o">=</span><span class="s1">&#39;cosine&#39;</span><span class="p">,</span> <span class="n">norm</span><span class="o">=</span><span class="s1">&#39;default&#39;</span><span class="p">,</span> <span class="n">norm_cell</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">norm_basis</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span> 
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Creating cell layer from raw data. </span>
 <span class="sd">        TODO: Fix documentaion after finishing Taxonomy class. </span>
 <span class="sd">        </span>
 <span class="sd">        Cell layer is unique as it&#39;s the only one where spatial information is directly used with Voronoi</span>
@@ -279,18 +296,29 @@
 <span class="sd">        </span>
 <span class="sd">         </span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">allowed_options</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;default&#39;</span><span class="p">,</span> <span class="s1">&#39;logrowmedian&#39;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">norm</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">allowed_options</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Choose from </span><span class="si">{</span><span class="n">allowed_options</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        
+        <span class="k">for</span> <span class="n">TG</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">TG</span><span class="o">.</span><span class="n">layer_type</span> <span class="o">==</span> <span class="s2">&quot;cell&quot;</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;!!`cell` layer already exists; return...&quot;</span><span class="p">)</span>
+                <span class="k">return</span> 
+
         <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;In TMG.create_cell_layer&#39;</span><span class="p">)</span>
         <span class="c1"># load all data - create the FISHbasis and XYS variables</span>
         <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Started reading matrices and metadata&#39;</span><span class="p">)</span>
         <span class="n">metadata_files</span> <span class="o">=</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">basepath</span><span class="si">}</span><span class="s2">//*_metadata.csv&quot;</span><span class="p">)</span>
         <span class="n">metadata_files</span><span class="o">.</span><span class="n">sort</span><span class="p">()</span>
         <span class="n">XYS</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span><span class="mi">3</span><span class="p">))</span>
+        <span class="n">dfall_meta</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">metadata_files</span><span class="p">)):</span> 
-            <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">metadata_files</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
-            <span class="n">xys_i</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">df</span><span class="p">[[</span><span class="s2">&quot;stage_x&quot;</span><span class="p">,</span><span class="s2">&quot;stage_y&quot;</span><span class="p">,</span><span class="s2">&quot;section_index&quot;</span><span class="p">]])</span>
+            <span class="n">meta</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">metadata_files</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+            <span class="n">xys_i</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">meta</span><span class="p">[[</span><span class="s2">&quot;stage_x&quot;</span><span class="p">,</span><span class="s2">&quot;stage_y&quot;</span><span class="p">,</span><span class="s2">&quot;section_index&quot;</span><span class="p">]])</span>
             <span class="n">XYS</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">((</span><span class="n">XYS</span><span class="p">,</span><span class="n">xys_i</span><span class="p">))</span>
+            <span class="n">dfall_meta</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">meta</span><span class="p">)</span>
+        <span class="n">dfall_meta</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">dfall_meta</span><span class="p">)</span>
         
-
         <span class="n">matrix_files</span> <span class="o">=</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">basepath</span><span class="si">}</span><span class="s2">//*_matrix.csv&quot;</span><span class="p">)</span>
         <span class="n">matrix_files</span><span class="o">.</span><span class="n">sort</span><span class="p">()</span>
         <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">matrix_files</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="n">index_col</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
@@ -302,15 +330,24 @@
             <span class="n">cellnames</span> <span class="o">=</span> <span class="n">cellnames</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
         
         <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;done reading files&#39;</span><span class="p">)</span>
+        <span class="c1"># return FISHbasis</span>
         
-        <span class="c1"># normalize data</span>
-        <span class="n">FISHbasis</span> <span class="o">=</span> <span class="n">normalize_data</span><span class="p">(</span><span class="n">FISHbasis</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">norm</span> <span class="o">==</span> <span class="s1">&#39;default&#39;</span><span class="p">:</span>
+            <span class="c1"># FISH basis is the raw count matrices from imaging; normalize data</span>
+            <span class="n">FISHbasis_norm</span> <span class="o">=</span> <span class="n">basicu</span><span class="o">.</span><span class="n">normalize_fishdata</span><span class="p">(</span><span class="n">FISHbasis</span><span class="p">,</span> <span class="n">norm_cell</span><span class="o">=</span><span class="n">norm_cell</span><span class="p">,</span> <span class="n">norm_basis</span><span class="o">=</span><span class="n">norm_basis</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">norm</span> <span class="o">==</span> <span class="s1">&#39;logrowmedian&#39;</span><span class="p">:</span>
+            <span class="n">FISHbasis_norm</span> <span class="o">=</span> <span class="n">basicu</span><span class="o">.</span><span class="n">normalize_fishdata_logrowmedian</span><span class="p">(</span><span class="n">FISHbasis</span><span class="p">,</span> <span class="n">norm_basis</span><span class="o">=</span><span class="n">norm_basis</span><span class="p">)</span>
         
         <span class="c1"># creating first layer - cell tissue graph</span>
-        <span class="n">TG</span> <span class="o">=</span> <span class="n">TissueGraph</span><span class="p">(</span><span class="n">feature_mat</span> <span class="o">=</span> <span class="n">FISHbasis</span><span class="p">,</span><span class="n">basepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">basepath</span><span class="p">,</span><span class="n">layer_type</span><span class="o">=</span><span class="s2">&quot;cells&quot;</span><span class="p">)</span>
+        <span class="n">TG</span> <span class="o">=</span> <span class="n">TissueGraph</span><span class="p">(</span><span class="n">feature_mat</span><span class="o">=</span><span class="n">FISHbasis_norm</span><span class="p">,</span>
+                         <span class="n">feature_mat_raw</span><span class="o">=</span><span class="n">FISHbasis</span><span class="p">,</span>
+                         <span class="n">basepath</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">basepath</span><span class="p">,</span>
+                         <span class="n">layer_type</span><span class="o">=</span><span class="s2">&quot;cell&quot;</span><span class="p">,</span> 
+                         <span class="n">obs</span><span class="o">=</span><span class="n">dfall_meta</span><span class="p">,</span> <span class="c1"># metadata carries over</span>
+                         <span class="n">redo</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         
         <span class="c1"># add observations and init size to 1 for all cells</span>
-        <span class="n">TG</span><span class="o">.</span><span class="n">node_size</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="n">FISHbasis</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="mi">1</span><span class="p">))</span>
+        <span class="n">TG</span><span class="o">.</span><span class="n">node_size</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="n">FISHbasis_norm</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="mi">1</span><span class="p">))</span>
 
         <span class="c1"># add XY and slice information </span>
         <span class="n">TG</span><span class="o">.</span><span class="n">XY</span> <span class="o">=</span> <span class="n">XYS</span><span class="p">[:,</span><span class="mi">0</span><span class="p">:</span><span class="mi">2</span><span class="p">]</span>
@@ -320,98 +357,73 @@
         <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;building spatial graphs&#39;</span><span class="p">)</span>
         <span class="n">TG</span><span class="o">.</span><span class="n">build_spatial_graph</span><span class="p">(</span><span class="n">XYS</span><span class="p">)</span>
         <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;building feature graphs&#39;</span><span class="p">)</span>
-        <span class="n">TG</span><span class="o">.</span><span class="n">build_feature_graph</span><span class="p">(</span><span class="n">FISHbasis</span><span class="p">,</span><span class="n">metric</span> <span class="o">=</span> <span class="n">metric</span><span class="p">)</span>
-        
+        <span class="n">TG</span><span class="o">.</span><span class="n">build_feature_graph</span><span class="p">(</span><span class="n">FISHbasis_norm</span><span class="p">,</span> <span class="n">metric</span><span class="o">=</span><span class="n">metric</span><span class="p">)</span>
         
         <span class="c1"># add layer</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">TG</span><span class="p">)</span>
         <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;done with create_cell_layer&#39;</span><span class="p">)</span>
         <span class="k">return</span></div>
-        
-        <span class="c1"># Add taxonomy (type) information. </span>
-        <span class="c1"># There are three possiblities, unsupervized, supervized, and hybrid</span>
-        
-<span class="c1">#         # completely unsupervised:</span>
-<span class="c1">#         if celltypes_org is None: </span>
-<span class="c1">#             # cluster cell types optimally - all cells from scratch</span>
-<span class="c1">#             celltypes,optres = TG.multilayer_Leiden_with_cond_entropy(return_res = True)</span>
-            
-<span class="c1">#             cell_taxonomy = Taxonomy()</span>
-<span class="c1">#             cell_taxonomy.add_labels(feature_mat = FISHbasis,labels = celltypes)</span>
-        
-<span class="c1">#         # hybrid: </span>
-<span class="c1">#         elif expand_types is not None : </span>
-<span class="c1">#             celltypes = celltypes_org.copy()</span>
-<span class="c1">#             mx_subtypes = 10000</span>
-<span class="c1">#             celltypes = TG.multi_optim_Leiden_from_existing_types(base_types = celltypes,</span>
-<span class="c1">#                                                                         types_to_expand = expand_types,</span>
-<span class="c1">#                                                                         FeatureMat = FeatureMat,</span>
-<span class="c1">#                                                                         max_subtypes = mx_subtypes)</span>
-<span class="c1">#             ix_exanded_types = np.isin(celltypes_org,expand_types)</span>
-<span class="c1">#             cell_taxonomy.add_types(feature_mat = FISHbasis[ix_exanded_types,:],labels = celltypes[ix_exanded_types])</span>
-<span class="c1">#         # completely supervised</span>
-<span class="c1">#         else: </span>
-<span class="c1">#             celltypes = celltypes_org.copy()</span>
-               
-        
-<span class="c1">#         # add types and key data</span>
-
-        
 
 <div class="viewcode-block" id="TissueMultiGraph.create_isozone_layer"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueMultiGraph.create_isozone_layer">[docs]</a>    <span class="k">def</span> <span class="nf">create_isozone_layer</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell_layer</span> <span class="o">=</span> <span class="mi">0</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Creates isozones layer using cell types. </span>
-<span class="sd">        </span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Creates isozones layer using cell types. </span>
+<span class="sd">        = IsoZoneLayer.tax </span>
 <span class="sd">        Contract cell types to create isozone graph. </span>
 <span class="sd">        </span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">TG</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">TG</span><span class="o">.</span><span class="n">layer_type</span> <span class="o">==</span> <span class="s2">&quot;isozone&quot;</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;!!`isozone` layer already exists; return...&quot;</span><span class="p">)</span>
+                <span class="k">return</span> 
         <span class="n">IsoZoneLayer</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="n">cell_layer</span><span class="p">]</span><span class="o">.</span><span class="n">contract_graph</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">IsoZoneLayer</span><span class="p">)</span>
         <span class="n">layer_id</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span>                             
-        <span class="bp">self</span><span class="o">.</span><span class="n">layer_taxonomy_mapping</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">layer_id</span><span class="p">,</span><span class="n">IsoZoneLayer</span><span class="o">.</span><span class="n">tax</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">layer_taxonomy_mapping</span><span class="p">[</span><span class="n">layer_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">IsoZoneLayer</span><span class="o">.</span><span class="n">tax</span> <span class="c1"># .append((layer_id,IsoZoneLayer.tax))</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">layers_graph</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">cell_layer</span><span class="p">,</span><span class="n">layer_id</span><span class="p">))</span></div>
-                                     
     
-    
-<div class="viewcode-block" id="TissueMultiGraph.create_region_layer"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueMultiGraph.create_region_layer">[docs]</a>    <span class="k">def</span> <span class="nf">create_region_layer</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">topics</span><span class="p">,</span> <span class="n">region_tax</span><span class="p">,</span> <span class="n">cell_layer</span> <span class="o">=</span> <span class="mi">0</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Add region layor given cells&#39; region types (topics)</span>
+<div class="viewcode-block" id="TissueMultiGraph.create_region_layer"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueMultiGraph.create_region_layer">[docs]</a>    <span class="k">def</span> <span class="nf">create_region_layer</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">topics</span><span class="p">,</span> <span class="n">region_tax</span><span class="p">,</span> <span class="n">cell_layer</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Add region layor given cells&#39; region types (topics)</span>
 <span class="sd">        </span>
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
 <span class="sd">        topics : numpy array / list</span>
-<span class="sd">            An array with local type environment </span>
+<span class="sd">            An array with local type environment (a number for each cell) </span>
 <span class="sd">        region_tax : Taxonomy</span>
 <span class="sd">            A Taxonomy object that contains the region classification scheme</span>
 <span class="sd">        cell_layer : int (default,0)</span>
 <span class="sd">            Which layer in TMG is the cell layer?          </span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">TG</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">TG</span><span class="o">.</span><span class="n">layer_type</span> <span class="o">==</span> <span class="s2">&quot;region&quot;</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;!!`region` layer already exists; return...&quot;</span><span class="p">)</span>
+                <span class="k">return</span> 
 
         <span class="c1"># create region layers through graph contraction</span>
-        <span class="n">CG</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="n">cell_layer</span><span class="p">]</span><span class="o">.</span><span class="n">contract_graph</span><span class="p">(</span><span class="n">topics</span><span class="p">)</span>
+        <span class="n">CG</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="n">cell_layer</span><span class="p">]</span><span class="o">.</span><span class="n">contract_graph</span><span class="p">(</span><span class="n">topics</span><span class="p">)</span> <span class="c1"># contract the cell layer by topics</span>
         
         <span class="c1"># contraction assumes that the feature_mat and taxonomy of the contracted layers are</span>
         <span class="c1"># inherited from the layer used for contraction. This is not true for regions so we need to update these</span>
         <span class="c1"># feature_mat is updated here and tax is updated by calling add_type_information</span>
-        <span class="n">Env</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="n">cell_layer</span><span class="p">]</span><span class="o">.</span><span class="n">extract_environments</span><span class="p">(</span><span class="n">typevec</span> <span class="o">=</span> <span class="n">CG</span><span class="o">.</span><span class="n">Upstream</span><span class="p">)</span>
+        <span class="n">Env</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="n">cell_layer</span><span class="p">]</span><span class="o">.</span><span class="n">extract_environments</span><span class="p">(</span><span class="n">typevec</span><span class="o">=</span><span class="n">CG</span><span class="o">.</span><span class="n">Upstream</span><span class="p">)</span>
         <span class="n">row_sums</span> <span class="o">=</span> <span class="n">Env</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
         <span class="n">row_sums</span> <span class="o">=</span> <span class="n">row_sums</span><span class="p">[:,</span><span class="kc">None</span><span class="p">]</span>
         <span class="n">Env</span> <span class="o">=</span> <span class="n">Env</span><span class="o">/</span><span class="n">row_sums</span>
         
         <span class="c1"># create the region layer merging information from contracted graph and environments</span>
-        <span class="n">RegionLayer</span> <span class="o">=</span> <span class="n">TissueGraph</span><span class="p">(</span><span class="n">feature_mat</span> <span class="o">=</span> <span class="n">Env</span><span class="p">,</span> <span class="n">basepath</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">basepath</span><span class="p">,</span><span class="n">layer_type</span><span class="o">=</span><span class="s2">&quot;region&quot;</span><span class="p">)</span>
+        <span class="n">RegionLayer</span> <span class="o">=</span> <span class="n">TissueGraph</span><span class="p">(</span><span class="n">feature_mat</span><span class="o">=</span><span class="n">Env</span><span class="p">,</span> <span class="n">basepath</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">basepath</span><span class="p">,</span> <span class="n">layer_type</span><span class="o">=</span><span class="s2">&quot;region&quot;</span><span class="p">,</span> <span class="n">redo</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="n">RegionLayer</span><span class="o">.</span><span class="n">SG</span> <span class="o">=</span> <span class="n">CG</span><span class="o">.</span><span class="n">SG</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
         <span class="n">RegionLayer</span><span class="o">.</span><span class="n">node_size</span> <span class="o">=</span> <span class="n">CG</span><span class="o">.</span><span class="n">node_size</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
         <span class="n">RegionLayer</span><span class="o">.</span><span class="n">Upstream</span> <span class="o">=</span> <span class="n">CG</span><span class="o">.</span><span class="n">Upstream</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">RegionLayer</span><span class="p">)</span>
         <span class="n">current_layer_id</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">add_type_informations</span><span class="p">(</span><span class="n">current_layer_id</span><span class="p">,</span><span class="n">CG</span><span class="o">.</span><span class="n">Type</span><span class="p">,</span><span class="n">region_tax</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add_type_information</span><span class="p">(</span><span class="n">current_layer_id</span><span class="p">,</span> <span class="n">CG</span><span class="o">.</span><span class="n">Type</span><span class="p">,</span> <span class="n">region_tax</span><span class="p">)</span>
 
         <span class="c1"># update the layers graph to show that regions are created from cells</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">layers_graph</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">cell_layer</span><span class="p">,</span><span class="n">current_layer_id</span><span class="p">))</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">layers_graph</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">cell_layer</span><span class="p">,</span> <span class="n">current_layer_id</span><span class="p">))</span></div>
 
 <div class="viewcode-block" id="TissueMultiGraph.fill_holes"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueMultiGraph.fill_holes">[docs]</a>    <span class="k">def</span> <span class="nf">fill_holes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">lvl_to_fill</span><span class="p">,</span><span class="n">min_node_size</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;EXPERIMENTAL: merges small biospatial units with their neighbors. </span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;EXPERIMENTAL: merges small biospatial units with their neighbors. </span>
 
 <span class="sd">        The goal of this method is to allow filling up &quot;holes&quot;, i.e. chunks in the tissue graph that we </span>
 <span class="sd">        are unhappy about their type using local neighbor types. </span>
@@ -457,40 +469,48 @@
         <span class="k">if</span> <span class="n">update_feature_mat_flag</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="n">lvl_to_fill</span><span class="p">]</span><span class="o">.</span><span class="n">feature_mat</span> <span class="o">=</span> <span class="n">feature_mat</span><span class="p">[</span><span class="n">fixed</span><span class="p">,:]</span></div>
 
-<div class="viewcode-block" id="TissueMultiGraph.find_upstream_layer"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueMultiGraph.find_upstream_layer">[docs]</a>    <span class="k">def</span> <span class="nf">find_upstream_layer</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">layer_id</span><span class="p">):</span>
-        <span class="c1">#TODO: remove hardcoded cell is always &quot;root&quot;</span>
+<div class="viewcode-block" id="TissueMultiGraph.find_upstream_layer"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueMultiGraph.find_upstream_layer">[docs]</a>    <span class="k">def</span> <span class="nf">find_upstream_layer</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">layer_id</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        #TODO: remove hardcoded cell is always &quot;root&quot;</span>
+<span class="sd">        (Fangming: why not fixing a root layer (layer 0) that is always `cells`)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">upstream_layer_id</span><span class="o">=</span><span class="mi">0</span>
         <span class="k">return</span> <span class="n">upstream_layer_id</span></div>
     
-<div class="viewcode-block" id="TissueMultiGraph.map_to_cell_level"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueMultiGraph.map_to_cell_level">[docs]</a>    <span class="k">def</span> <span class="nf">map_to_cell_level</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">lvl</span><span class="p">,</span><span class="n">VecToMap</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span><span class="n">return_ix</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;</span>
+<div class="viewcode-block" id="TissueMultiGraph.map_to_cell_level"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueMultiGraph.map_to_cell_level">[docs]</a>    <span class="k">def</span> <span class="nf">map_to_cell_level</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lvl</span><span class="p">,</span> <span class="n">VecToMap</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">return_ix</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Maps values to first layer of the graph, mostly used for plotting. </span>
 <span class="sd">        lvl is the level we want to map all the way to </span>
+
+<span class="sd">        TODO: this function might have some problems</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="c1"># if VecToMap is not supplied, will use the layer Type as default thing to map to lower levels</span>
-        <span class="k">if</span> <span class="n">VecToMap</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span> 
+        <span class="k">if</span> <span class="n">VecToMap</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span> <span class="c1"># type </span>
             <span class="n">VecToMap</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="n">lvl</span><span class="p">]</span><span class="o">.</span><span class="n">Type</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">VecToMap</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">VecToMap</span> <span class="o">==</span> <span class="s1">&#39;index&#39;</span><span class="p">:</span> 
+            <span class="n">VecToMap</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="n">lvl</span><span class="p">]</span><span class="o">.</span><span class="n">N</span><span class="p">)</span>
         <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">VecToMap</span><span class="p">)</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="n">lvl</span><span class="p">]</span><span class="o">.</span><span class="n">N</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Number of elements in VecToMap doesn&#39;t match requested Layer size&quot;</span><span class="p">)</span>
             
         <span class="c1"># if needed (i.e. not already at cell level) expand indexing backwards in layers following layers_graph</span>
-        <span class="n">ix</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="n">lvl</span><span class="p">]</span><span class="o">.</span><span class="n">Upstream</span>
-        <span class="k">while</span> <span class="n">lvl</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">:</span>
-            <span class="n">lvl</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">find_upstream_layer</span><span class="p">(</span><span class="n">lvl</span><span class="p">)</span>
-            <span class="n">ix</span><span class="o">=</span><span class="n">ix</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="n">lvl</span><span class="p">]</span><span class="o">.</span><span class="n">Upstream</span><span class="p">]</span>
-        
-        <span class="n">VecToMap</span> <span class="o">=</span> <span class="n">VecToMap</span><span class="p">[</span><span class="n">ix</span><span class="p">]</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>
-        
-        <span class="k">if</span> <span class="n">return_ix</span><span class="p">:</span> 
-            <span class="k">return</span> <span class="p">(</span><span class="n">VecToMap</span><span class="p">,</span><span class="n">ix</span><span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span> 
-            <span class="k">return</span> <span class="n">VecToMap</span></div>
+        <span class="k">if</span> <span class="n">lvl</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">VecToMap</span>
+        <span class="k">else</span><span class="p">:</span>  <span class="c1"># (lvl &gt; 0)</span>
+            <span class="c1"># # while lvl &gt; 0:</span>
+            <span class="c1"># lvl = self.find_upstream_layer(lvl)</span>
+            <span class="c1"># ix=ix[self.Layers[lvl].Upstream</span>
+
+            <span class="n">ix</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="n">lvl</span><span class="p">]</span><span class="o">.</span><span class="n">Upstream</span>
+            <span class="n">VecToMap</span> <span class="o">=</span> <span class="n">VecToMap</span><span class="p">[</span><span class="n">ix</span><span class="p">]</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">return_ix</span><span class="p">:</span> 
+                <span class="k">return</span> <span class="p">(</span><span class="n">VecToMap</span><span class="p">,</span><span class="n">ix</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span> 
+                <span class="k">return</span> <span class="n">VecToMap</span></div>
     
-<div class="viewcode-block" id="TissueMultiGraph.find_regions_edge_level"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueMultiGraph.find_regions_edge_level">[docs]</a>    <span class="k">def</span> <span class="nf">find_regions_edge_level</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">region_layer</span> <span class="o">=</span> <span class="mi">2</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot; finds cells graph edges edges that are also region edges</span>
+<div class="viewcode-block" id="TissueMultiGraph.find_regions_edge_level"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueMultiGraph.find_regions_edge_level">[docs]</a>    <span class="k">def</span> <span class="nf">find_regions_edge_level</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">region_layer</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; finds cells graph edges that are also region edges</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        
-        <span class="c1"># create edge list with sorted tuples (the geom convention)</span>
+        <span class="c1"># create edge list with sorted tuples (the geom convention)s</span>
         <span class="n">edge_list</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
         <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">SG</span><span class="o">.</span><span class="n">es</span><span class="p">:</span>
             <span class="n">t</span><span class="o">=</span><span class="n">e</span><span class="o">.</span><span class="n">tuple</span>
@@ -499,23 +519,23 @@
             <span class="n">edge_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
         
         <span class="n">np_edge_list</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">edge_list</span><span class="p">)</span>
-        <span class="n">region_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">map_to_cell_level</span><span class="p">(</span><span class="n">region_layer</span><span class="p">,</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">N</span><span class="p">[</span><span class="n">region_layer</span><span class="p">]))</span>
+        <span class="n">region_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">map_to_cell_level</span><span class="p">(</span><span class="n">region_layer</span><span class="p">,</span> <span class="n">VecToMap</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">N</span><span class="p">[</span><span class="n">region_layer</span><span class="p">]))</span>
         <span class="n">np_edge_list</span> <span class="o">=</span> <span class="n">np_edge_list</span><span class="p">[</span><span class="n">region_id</span><span class="p">[</span><span class="n">np_edge_list</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]]</span> <span class="o">!=</span> <span class="n">region_id</span><span class="p">[</span><span class="n">np_edge_list</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]],:]</span>
         <span class="n">region_edge_list</span> <span class="o">=</span> <span class="p">[(</span><span class="n">np_edge_list</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="mi">0</span><span class="p">],</span><span class="n">np_edge_list</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">np_edge_list</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])]</span>            
         <span class="k">return</span> <span class="n">region_edge_list</span></div>
     
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">N</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;list : Number of cells in each layer of TMG.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;list : Number of cells in each layer of TMG.&quot;&quot;&quot;</span>
         <span class="k">return</span><span class="p">([</span><span class="n">L</span><span class="o">.</span><span class="n">N</span> <span class="k">for</span> <span class="n">L</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">])</span>
     
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">Ntypes</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;list : Number of types in each layer of TMG.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;list : Number of types in each layer of TMG.&quot;&quot;&quot;</span>
         <span class="k">return</span><span class="p">([</span><span class="n">L</span><span class="o">.</span><span class="n">Ntypes</span> <span class="k">for</span> <span class="n">L</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">Layers</span><span class="p">])</span>
     
 <div class="viewcode-block" id="TissueMultiGraph.add_geoms"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueMultiGraph.add_geoms">[docs]</a>    <span class="k">def</span> <span class="nf">add_geoms</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Creates the geometies needed (boundingbox, lines, points, and polygons) to be used in views to create maps. </span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Creates the geometries needed (boundingbox, lines, points, and polygons) to be used in views to create maps. </span>
 <span class="sd">        &quot;&quot;&quot;</span>
         
         <span class="c1"># Bounding box geometry </span>
@@ -605,11 +625,9 @@
             <span class="n">slice_geoms</span><span class="p">[</span><span class="s1">&#39;point&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">XY</span>
 
             <span class="bp">self</span><span class="o">.</span><span class="n">Geoms</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">slice_geoms</span><span class="p">)</span></div></div>
-            
-
 
 <div class="viewcode-block" id="TissueGraph"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueGraph">[docs]</a><span class="k">class</span> <span class="nc">TissueGraph</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Representation of transcriptional state of biospatial units as a graph. </span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Representation of transcriptional state of biospatial units as a graph. </span>
 <span class="sd">    </span>
 <span class="sd">    TissueGraph (TG) is the core class used to analyze tissues using Graph representation. </span>
 <span class="sd">    TG stores a two layer graph G = {V,Es,Ef} where Es are spatial edges (physical neighbors) and Ef are feature neighnors. </span>
@@ -638,8 +656,11 @@
 
 
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">feature_mat</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">basepath</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">layer_type</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">tax</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span><span class="n">redo</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Create a TissueGraph object</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">feature_mat</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">feature_mat_raw</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">basepath</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">layer_type</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tax</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">redo</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> 
+        <span class="n">obs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">quick_load_cell_obs</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a TissueGraph object</span>
 <span class="sd">        </span>
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
@@ -657,38 +678,14 @@
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;missing basepath in TissueGraph constructor&quot;</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">layer_type</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span> 
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Missing layer type information in TissueGraph constructor&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">layer_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;cell&#39;</span><span class="p">,</span> <span class="s1">&#39;isozone&#39;</span><span class="p">,</span> <span class="s1">&#39;region&#39;</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid layer type&quot;</span><span class="p">)</span>
 
         <span class="c1"># what is stored in this layer (cells, zones, regions, etc)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">layer_type</span> <span class="o">=</span> <span class="n">layer_type</span> <span class="c1"># label layers by their type</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">basepath</span> <span class="o">=</span> <span class="n">basepath</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">basepath</span><span class="p">,</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">layer_type</span><span class="si">}</span><span class="s2">.h5ad&quot;</span><span class="p">)</span>
-        
-        <span class="c1"># if anndata file exists and redo is False, just read the file. </span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">redo</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filename</span><span class="p">):</span> 
-            <span class="bp">self</span><span class="o">.</span><span class="n">adata</span> <span class="o">=</span> <span class="n">anndata</span><span class="o">.</span><span class="n">read_h5ad</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filename</span><span class="p">)</span>
-            <span class="c1"># create SG and FG from Anndata</span>
-            <span class="n">sg</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obsp</span><span class="p">[</span><span class="s2">&quot;SG&quot;</span><span class="p">])</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">SG</span> <span class="o">=</span> <span class="n">Graph</span><span class="o">.</span><span class="n">Adjacency</span><span class="p">((</span><span class="n">sg</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">tolist</span><span class="p">())</span>
-            <span class="n">fg</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obsp</span><span class="p">[</span><span class="s2">&quot;FG&quot;</span><span class="p">])</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">FG</span> <span class="o">=</span> <span class="n">Graph</span><span class="o">.</span><span class="n">Adjacency</span><span class="p">((</span><span class="n">fg</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">tolist</span><span class="p">())</span>
-            
 
-        <span class="k">else</span><span class="p">:</span> <span class="c1"># create an object from given feature_mat data</span>
-            <span class="c1"># validate input</span>
-            <span class="k">if</span> <span class="n">feature_mat</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span> 
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Missing feature_mat in TisseGraph constructor&quot;</span><span class="p">)</span>
-            <span class="c1"># if feautre_mat is a tuple, replace with NaNs</span>
-            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">feature_mat</span><span class="p">,</span><span class="nb">tuple</span><span class="p">):</span> 
-                <span class="n">feature_mat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">feature_mat</span><span class="p">)</span>
-                <span class="n">feature_mat</span><span class="p">[:]</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">nan</span>
-
-            <span class="c1"># The main data container is an anndata, initalize with feature_mat  </span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">adata</span> <span class="o">=</span> <span class="n">anndata</span><span class="o">.</span><span class="n">AnnData</span><span class="p">(</span><span class="n">feature_mat</span><span class="p">)</span> <span class="c1"># the tissuegraph AnnData object</span>
-            
-            <span class="c1"># Key graphs - spatial and feature based</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">SG</span> <span class="o">=</span> <span class="kc">None</span> <span class="c1"># spatial graph (created by build_spatial_graph, or load)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">FG</span> <span class="o">=</span> <span class="kc">None</span> <span class="c1"># Feature graph (created by build_feature_graph, or load)</span>
-            
         <span class="c1"># Taxonomy object - if it exists, provides a pointer to the object, None by default: </span>
         <span class="bp">self</span><span class="o">.</span><span class="n">tax</span> <span class="o">=</span> <span class="n">tax</span>
             
@@ -705,10 +702,45 @@
         <span class="c1"># Note: a these mapping are not used for few attributes such as SG/FG/Upstream that are &quot;hard coded&quot; </span>
         <span class="c1"># as much as possible, the only memory footprint is in the anndata object, the exceptions are SG/FG that </span>
         <span class="c1"># are large objects that we want to keep as iGraph in mem. </span>
+        
+        <span class="c1"># if anndata file exists and redo is False, just read the file. </span>
+        <span class="nb">print</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filename</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">quick_load_cell_obs</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">adata</span> <span class="o">=</span> <span class="n">anndata</span><span class="o">.</span><span class="n">read_h5ad</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filename</span><span class="p">,</span> <span class="n">backed</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">redo</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filename</span><span class="p">):</span> 
+            <span class="bp">self</span><span class="o">.</span><span class="n">adata</span> <span class="o">=</span> <span class="n">anndata</span><span class="o">.</span><span class="n">read_h5ad</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filename</span><span class="p">)</span>
+            <span class="k">if</span> <span class="s2">&quot;SG&quot;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obsp</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+                <span class="c1"># create SG and FG from Anndata</span>
+                <span class="n">sg</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obsp</span><span class="p">[</span><span class="s2">&quot;SG&quot;</span><span class="p">]</span> <span class="c1"># csr matrix</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">SG</span> <span class="o">=</span> <span class="n">tmgu</span><span class="o">.</span><span class="n">adjacency_to_igraph</span><span class="p">(</span><span class="n">sg</span><span class="p">,</span> <span class="n">directed</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="c1"># leiden requires undirected</span>
+            <span class="k">if</span> <span class="s2">&quot;FG&quot;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obsp</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+                <span class="n">fg</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obsp</span><span class="p">[</span><span class="s2">&quot;FG&quot;</span><span class="p">]</span> <span class="c1"># csr matrix</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">FG</span> <span class="o">=</span> <span class="n">tmgu</span><span class="o">.</span><span class="n">adjacency_to_igraph</span><span class="p">(</span><span class="n">fg</span><span class="p">,</span> <span class="n">directed</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            
+        <span class="k">else</span><span class="p">:</span> <span class="c1"># create an object from given feature_mat data</span>
+            <span class="c1"># validate input</span>
+            <span class="k">if</span> <span class="n">feature_mat</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span> 
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Missing feature_mat in TisseGraph constructor&quot;</span><span class="p">)</span>
+            <span class="c1"># if feautre_mat is a tuple, replace with NaNs</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">feature_mat</span><span class="p">,</span><span class="nb">tuple</span><span class="p">):</span> 
+                <span class="n">feature_mat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">feature_mat</span><span class="p">)</span>
+                <span class="n">feature_mat</span><span class="p">[:]</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+
+            <span class="c1"># The main data container is an anndata, initalize with feature_mat  </span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">adata</span> <span class="o">=</span> <span class="n">anndata</span><span class="o">.</span><span class="n">AnnData</span><span class="p">(</span><span class="n">feature_mat</span><span class="p">,</span> <span class="n">obs</span><span class="o">=</span><span class="n">obs</span><span class="p">)</span> <span class="c1"># the tissuegraph AnnData object</span>
+
+            <span class="k">if</span> <span class="n">feature_mat_raw</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">layers</span><span class="p">[</span><span class="s1">&#39;raw&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">feature_mat_raw</span>
+            
+            <span class="c1"># Key graphs - spatial and feature based</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">SG</span> <span class="o">=</span> <span class="kc">None</span> <span class="c1"># spatial graph (created by build_spatial_graph, or load)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">FG</span> <span class="o">=</span> <span class="kc">None</span> <span class="c1"># Feature graph (created by build_feature_graph, or load)</span>
+            
         <span class="k">return</span> <span class="kc">None</span>
     
 <div class="viewcode-block" id="TissueGraph.is_empty"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueGraph.is_empty">[docs]</a>    <span class="k">def</span> <span class="nf">is_empty</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Determines if the TG object is empty</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Determines if the TG object is empty</span>
 <span class="sd">        </span>
 <span class="sd">        Checks if internal adata is None of empty</span>
 <span class="sd">        &quot;&quot;&quot;</span> 
@@ -718,14 +750,13 @@
             <span class="k">return</span> <span class="kc">False</span></div>
     
 <div class="viewcode-block" id="TissueGraph.save"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueGraph.save">[docs]</a>    <span class="k">def</span> <span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;save TG to file&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;save TG to file&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_empty</span><span class="p">():</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filename</span><span class="p">)</span></div>
-        
     
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">names</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;list : observation names&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;list : observation names&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_empty</span><span class="p">():</span>
             <span class="k">return</span> <span class="kc">None</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">adata_mapping</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]]</span>
@@ -734,14 +765,13 @@
     <span class="k">def</span> <span class="nf">names</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">names</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">adata_mapping</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]]</span><span class="o">=</span><span class="n">names</span>
     
-    
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">Upstream</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;list : mapping between current TG layer (self) and upstream layer</span>
-<span class="sd">        Return value has he length of upsteam level and index values of current layer&quot;&quot;&quot;</span> 
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;list : mapping between current TG layer (self) and upstream layer</span>
+<span class="sd">        Return value has the length of upstream level and index values of current layer&quot;&quot;&quot;</span> 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_empty</span><span class="p">():</span>
             <span class="k">return</span> <span class="kc">None</span>
-        <span class="c1"># Upstream is stored as ups in adata: </span>
+        <span class="c1"># Upstream is stored as uns in adata: </span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s2">&quot;Upstream&quot;</span><span class="p">]</span>
     
     <span class="nd">@Upstream</span><span class="o">.</span><span class="n">setter</span>
@@ -750,7 +780,7 @@
     
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">feature_mat</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;matrix : the feature values for this TG observations</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;matrix : the feature values for this TG observations</span>
 <span class="sd">        </span>
 <span class="sd">        The feature_mat is stored in the underlying anndata object and is required to properly init it. </span>
 <span class="sd">        &quot;&quot;&quot;</span>
@@ -766,12 +796,13 @@
     
     <span class="nd">@property</span> 
     <span class="k">def</span> <span class="nf">Type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> 
-        <span class="sd">&quot;&quot;&quot;Type</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Type</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_empty</span><span class="p">():</span>
             <span class="k">return</span> <span class="kc">None</span>
         <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata_mapping</span><span class="p">[</span><span class="s2">&quot;Type&quot;</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">tolist</span><span class="p">():</span> 
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Mapping of type to AnnData is broken, please check!&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span>
+            <span class="c1"># raise ValueError(&quot;Mapping of type to AnnData is broken, please check!&quot;)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">typ</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">adata_mapping</span><span class="p">[</span><span class="s2">&quot;Type&quot;</span><span class="p">]]</span>
             <span class="n">typ</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">typ</span><span class="p">)</span> 
@@ -779,12 +810,12 @@
         
     <span class="nd">@Type</span><span class="o">.</span><span class="n">setter</span>
     <span class="k">def</span> <span class="nf">Type</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">Type</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;list : list (or 1D np array) of integer values that reference a Taxonomy object types&quot;&quot;&quot;</span> 
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;list : list (or 1D np array) of integer values that reference a Taxonomy object types&quot;&quot;&quot;</span> 
         <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">adata_mapping</span><span class="p">[</span><span class="s2">&quot;Type&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="n">Type</span>
         
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">N</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;int : Size of the tissue graph</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int : Size of the tissue graph</span>
 <span class="sd">            internally stored as igraph size</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_empty</span><span class="p">():</span>
@@ -792,8 +823,6 @@
         <span class="k">else</span><span class="p">:</span> 
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;TissueGraph does not contain an AnnData object, please verify!&#39;</span><span class="p">)</span>
     
-
-
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">node_size</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_empty</span><span class="p">():</span>
@@ -802,7 +831,6 @@
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Mapping of type to AnnData is broken, please check!&quot;</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span> 
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">adata_mapping</span><span class="p">[</span><span class="s2">&quot;node_size&quot;</span><span class="p">]]</span>
-        
     
     <span class="nd">@node_size</span><span class="o">.</span><span class="n">setter</span>
     <span class="k">def</span> <span class="nf">node_size</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">Nsz</span><span class="p">):</span>
@@ -810,7 +838,7 @@
     
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">Slice</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">            Slice : dependent property - will query info from anndata and return</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -826,7 +854,7 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">XY</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">            XY : dependent property - will query info from anndata and return</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -836,27 +864,26 @@
         <span class="k">else</span><span class="p">:</span> 
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obsm</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">adata_mapping</span><span class="p">[</span><span class="s2">&quot;XY&quot;</span><span class="p">]]</span>
 
-    
     <span class="nd">@XY</span><span class="o">.</span><span class="n">setter</span>
     <span class="k">def</span> <span class="nf">XY</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">XY</span><span class="p">):</span> 
         <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obsm</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">adata_mapping</span><span class="p">[</span><span class="s2">&quot;XY&quot;</span><span class="p">]]</span><span class="o">=</span><span class="n">XY</span>
         
     <span class="nd">@property</span>    
     <span class="k">def</span> <span class="nf">X</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">            X : dependent property - will query info from Graph and return</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">XY</span><span class="p">[:,</span><span class="mi">0</span><span class="p">])</span>
         
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">Y</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Y : dependent property - will query info from Graph and return</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Y : dependent property - will query info from Graph and return</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">XY</span><span class="p">[:,</span><span class="mi">1</span><span class="p">])</span>
     
     <span class="nd">@property</span>    
     <span class="k">def</span> <span class="nf">Ntypes</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> 
-        <span class="sd">&quot;&quot;&quot; </span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; </span>
 <span class="sd">            Ntypes: returns number of unique types in the graph</span>
 <span class="sd">        &quot;&quot;&quot;</span> 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">Type</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span> 
@@ -865,14 +892,15 @@
     
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">Nslices</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">            Nslices : returns number of unique slices in TG</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">unqS</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Slice</span><span class="p">)</span>
         <span class="k">return</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">unqS</span><span class="p">))</span>
     
-<div class="viewcode-block" id="TissueGraph.build_feature_graph"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueGraph.build_feature_graph">[docs]</a>    <span class="k">def</span> <span class="nf">build_feature_graph</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">X</span><span class="p">,</span><span class="n">n_neighbors</span> <span class="o">=</span> <span class="mi">15</span><span class="p">,</span><span class="n">metric</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span><span class="n">accuracy</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;prob&#39;</span> <span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;extras&#39;</span> <span class="p">:</span> <span class="mf">1.5</span><span class="p">},</span><span class="n">metric_kwds</span> <span class="o">=</span> <span class="p">{},</span><span class="n">return_graph</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;construct k-graph based on feature similarity</span>
+<div class="viewcode-block" id="TissueGraph.build_feature_graph"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueGraph.build_feature_graph">[docs]</a>    <span class="k">def</span> <span class="nf">build_feature_graph</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+        <span class="n">X</span><span class="p">,</span> <span class="n">n_neighbors</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span> <span class="n">metric</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">accuracy</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;prob&#39;</span><span class="p">:</span><span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;extras&#39;</span><span class="p">:</span><span class="mf">1.5</span><span class="p">},</span> <span class="n">metric_kwds</span><span class="o">=</span><span class="p">{},</span> <span class="n">return_graph</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;construct k-graph based on feature similarity</span>
 
 <span class="sd">        Create a kNN graph (an igraph object) based on feature similarity. The core of this method is the calculation on how to find neighbors. </span>
 <span class="sd">        If metric is &quot;precomputed&quot; the distances are assumed to be known and we&#39;re almost done. </span>
@@ -925,25 +953,25 @@
             <span class="p">(</span><span class="n">indices</span><span class="p">,</span><span class="n">distances</span><span class="p">)</span> <span class="o">=</span> <span class="n">knn</span><span class="o">.</span><span class="n">neighbor_graph</span>
 
         <span class="c1"># take the first K values remove first self similarities    </span>
-        <span class="n">indices</span> <span class="o">=</span> <span class="n">indices</span><span class="p">[:,</span><span class="mi">1</span><span class="p">:</span><span class="n">n_neighbors</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span>
-        <span class="n">distances</span> <span class="o">=</span> <span class="n">distances</span><span class="p">[:,</span><span class="mi">1</span><span class="p">:</span><span class="n">n_neighbors</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">indices</span> <span class="o">=</span> <span class="n">indices</span><span class="p">[:,</span><span class="mi">1</span><span class="p">:]</span>
+        <span class="n">distances</span> <span class="o">=</span> <span class="n">distances</span><span class="p">[:,</span><span class="mi">1</span><span class="p">:]</span>
 
         <span class="n">id_from</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">tile</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">indices</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span><span class="n">indices</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
         <span class="n">id_to</span> <span class="o">=</span> <span class="n">indices</span><span class="o">.</span><span class="n">flatten</span><span class="p">(</span><span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
 
         <span class="c1"># build graph</span>
         <span class="n">edgeList</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">((</span><span class="n">id_from</span><span class="p">,</span><span class="n">id_to</span><span class="p">))</span><span class="o">.</span><span class="n">T</span>
-        <span class="n">G</span> <span class="o">=</span> <span class="n">Graph</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="n">X</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">edges</span><span class="o">=</span><span class="n">edgeList</span><span class="p">)</span>
+        <span class="n">G</span> <span class="o">=</span> <span class="n">igraph</span><span class="o">.</span><span class="n">Graph</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="n">X</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">edges</span><span class="o">=</span><span class="n">edgeList</span><span class="p">)</span>
         <span class="n">G</span><span class="o">.</span><span class="n">simplify</span><span class="p">()</span>
+
+        <span class="c1"># register</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obsp</span><span class="p">[</span><span class="s2">&quot;FG&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">G</span><span class="o">.</span><span class="n">get_adjacency_sparse</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">FG</span> <span class="o">=</span> <span class="n">G</span>
         <span class="k">if</span> <span class="n">return_graph</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">G</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obsp</span><span class="p">[</span><span class="s2">&quot;FG&quot;</span><span class="p">]</span><span class="o">=</span>  <span class="n">G</span><span class="o">.</span><span class="n">get_adjacency_sparse</span><span class="p">()</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">FG</span> <span class="o">=</span> <span class="n">G</span>
-            <span class="k">return</span> <span class="bp">self</span></div>
+            <span class="k">return</span> <span class="n">G</span></div>
     
 <div class="viewcode-block" id="TissueGraph.build_spatial_graph"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueGraph.build_spatial_graph">[docs]</a>    <span class="k">def</span> <span class="nf">build_spatial_graph</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">XYS</span><span class="p">,</span><span class="n">names</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;construct graph based on Delauny neighbors</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;construct graph based on Delaunay neighbors</span>
 <span class="sd">        </span>
 <span class="sd">        build_spatial_graph will create an igrah using Delaunay triangulation</span>
 
@@ -972,14 +1000,14 @@
             <span class="c1"># get XY for a given slice</span>
             <span class="n">XY</span> <span class="o">=</span> <span class="n">XYS</span><span class="p">[</span><span class="n">XYS</span><span class="p">[:,</span><span class="mi">2</span><span class="p">]</span><span class="o">==</span><span class="n">unqS</span><span class="p">[</span><span class="n">s</span><span class="p">],</span><span class="mi">0</span><span class="p">:</span><span class="mi">2</span><span class="p">]</span>
             <span class="c1"># start with triangulation</span>
-            <span class="n">dd</span><span class="o">=</span><span class="n">Delaunay</span><span class="p">(</span><span class="n">XY</span><span class="p">)</span>
+            <span class="n">dd</span> <span class="o">=</span> <span class="n">Delaunay</span><span class="p">(</span><span class="n">XY</span><span class="p">)</span>
 
             <span class="c1"># create Graph from edge list</span>
             <span class="n">EL</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">dd</span><span class="o">.</span><span class="n">simplices</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="mi">3</span><span class="p">,</span><span class="mi">2</span><span class="p">),</span><span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
             <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">dd</span><span class="o">.</span><span class="n">simplices</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span> 
-                <span class="n">EL</span><span class="p">[</span><span class="n">i</span><span class="o">*</span><span class="mi">3</span><span class="p">,:]</span><span class="o">=</span><span class="p">[</span><span class="n">dd</span><span class="o">.</span><span class="n">simplices</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="mi">0</span><span class="p">],</span><span class="n">dd</span><span class="o">.</span><span class="n">simplices</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="mi">1</span><span class="p">]]</span>
-                <span class="n">EL</span><span class="p">[</span><span class="n">i</span><span class="o">*</span><span class="mi">3</span><span class="o">+</span><span class="mi">1</span><span class="p">,:]</span><span class="o">=</span><span class="p">[</span><span class="n">dd</span><span class="o">.</span><span class="n">simplices</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="mi">0</span><span class="p">],</span><span class="n">dd</span><span class="o">.</span><span class="n">simplices</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="mi">2</span><span class="p">]]</span>
-                <span class="n">EL</span><span class="p">[</span><span class="n">i</span><span class="o">*</span><span class="mi">3</span><span class="o">+</span><span class="mi">2</span><span class="p">,:]</span><span class="o">=</span><span class="p">[</span><span class="n">dd</span><span class="o">.</span><span class="n">simplices</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span><span class="n">dd</span><span class="o">.</span><span class="n">simplices</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="mi">2</span><span class="p">]]</span>
+                <span class="n">EL</span><span class="p">[</span><span class="n">i</span><span class="o">*</span><span class="mi">3</span><span class="p">,</span>  <span class="p">:]</span> <span class="o">=</span> <span class="p">[</span><span class="n">dd</span><span class="o">.</span><span class="n">simplices</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="mi">0</span><span class="p">],</span> <span class="n">dd</span><span class="o">.</span><span class="n">simplices</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="mi">1</span><span class="p">]]</span>
+                <span class="n">EL</span><span class="p">[</span><span class="n">i</span><span class="o">*</span><span class="mi">3</span><span class="o">+</span><span class="mi">1</span><span class="p">,:]</span> <span class="o">=</span> <span class="p">[</span><span class="n">dd</span><span class="o">.</span><span class="n">simplices</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="mi">0</span><span class="p">],</span> <span class="n">dd</span><span class="o">.</span><span class="n">simplices</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="mi">2</span><span class="p">]]</span>
+                <span class="n">EL</span><span class="p">[</span><span class="n">i</span><span class="o">*</span><span class="mi">3</span><span class="o">+</span><span class="mi">2</span><span class="p">,:]</span> <span class="o">=</span> <span class="p">[</span><span class="n">dd</span><span class="o">.</span><span class="n">simplices</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span> <span class="n">dd</span><span class="o">.</span><span class="n">simplices</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="mi">2</span><span class="p">]]</span>
 
             <span class="c1"># update vertices numbers to account for previously added nodes (cnt)</span>
             <span class="n">EL</span> <span class="o">=</span> <span class="n">EL</span> <span class="o">+</span> <span class="n">cnt</span>
@@ -989,7 +1017,7 @@
             <span class="c1"># convert to list of tuples to make igraph happy and add them. </span>
             <span class="n">el</span> <span class="o">=</span> <span class="n">el</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">EL</span><span class="p">[:,</span><span class="mi">0</span><span class="p">],</span> <span class="n">EL</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]))</span>
         
-        <span class="bp">self</span><span class="o">.</span><span class="n">SG</span>  <span class="o">=</span> <span class="n">Graph</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="n">XYS</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="n">edges</span><span class="o">=</span><span class="n">el</span><span class="p">,</span><span class="n">directed</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">simplify</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">SG</span> <span class="o">=</span> <span class="n">igraph</span><span class="o">.</span><span class="n">Graph</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="n">XYS</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">edges</span><span class="o">=</span><span class="n">el</span><span class="p">,</span> <span class="n">directed</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">simplify</span><span class="p">()</span>
         <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;updating anndata&quot;</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obsp</span><span class="p">[</span><span class="s2">&quot;SG&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">SG</span><span class="o">.</span><span class="n">get_adjacency_sparse</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obsm</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">adata_mapping</span><span class="p">[</span><span class="s2">&quot;XY&quot;</span><span class="p">]]</span><span class="o">=</span><span class="n">XYS</span><span class="p">[:,</span><span class="mi">0</span><span class="p">:</span><span class="mi">2</span><span class="p">]</span>
@@ -999,10 +1027,9 @@
         <span class="k">else</span><span class="p">:</span> 
             <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">adata_mapping</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="n">names</span>
         <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;done building spatial graph&quot;</span><span class="p">)</span></div>
-        
     
-<div class="viewcode-block" id="TissueGraph.contract_graph"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueGraph.contract_graph">[docs]</a>    <span class="k">def</span> <span class="nf">contract_graph</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">TypeVec</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;find zones/region, i.e. spatially continous areas in the graph the same (cell/microenvironment) type</span>
+<div class="viewcode-block" id="TissueGraph.contract_graph"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueGraph.contract_graph">[docs]</a>    <span class="k">def</span> <span class="nf">contract_graph</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">TypeVec</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;find zones/region, i.e. spatially continous areas in the graph the same (cell/microenvironment) type</span>
 <span class="sd">        </span>
 <span class="sd">        reduce graph size by merging spatial neighbors of same type. </span>
 <span class="sd">        Given a vector of types, will contract the graph to merge vertices that are both next to each other and of the same type. </span>
@@ -1036,7 +1063,7 @@
         <span class="n">EL</span> <span class="o">=</span> <span class="n">EL</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">take</span><span class="p">(</span><span class="n">TypeVec</span><span class="p">,</span><span class="n">EL</span><span class="p">[:,</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="n">np</span><span class="o">.</span><span class="n">take</span><span class="p">(</span><span class="n">TypeVec</span><span class="p">,</span><span class="n">EL</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]),:]</span>
         
         <span class="c1"># remake a graph with potentially many components</span>
-        <span class="n">IsoZonesGraph</span> <span class="o">=</span> <span class="n">Graph</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">N</span><span class="p">,</span> <span class="n">edges</span><span class="o">=</span><span class="n">EL</span><span class="p">,</span> <span class="n">directed</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="n">IsoZonesGraph</span> <span class="o">=</span> <span class="n">igraph</span><span class="o">.</span><span class="n">Graph</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">N</span><span class="p">,</span> <span class="n">edges</span><span class="o">=</span><span class="n">EL</span><span class="p">,</span> <span class="n">directed</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span>
         <span class="n">IsoZonesGraph</span> <span class="o">=</span> <span class="n">IsoZonesGraph</span><span class="o">.</span><span class="n">as_undirected</span><span class="p">()</span><span class="o">.</span><span class="n">simplify</span><span class="p">()</span>
 
         <span class="c1"># because we used both type and proximity, the original graph (based only on proximity)</span>
@@ -1075,7 +1102,11 @@
         <span class="n">ZSG</span><span class="o">.</span><span class="n">simplify</span><span class="p">()</span>
 
         <span class="c1"># create a new Tissue graph by copying existing one, contracting, and updating XY</span>
-        <span class="n">ZoneGraph</span> <span class="o">=</span> <span class="n">TissueGraph</span><span class="p">(</span><span class="n">feature_mat</span> <span class="o">=</span> <span class="n">zone_feat_mat</span><span class="p">,</span> <span class="n">basepath</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">basepath</span><span class="p">,</span><span class="n">layer_type</span><span class="o">=</span><span class="s2">&quot;isozones&quot;</span><span class="p">)</span>
+        <span class="n">ZoneGraph</span> <span class="o">=</span> <span class="n">TissueGraph</span><span class="p">(</span><span class="n">feature_mat</span><span class="o">=</span><span class="n">zone_feat_mat</span><span class="p">,</span> 
+                                <span class="n">basepath</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">basepath</span><span class="p">,</span>
+                                <span class="n">layer_type</span><span class="o">=</span><span class="s2">&quot;isozone&quot;</span><span class="p">,</span>
+                                <span class="n">redo</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                                <span class="p">)</span>
 
         <span class="n">ZoneGraph</span><span class="o">.</span><span class="n">SG</span> <span class="o">=</span> <span class="n">ZSG</span>
         <span class="n">ZoneGraph</span><span class="o">.</span><span class="n">names</span> <span class="o">=</span> <span class="n">ZoneName</span>
@@ -1086,23 +1117,20 @@
         
         <span class="k">return</span><span class="p">(</span><span class="n">ZoneGraph</span><span class="p">)</span></div>
                              
-
-                             
 <div class="viewcode-block" id="TissueGraph.type_freq"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueGraph.type_freq">[docs]</a>    <span class="k">def</span> <span class="nf">type_freq</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> 
-        <span class="sd">&quot;&quot;&quot;return the catogorical probability for each type in TG</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;return the catogorical probability for each type in TG</span>
 <span class="sd">        </span>
 <span class="sd">        Probabilities are weighted by the node_size</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">Type</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span> 
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Type not yet assigned, can&#39;t count frequencies&quot;</span><span class="p">)</span>
         <span class="n">unqTypes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Type</span><span class="p">)</span>
-        <span class="n">Ptypes</span> <span class="o">=</span> <span class="n">count_values</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Type</span><span class="p">,</span><span class="n">unqTypes</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">node_size</span><span class="p">)</span>
+        <span class="n">Ptypes</span> <span class="o">=</span> <span class="n">tmgu</span><span class="o">.</span><span class="n">count_values</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Type</span><span class="p">,</span><span class="n">unqTypes</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">node_size</span><span class="p">)</span>
         
         <span class="k">return</span> <span class="n">Ptypes</span><span class="p">,</span><span class="n">unqTypes</span></div>
     
-    
 <div class="viewcode-block" id="TissueGraph.cond_entropy"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueGraph.cond_entropy">[docs]</a>    <span class="k">def</span> <span class="nf">cond_entropy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;calculate conditional entropy of the tissue graph</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;calculate conditional entropy of the tissue graph</span>
 <span class="sd">           </span>
 <span class="sd">           cond entropy is the difference between graph entropy based on zones and type entropy</span>
 <span class="sd">        &quot;&quot;&quot;</span>
@@ -1121,7 +1149,7 @@
         <span class="k">return</span><span class="p">(</span><span class="n">cond_entropy</span><span class="p">)</span></div>
     
 <div class="viewcode-block" id="TissueGraph.extract_environments"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueGraph.extract_environments">[docs]</a>    <span class="k">def</span> <span class="nf">extract_environments</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">ordr</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span><span class="n">typevec</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;returns the categorical distribution of neighbors. </span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;returns the categorical distribution of neighbors. </span>
 <span class="sd">        </span>
 <span class="sd">        Depending on input there could be two uses, </span>
 <span class="sd">            usage 1: if ordr is not None returns local neighberhood defined as nodes up to distance ordr on the graph for all vertices. </span>
@@ -1158,11 +1186,10 @@
         <span class="c1"># should be the same as above, but much slower... keeping it here for now till more testing is done. </span>
         <span class="c1"># for i in range(len(ind)):</span>
         <span class="c1">#     Env[i,:]=count_values(self.Type[ind[i]],unqlbl,ndsz[ind[i]],norm_to_one = False)</span>
-            
         <span class="k">return</span><span class="p">(</span><span class="n">Env</span><span class="p">)</span></div>
     
 <div class="viewcode-block" id="TissueGraph.graph_local_avg"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueGraph.graph_local_avg">[docs]</a>    <span class="k">def</span> <span class="nf">graph_local_avg</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">VecToSmooth</span><span class="p">,</span><span class="n">ordr</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span><span class="n">kernel</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.4</span><span class="p">,</span><span class="mf">0.3</span><span class="p">,</span><span class="mf">0.2</span><span class="p">,</span><span class="mf">0.1</span><span class="p">])):</span>
-        <span class="sd">&quot;&quot;&quot;Simple local average of a Vec based on local neighborgood</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Simple local average of a Vec based on local neighborgood</span>
 <span class="sd">        </span>
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
@@ -1191,10 +1218,9 @@
         <span class="n">Smoothed</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">Smoothed</span><span class="p">,</span><span class="n">kernel</span><span class="p">)</span>
         <span class="n">Smoothed</span> <span class="o">=</span> <span class="n">Smoothed</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
         <span class="k">return</span><span class="p">(</span><span class="n">Smoothed</span><span class="p">)</span></div>
-
     
 <div class="viewcode-block" id="TissueGraph.watershed"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueGraph.watershed">[docs]</a>    <span class="k">def</span> <span class="nf">watershed</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">InputVec</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Watershed segmentation based on InputVec values</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Watershed segmentation based on InputVec values</span>
 <span class="sd">        </span>
 <span class="sd">        Watershed on the TG spatial graph. </span>
 <span class="sd">        First finds local peaks and then assigns all nodes to their closest local peak using dijkstra</span>
@@ -1214,7 +1240,7 @@
         <span class="n">peaks</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span><span class="n">is_peak</span><span class="p">)</span>  
 
         <span class="n">Adj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">SG</span><span class="o">.</span><span class="n">get_adjacency_sparse</span><span class="p">()</span>
-        <span class="n">Dij_min</span><span class="p">,</span> <span class="n">predecessors</span><span class="p">,</span><span class="n">ClosestPeak</span> <span class="o">=</span> <span class="n">dijkstra</span><span class="p">(</span><span class="n">Adj</span><span class="p">,</span> <span class="n">directed</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> 
+        <span class="n">Dij_min</span><span class="p">,</span> <span class="n">predecessors</span><span class="p">,</span> <span class="n">ClosestPeak</span> <span class="o">=</span> <span class="n">dijkstra</span><span class="p">(</span><span class="n">Adj</span><span class="p">,</span> <span class="n">directed</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> 
                                                           <span class="n">indices</span><span class="o">=</span><span class="n">peaks</span><span class="p">,</span> 
                                                           <span class="n">return_predecessors</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> 
                                                           <span class="n">unweighted</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> 
@@ -1231,10 +1257,8 @@
         <span class="n">CG</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">contract_graph</span><span class="p">(</span><span class="n">TypeVec</span> <span class="o">=</span> <span class="n">ClosestPeak</span><span class="p">)</span>
         <span class="n">Id</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">CG</span><span class="o">.</span><span class="n">N</span><span class="p">)</span>
         <span class="n">ClosestPeak</span> <span class="o">=</span> <span class="n">Id</span><span class="p">[</span><span class="n">CG</span><span class="o">.</span><span class="n">Upstream</span><span class="p">]</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">ClosestPeak</span><span class="p">,</span> <span class="n">Dij_min</span><span class="p">)</span></div>
         
-        <span class="k">return</span> <span class="p">(</span><span class="n">ClosestPeak</span><span class="p">,</span><span class="n">Dij_min</span><span class="p">)</span></div>
-        
-
 <div class="viewcode-block" id="TissueGraph.calc_entropy_at_different_Leiden_resolutions"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueGraph.calc_entropy_at_different_Leiden_resolutions">[docs]</a>    <span class="k">def</span> <span class="nf">calc_entropy_at_different_Leiden_resolutions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">Rvec</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">logspace</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mf">2.5</span><span class="p">,</span><span class="mi">100</span><span class="p">)):</span> 
         <span class="n">Ent</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">Rvec</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
         <span class="n">Ntypes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">Rvec</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
@@ -1246,172 +1270,8 @@
             
         <span class="bp">self</span><span class="o">.</span><span class="n">cond_entropy_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">data</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;Entropy&#39;</span> <span class="p">:</span> <span class="n">Ent</span><span class="p">,</span> <span class="s1">&#39;Ntypes&#39;</span> <span class="p">:</span> <span class="n">Ntypes</span><span class="p">,</span> <span class="s1">&#39;Resolution&#39;</span> <span class="p">:</span> <span class="n">Rvec</span><span class="p">})</span>     </div>
     
-    <span class="c1"># def multi_optim_Leiden_from_existing_types(self,base_types,types_to_expand, </span>
-    <span class="c1">#                                            FeatureMat, max_subtypes = 10000, </span>
-    <span class="c1">#                                            opt_params = {&#39;iters&#39; : 10, &#39;n_consensus&#39; : 50}):</span>
-        
-    <span class="c1">#     def ObjFunLeidenRes_FG(res,FGtosplit,ix,TypeVec,return_types = False):</span>
-    <span class="c1">#         &quot;&quot;&quot;</span>
-    <span class="c1">#         Basic optimization routine for Leiden resolution parameter. </span>
-    <span class="c1">#         Implemented using igraph leiden community detection</span>
-    <span class="c1">#         &quot;&quot;&quot;</span>
-            
-    <span class="c1">#         mask = np.zeros(TypeVec.shape,dtype=&#39;bool&#39;)</span>
-    <span class="c1">#         mask[ix] = True</span>
-    <span class="c1">#         mx_id = TypeVec[~mask].max()+1</span>
-            
-    <span class="c1">#         # if asked to return types, run this only once, no need for averaging. </span>
-    <span class="c1">#         iter_to_avg = opt_params[&#39;iters&#39;]</span>
-    <span class="c1">#         if return_types:</span>
-    <span class="c1">#             iter_to_avg=1</span>
-            
-    <span class="c1">#         EntropyVec = np.zeros(opt_params[&#39;iters&#39;])</span>
-    <span class="c1">#         for i in range(iter_to_avg):</span>
-    <span class="c1">#             # split cells in the provided graph</span>
-    <span class="c1">#             SplitTypes = FGtosplit.community_leiden(resolution_parameter=res,objective_function=&#39;modularity&#39;).membership</span>
-    <span class="c1">#             # adjust ids - make into numpy array and shift to account for existing types</span>
-    <span class="c1">#             SplitTypes = np.array(SplitTypes).astype(np.int64) + mx_id</span>
-                
-    <span class="c1">#             # recreate type vector for the whole tissue</span>
-    <span class="c1">#             TypeVec2 = TypeVec.copy()</span>
-    <span class="c1">#             TypeVec2[ix] = TypeVec2[ix] + SplitTypes</span>
-    <span class="c1">#             EntropyVec[i] = self.contract_graph(TypeVec2).cond_entropy()</span>
-                
-    <span class="c1">#         Entropy = EntropyVec.mean()</span>
-    <span class="c1">#         if return_types: </span>
-    <span class="c1">#             return -Entropy,TypeVec2</span>
-    <span class="c1">#         else:</span>
-    <span class="c1">#             return(-Entropy)</span>
-            
-    <span class="c1">#     # to ease bookkeeping, multiply cell type integers with a large const so we could add subtypes later</span>
-    <span class="c1">#     # ix_expand = np.isin(base_types,types_to_expand)</span>
-    <span class="c1">#     # base_types[ix_expand] = base_types[ix_expand] * max_subtypes</span>
-    <span class="c1">#     # types_to_expand = [x * max_subtypes for x in types_to_expand]</span>
-        
-    <span class="c1">#     # Build subgraphs    </span>
-    <span class="c1">#     start = time.time()</span>
-
-    <span class="c1">#     print(f&quot;Optimize each type to see if it can be split further&quot;)</span>
-    <span class="c1">#     for i in range(len(types_to_expand)):</span>
-            
-    <span class="c1">#         # get indexes of cells with this type</span>
-    <span class="c1">#         ix = np.flatnonzero(base_types == types_to_expand[i])</span>
-            
-    <span class="c1">#         # create a subgraph for these cells </span>
-    <span class="c1">#         sub_FG = self.build_feature_graph(FeatureMat[ix,:],metric = &#39;cosine&#39;,accuracy=3,return_graph = True)</span>
-            
-    <span class="c1">#         # Cond entropy optimization only for these cells</span>
-    <span class="c1">#         type_copy = base_types.copy()</span>
-    <span class="c1">#         n_before = len(np.unique(base_types))</span>
-    <span class="c1">#         sol = minimize_scalar(ObjFunLeidenRes_FG, bounds = (0.1,30), </span>
-    <span class="c1">#                                                   method=&#39;bounded&#39;,</span>
-    <span class="c1">#                                                   args = (sub_FG,ix,type_copy),</span>
-    <span class="c1">#                                                   options={&#39;xatol&#39;: 1e-1, &#39;disp&#39;: 3})</span>
-    <span class="c1">#         # get types</span>
-    <span class="c1">#         opt_res = sol[&#39;x&#39;]</span>
-    <span class="c1">#         ent,base_types = ObjFunLeidenRes_FG(opt_res,sub_FG,ix,base_types,return_types=True)</span>
-    <span class="c1">#         n_after = len(np.unique(base_types))</span>
-    <span class="c1">#         print(f&#39;i: {i} time: {time.time()-start:.2f} type before: {n_before} added: {n_after-n_before}&#39;)</span>
-            
-    <span class="c1">#     return base_types</span>
-                
-    
-    <span class="c1"># def multilayer_Leiden_with_cond_entropy(self,base_types = None, </span>
-    <span class="c1">#                                         FeatureMat = None, </span>
-    <span class="c1">#                                         return_res = False,</span>
-    <span class="c1">#                                         opt_params = {&#39;iters&#39; : 10, &#39;n_consensus&#39; : 50}): </span>
-    <span class="c1">#     &quot;&quot;&quot;</span>
-    <span class="c1">#         Find optimial clusters by peforming clustering on two-layer graph. </span>
-            
-    <span class="c1">#         Input</span>
-    <span class="c1">#         -----</span>
-    <span class="c1">#         TG : A TissueGraph that has matching SpatialGraph (SG) and FeatureGraph (FG)</span>
-    <span class="c1">#         optimization is done on resolution parameter  </span>
-            
-    <span class="c1">#     &quot;&quot;&quot;</span>
-    <span class="c1">#     start = time.time()</span>
-    <span class="c1">#     if base_types is not None: </span>
-    <span class="c1">#         unq_types = np.unique(base_types)</span>
-    <span class="c1">#         if FeatureMat is None: </span>
-    <span class="c1">#             raise ValueError(&#39;if types are supplied then a features matrix must be included&#39;)</span>
-    <span class="c1">#         sub_FGs = list()</span>
-    <span class="c1">#         all_ix = list()</span>
-    <span class="c1">#         print(f&quot;Building feature subgraphs for each type&quot;)</span>
-    <span class="c1">#         for i in range(len(unq_types)):</span>
-    <span class="c1">#             ix = np.flatnonzero(base_types == unq_types[i])</span>
-    <span class="c1">#             all_ix.append(ix)</span>
-    <span class="c1">#             # create a subgraph </span>
-    <span class="c1">#             sub_FGs.append(self.build_feature_graph(FeatureMat[ix,:],metric = &#39;cosine&#39;,accuracy=1,return_graph=True))</span>
-    <span class="c1">#         print(f&#39;done, time: {time.time()-start:.2f}&#39;)</span>
-            
-
-    <span class="c1">#     def ObjFunLeidenRes(res,return_types = False):</span>
-    <span class="c1">#         &quot;&quot;&quot;</span>
-    <span class="c1">#         Basic optimization routine for Leiden resolution parameter. </span>
-    <span class="c1">#         Implemented using igraph leiden community detection</span>
-    <span class="c1">#         &quot;&quot;&quot;</span>
-    <span class="c1">#         EntropyVec = np.zeros(opt_params[&#39;iters&#39;])</span>
-    <span class="c1">#         if base_types is not None:</span>
-    <span class="c1">#             for i in range(opt_params[&#39;iters&#39;]):</span>
-    <span class="c1">#                 all_sub_Types = list()</span>
-    <span class="c1">#                 for j in range(len(unq_types)):</span>
-    <span class="c1">#                     sub_TypeVec = sub_FGs[j].community_leiden(resolution_parameter=res,</span>
-    <span class="c1">#                                                               objective_function=&#39;modularity&#39;).membership</span>
-    <span class="c1">#                     sub_TypeVec = np.array(sub_TypeVec).astype(np.int64)</span>
-    <span class="c1">#                     all_sub_Types.append(sub_TypeVec)</span>
-                        
-    <span class="c1">#                 # bookeeping: rename all clusters so that numbers are allways unique. </span>
-    <span class="c1">#                 # find the largest number of subtypes we need to add</span>
-    <span class="c1">#                 # take log10 and ceil so that we find a place value that is larget that that</span>
-    <span class="c1">#                 # multiply base_types with that value. </span>
-    <span class="c1">#                 mxdec = np.max(10**np.ceil(np.log10([len(np.unique(x)) for x in all_sub_Types])))</span>
-    <span class="c1">#                 TypeVec = base_types * mxdec</span>
-    <span class="c1">#                 for j in range(len(all_ix)): </span>
-    <span class="c1">#                     TypeVec[all_ix[j]] = TypeVec[all_ix[j]] + all_sub_Types[j]</span>
-    <span class="c1">#                 EntropyVec[i] = self.contract_graph(TypeVec).cond_entropy()</span>
-    <span class="c1">#             Entropy = EntropyVec.mean()</span>
-                    
-    <span class="c1">#         else:</span>
-    <span class="c1">#             for i in range(opt_params[&#39;iters&#39;]):</span>
-    <span class="c1">#                 TypeVec = self.FG.community_leiden(resolution_parameter=res,</span>
-    <span class="c1">#                                                    objective_function=&#39;modularity&#39;).membership</span>
-    <span class="c1">#                 TypeVec = np.array(TypeVec).astype(np.int64)</span>
-    <span class="c1">#                 EntropyVec[i] = self.contract_graph(TypeVec).cond_entropy()</span>
-    <span class="c1">#             Entropy = EntropyVec.mean()</span>
-    <span class="c1">#         if return_types: </span>
-    <span class="c1">#             return -Entropy,TypeVec</span>
-    <span class="c1">#         else:</span>
-    <span class="c1">#             return(-Entropy)</span>
-
-    <span class="c1">#     print(f&quot;Calling initial optimization&quot;)</span>
-    <span class="c1">#     sol = minimize_scalar(ObjFunLeidenRes, bounds = (0.1,30), </span>
-    <span class="c1">#                                            method=&#39;bounded&#39;,</span>
-    <span class="c1">#                                            options={&#39;xatol&#39;: 1e-2, &#39;disp&#39;: 3})</span>
-    <span class="c1">#     opt_res = sol[&#39;x&#39;]</span>
-        
-    <span class="c1">#     # consensus clustering</span>
-    <span class="c1">#     TypeVec = np.zeros((self.N,opt_params[&#39;n_consensus&#39;]))</span>
-    <span class="c1">#     for i in range(opt_params[&#39;n_consensus&#39;]):</span>
-    <span class="c1">#         ent,TypeVec[:,i] = ObjFunLeidenRes(opt_res,return_types = True)</span>
-            
-    <span class="c1">#     if opt_params[&#39;n_consensus&#39;]&gt;1:</span>
-    <span class="c1">#         cmb = np.array(list(itertools.combinations(np.arange(opt_params[&#39;n_consensus&#39;]), r=2)))</span>
-    <span class="c1">#         rand_scr = np.zeros(cmb.shape[0])</span>
-    <span class="c1">#         for i in range(cmb.shape[0]):</span>
-    <span class="c1">#             rand_scr[i] = adjusted_rand_score(TypeVec[:,cmb[i,0]],TypeVec[:,cmb[i,1]])</span>
-    <span class="c1">#         rand_scr = squareform(rand_scr)</span>
-    <span class="c1">#         total_rand_scr = rand_scr.sum(axis=0)</span>
-    <span class="c1">#         TypeVec = TypeVec[:,np.argmax(total_rand_scr)]</span>
-                                                  
-
-    <span class="c1">#     print(f&quot;Number of types: {len(np.unique(TypeVec))} initial entropy: {-sol[&#39;fun&#39;]} number of evals: {sol[&#39;nfev&#39;]}&quot;)</span>
-    <span class="c1">#     if return_res: </span>
-    <span class="c1">#         return TypeVec,opt_res</span>
-    <span class="c1">#     else: </span>
-    <span class="c1">#         return TypeVec</span>
-    
 <div class="viewcode-block" id="TissueGraph.gradient_magnitude"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueGraph.gradient_magnitude">[docs]</a>    <span class="k">def</span> <span class="nf">gradient_magnitude</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">V</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Spatial gradient based on spatial graph</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Spatial gradient based on spatial graph</span>
 <span class="sd">        </span>
 <span class="sd">        Calculate the gradient defined as sqrt(dV/dx^2+dV/dy^2) where dV/dx(y) is calcualted using simple trigo</span>
 <span class="sd">        </span>
@@ -1433,7 +1293,7 @@
         <span class="k">return</span><span class="p">(</span><span class="n">gradmag</span><span class="p">)</span></div>
     
 <div class="viewcode-block" id="TissueGraph.graph_local_median"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.TissueGraph.graph_local_median">[docs]</a>    <span class="k">def</span> <span class="nf">graph_local_median</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">VecToSmooth</span><span class="p">,</span><span class="n">ordr</span> <span class="o">=</span> <span class="mi">3</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;local median of VecToSmooth based in spatial graph</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;local median of VecToSmooth based in spatial graph</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">ind</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">SG</span><span class="o">.</span><span class="n">neighborhood</span><span class="p">(</span><span class="n">order</span> <span class="o">=</span> <span class="n">ordr</span><span class="p">)</span>
         <span class="n">Smoothed</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">VecToSmooth</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
@@ -1441,11 +1301,8 @@
             <span class="n">ix</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">ind</span><span class="p">[</span><span class="n">j</span><span class="p">],</span><span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
             <span class="n">Smoothed</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nanmedian</span><span class="p">(</span><span class="n">VecToSmooth</span><span class="p">[</span><span class="n">ix</span><span class="p">])</span>
         <span class="k">return</span><span class="p">(</span><span class="n">Smoothed</span><span class="p">)</span></div></div>
-    
-
-        
 <div class="viewcode-block" id="Taxonomy"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.Taxonomy">[docs]</a><span class="k">class</span> <span class="nc">Taxonomy</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Taxonomical system for different biospatial units (cells, isozones, regions)</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Taxonomical system for different biospatial units (cells, isozones, regions)</span>
 <span class="sd">    </span>
 <span class="sd">    Attributes</span>
 <span class="sd">    ----------</span>
@@ -1454,8 +1311,10 @@
 <span class="sd">    </span>
 <span class="sd">    &quot;&quot;&quot;</span>
     
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">name</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span><span class="n">Types</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span><span class="n">feature_mat</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span> 
-        <span class="sd">&quot;&quot;&quot;Create a Taxonomy object</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> 
+        <span class="c1"># Types=None, feature_mat=None</span>
+        <span class="p">):</span> 
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a Taxonomy object</span>
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
@@ -1466,15 +1325,15 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">name</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span> 
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Taxonomy must get a name&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
             
         <span class="bp">self</span><span class="o">.</span><span class="n">_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_feature_cols</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
         <span class="k">return</span> <span class="kc">None</span>
     
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">Type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> 
-        <span class="sd">&quot;&quot;&quot;list: Building blocks of this Taxonomy</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;list: Building blocks of this Taxonomy</span>
 <span class="sd">        </span>
 <span class="sd">        Setter verify that there are no duplications. </span>
 <span class="sd">        &quot;&quot;&quot;</span>
@@ -1494,7 +1353,7 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">feature_mat</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> 
-        <span class="sd">&quot;&quot;&quot;ndarray: feature values for all types in the taxonomy</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;ndarray: feature values for all types in the taxonomy</span>
 <span class="sd">        </span>
 <span class="sd">        Setter can get as input either numpy array (ordered same as self.Type) or pandas dataframe</span>
 <span class="sd">        &quot;&quot;&quot;</span>
@@ -1522,25 +1381,23 @@
         
         <span class="bp">self</span><span class="o">.</span><span class="n">_feature_cols</span> <span class="o">=</span> <span class="n">df_features</span><span class="o">.</span><span class="n">columns</span>
         
-        
 <div class="viewcode-block" id="Taxonomy.is_empty"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.Taxonomy.is_empty">[docs]</a>    <span class="k">def</span> <span class="nf">is_empty</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot; determie if taxonomy is empty</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; determie if taxonomy is empty</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_df</span><span class="o">.</span><span class="n">empty</span><span class="p">)</span></div>
         
-<div class="viewcode-block" id="Taxonomy.save"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.Taxonomy.save">[docs]</a>    <span class="k">def</span> <span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">basepath</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;save to basepath using Taxonomy name</span>
+<div class="viewcode-block" id="Taxonomy.save"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.Taxonomy.save">[docs]</a>    <span class="k">def</span> <span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">basepath</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;save to basepath using Taxonomy name</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_df</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">basepath</span><span class="p">,</span><span class="sa">f</span><span class="s2">&quot;Taxonomy_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">.csv&quot;</span><span class="p">))</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_df</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">basepath</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;Taxonomy_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">.csv&quot;</span><span class="p">))</span></div>
         
-<div class="viewcode-block" id="Taxonomy.load"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.Taxonomy.load">[docs]</a>    <span class="k">def</span> <span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">basepath</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;save from basepath using Taxonomy name</span>
+<div class="viewcode-block" id="Taxonomy.load"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.Taxonomy.load">[docs]</a>    <span class="k">def</span> <span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">basepath</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;save from basepath using Taxonomy name</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">basepath</span><span class="p">,</span><span class="sa">f</span><span class="s2">&quot;Taxonomy_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">.csv&quot;</span><span class="p">))</span></div>
-        
+        <span class="bp">self</span><span class="o">.</span><span class="n">_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">basepath</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;Taxonomy_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">.csv&quot;</span><span class="p">))</span></div>
         
 <div class="viewcode-block" id="Taxonomy.add_types"><a class="viewcode-back" href="../../Analysis.html#Analysis.TissueGraph.Taxonomy.add_types">[docs]</a>    <span class="k">def</span> <span class="nf">add_types</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">new_types</span><span class="p">,</span><span class="n">feature_mat</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;add new types and their feature average to the Taxonomy</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;add new types and their feature average to the Taxonomy</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">df_new</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">feature_mat</span><span class="p">)</span>
         <span class="n">df_new</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span><span class="o">=</span><span class="n">new_types</span>
@@ -1587,7 +1444,7 @@
     </div>
     <div class="footer" role="contentinfo">
         &#169; Copyright 2022, Wollman lab.
-      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 5.0.1.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 6.0.0.
     </div>
   </body>
 </html>

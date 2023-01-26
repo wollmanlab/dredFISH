@@ -1,0 +1,509 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+
+    <title>Utils package &#8212; dredFISH  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="_static/sphinxdoc.css" />
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/sphinx_highlight.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Design package" href="Design.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="Design.html" title="Design package"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">dredFISH  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Utils package</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="utils-package">
+<h1>Utils package<a class="headerlink" href="#utils-package" title="Permalink to this heading">¶</a></h1>
+<section id="module-Utils.basicu">
+<span id="utils-basicu-module"></span><h2>Utils.basicu module<a class="headerlink" href="#module-Utils.basicu" title="Permalink to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.basicu.clip_by_percentile">
+<span class="sig-prename descclassname"><span class="pre">Utils.basicu.</span></span><span class="sig-name descname"><span class="pre">clip_by_percentile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">vector</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">low_p</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">high_p</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">95</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/basicu.html#clip_by_percentile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.basicu.clip_by_percentile" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.basicu.corr_paired_rows_fast">
+<span class="sig-prename descclassname"><span class="pre">Utils.basicu.</span></span><span class="sig-name descname"><span class="pre">corr_paired_rows_fast</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">offset</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'pearsonr'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/basicu.html#corr_paired_rows_fast"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.basicu.corr_paired_rows_fast" title="Permalink to this definition">¶</a></dt>
+<dd><p>low memory compared to fast2</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.basicu.corr_paired_rows_fast2">
+<span class="sig-prename descclassname"><span class="pre">Utils.basicu.</span></span><span class="sig-name descname"><span class="pre">corr_paired_rows_fast2</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">offset</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nan_to_num</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'pearsonr'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/basicu.html#corr_paired_rows_fast2"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.basicu.corr_paired_rows_fast2" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.basicu.diag_matrix">
+<span class="sig-prename descclassname"><span class="pre">Utils.basicu.</span></span><span class="sig-name descname"><span class="pre">diag_matrix</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rows=&lt;Mock</span> <span class="pre">name='mock.array()'</span> <span class="pre">id='140651168226560'&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cols=&lt;Mock</span> <span class="pre">name='mock.array()'</span> <span class="pre">id='140651168226560'&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">threshold=None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/basicu.html#diag_matrix"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.basicu.diag_matrix" title="Permalink to this definition">¶</a></dt>
+<dd><p>Diagonalize a matrix as much as possible
+threshold controls the level of diagnalization
+a smaller threshold encourges more number of strict diagnal values,
+while discourages less number of free columns (quasi-diagnal)</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.basicu.diag_matrix_cols">
+<span class="sig-prename descclassname"><span class="pre">Utils.basicu.</span></span><span class="sig-name descname"><span class="pre">diag_matrix_cols</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/basicu.html#diag_matrix_cols"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.basicu.diag_matrix_cols" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.basicu.diag_matrix_rows">
+<span class="sig-prename descclassname"><span class="pre">Utils.basicu.</span></span><span class="sig-name descname"><span class="pre">diag_matrix_rows</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/basicu.html#diag_matrix_rows"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.basicu.diag_matrix_rows" title="Permalink to this definition">¶</a></dt>
+<dd><p>Diagonalize a matrix as much as possible by only rearrange rows</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.basicu.encode_mat">
+<span class="sig-prename descclassname"><span class="pre">Utils.basicu.</span></span><span class="sig-name descname"><span class="pre">encode_mat</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">a</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">d</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entrysize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/basicu.html#encode_mat"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.basicu.encode_mat" title="Permalink to this definition">¶</a></dt>
+<dd><p>Given a matrix and a dictionary; map elements of a according to d
+a - numpy array
+d - dictionary</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.basicu.get_index_from_array">
+<span class="sig-prename descclassname"><span class="pre">Utils.basicu.</span></span><span class="sig-name descname"><span class="pre">get_index_from_array</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">arr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inqs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">na_rep</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/basicu.html#get_index_from_array"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.basicu.get_index_from_array" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get index of array</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.basicu.group_mean">
+<span class="sig-prename descclassname"><span class="pre">Utils.basicu.</span></span><span class="sig-name descname"><span class="pre">group_mean</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mat</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">groups</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">group_order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">expand</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">clip_groupsize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/basicu.html#group_mean"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.basicu.group_mean" title="Permalink to this definition">¶</a></dt>
+<dd><p>mat is a matrix (cell-by-feature) ; group are the labels (for each cell).</p>
+<p>len(group_order) determines the number of clusters; will infer from <cite>mat</cite> if empty.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.basicu.group_sum">
+<span class="sig-prename descclassname"><span class="pre">Utils.basicu.</span></span><span class="sig-name descname"><span class="pre">group_sum</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mat</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">groups</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">group_order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/basicu.html#group_sum"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.basicu.group_sum" title="Permalink to this definition">¶</a></dt>
+<dd><p>mat is a matrix (cell-by-feature) ; group are the labels (for each cell).</p>
+<p>this can be speed up!!! take advantage of the cluster label structure… check my metacell analysis script as well</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.basicu.libsize_norm">
+<span class="sig-prename descclassname"><span class="pre">Utils.basicu.</span></span><span class="sig-name descname"><span class="pre">libsize_norm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mat</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scale</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/basicu.html#libsize_norm"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.basicu.libsize_norm" title="Permalink to this definition">¶</a></dt>
+<dd><p>cell by gene matrix, norm to median library size
+assume the matrix is in sparse format, the output will keep sparse</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.basicu.normalize_fishdata">
+<span class="sig-prename descclassname"><span class="pre">Utils.basicu.</span></span><span class="sig-name descname"><span class="pre">normalize_fishdata</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">norm_cell</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">norm_basis</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">allow_nan</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/basicu.html#normalize_fishdata"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.basicu.normalize_fishdata" title="Permalink to this definition">¶</a></dt>
+<dd><p>X – cell by basis raw count matrix</p>
+<p>0 clipping; cell normalization; bit normalization</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.basicu.normalize_fishdata_logrowmedian">
+<span class="sig-prename descclassname"><span class="pre">Utils.basicu.</span></span><span class="sig-name descname"><span class="pre">normalize_fishdata_logrowmedian</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">norm_basis</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">allow_nan</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/basicu.html#normalize_fishdata_logrowmedian"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.basicu.normalize_fishdata_logrowmedian" title="Permalink to this definition">¶</a></dt>
+<dd><p>X – cell by basis raw count matrix</p>
+<p>0 clipping; cell normalization; bit normalization</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.basicu.rank">
+<span class="sig-prename descclassname"><span class="pre">Utils.basicu.</span></span><span class="sig-name descname"><span class="pre">rank</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">arr</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/basicu.html#rank"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.basicu.rank" title="Permalink to this definition">¶</a></dt>
+<dd><p>rank is equivalent to argsort twice</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.basicu.rank_array">
+<span class="sig-prename descclassname"><span class="pre">Utils.basicu.</span></span><span class="sig-name descname"><span class="pre">rank_array</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">array</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/basicu.html#rank_array"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.basicu.rank_array" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return ranking of each element of an array</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.basicu.rank_rows">
+<span class="sig-prename descclassname"><span class="pre">Utils.basicu.</span></span><span class="sig-name descname"><span class="pre">rank_rows</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">matrix</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/basicu.html#rank_rows"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.basicu.rank_rows" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return rankings of each rwo in a 2d array</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.basicu.reset_logging">
+<span class="sig-prename descclassname"><span class="pre">Utils.basicu.</span></span><span class="sig-name descname"><span class="pre">reset_logging</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/basicu.html#reset_logging"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.basicu.reset_logging" title="Permalink to this definition">¶</a></dt>
+<dd><p>reset logging.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.basicu.sparse_libsize_norm">
+<span class="sig-prename descclassname"><span class="pre">Utils.basicu.</span></span><span class="sig-name descname"><span class="pre">sparse_libsize_norm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mat</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/basicu.html#sparse_libsize_norm"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.basicu.sparse_libsize_norm" title="Permalink to this definition">¶</a></dt>
+<dd><p>cell by gene matrix, norm to median library size
+assume the matrix is in sparse format, the output will keep sparse</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.basicu.spearman_corrcoef">
+<span class="sig-prename descclassname"><span class="pre">Utils.basicu.</span></span><span class="sig-name descname"><span class="pre">spearman_corrcoef</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Y</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/basicu.html#spearman_corrcoef"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.basicu.spearman_corrcoef" title="Permalink to this definition">¶</a></dt>
+<dd><p>return spearman correlation matrix for each pair of rows of X and Y</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.basicu.spearmanr_paired_rows">
+<span class="sig-prename descclassname"><span class="pre">Utils.basicu.</span></span><span class="sig-name descname"><span class="pre">spearmanr_paired_rows</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Y</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/basicu.html#spearmanr_paired_rows"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.basicu.spearmanr_paired_rows" title="Permalink to this definition">¶</a></dt>
+<dd><p>with p-value, slow</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.basicu.stratified_sample">
+<span class="sig-prename descclassname"><span class="pre">Utils.basicu.</span></span><span class="sig-name descname"><span class="pre">stratified_sample</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">col</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dict</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_idx</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">group_keys</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sort</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">random_state</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/basicu.html#stratified_sample"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.basicu.stratified_sample" title="Permalink to this definition">¶</a></dt>
+<dd><p>n (int) represents the number for each group
+n (dict) can be used to sample different numbers for each group
+does not allow oversampling</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.basicu.stratified_sample_withrep">
+<span class="sig-prename descclassname"><span class="pre">Utils.basicu.</span></span><span class="sig-name descname"><span class="pre">stratified_sample_withrep</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">col</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dict</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_idx</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">group_keys</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sort</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">random_state</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/basicu.html#stratified_sample_withrep"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.basicu.stratified_sample_withrep" title="Permalink to this definition">¶</a></dt>
+<dd><p>n (int) represents the number for each group
+n (dict) can be used to sample different numbers for each group
+replace=True: allow oversampling</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.basicu.swap_mask">
+<span class="sig-prename descclassname"><span class="pre">Utils.basicu.</span></span><span class="sig-name descname"><span class="pre">swap_mask</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mat</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lookup_o2n</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/basicu.html#swap_mask"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.basicu.swap_mask" title="Permalink to this definition">¶</a></dt>
+<dd><p>create from the old mask matrix a new matrix with the swapped labels according to the lookup table (pd.Series)
+lookup_o2n = pd.Series(lbl, index=unq)
+newmat = swap_mask(mat, lookup_o2n)</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.basicu.zscore">
+<span class="sig-prename descclassname"><span class="pre">Utils.basicu.</span></span><span class="sig-name descname"><span class="pre">zscore</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">v</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">allow_nan</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ignore_zero</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">zero_threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-10</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/basicu.html#zscore"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.basicu.zscore" title="Permalink to this definition">¶</a></dt>
+<dd><p>v is an numpy array (any dimensional)</p>
+<p><a href="#id1"><span class="problematic" id="id2">**</span></a>kwargs are arguments of np.mean and np.std, such as</p>
+<p>axis=0 # zscore across rows for each column (if v is 2-dimensional)
+axis=1 # zscore across cols for each row  (if v is 2-dimensional)</p>
+</dd></dl>
+
+</section>
+<section id="module-Utils.celltypeu">
+<span id="utils-celltypeu-module"></span><h2>Utils.celltypeu module<a class="headerlink" href="#module-Utils.celltypeu" title="Permalink to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="Utils.celltypeu.CellTypeClassify">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">Utils.celltypeu.</span></span><span class="sig-name descname"><span class="pre">CellTypeClassify</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X_refdata</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y_refdata</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">X_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/celltypeu.html#CellTypeClassify"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.celltypeu.CellTypeClassify" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="Utils.celltypeu.CellTypeClassify.backup">
+<span class="sig-name descname"><span class="pre">backup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/celltypeu.html#CellTypeClassify.backup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.celltypeu.CellTypeClassify.backup" title="Permalink to this definition">¶</a></dt>
+<dd><p>save a copy</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="Utils.celltypeu.CellTypeClassify.buildModel">
+<span class="sig-name descname"><span class="pre">buildModel</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/celltypeu.html#CellTypeClassify.buildModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.celltypeu.CellTypeClassify.buildModel" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="Utils.celltypeu.CellTypeClassify.classBalance">
+<span class="sig-name descname"><span class="pre">classBalance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_cells</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dict</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">random_state</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/celltypeu.html#CellTypeClassify.classBalance"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.celltypeu.CellTypeClassify.classBalance" title="Permalink to this definition">¶</a></dt>
+<dd><p>Class Balance  the reference data
+select <cite>n_cells</cite> from each cluster without replacement
+if n_cells &gt; cluster size, it selects <strong>all</strong> cells</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="Utils.celltypeu.CellTypeClassify.normalizeData">
+<span class="sig-name descname"><span class="pre">normalizeData</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">norm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'per_bit'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/celltypeu.html#CellTypeClassify.normalizeData"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.celltypeu.CellTypeClassify.normalizeData" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="Utils.celltypeu.CellTypeClassify.predictLabels">
+<span class="sig-name descname"><span class="pre">predictLabels</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/celltypeu.html#CellTypeClassify.predictLabels"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.celltypeu.CellTypeClassify.predictLabels" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="Utils.celltypeu.CellTypeClassify.rankNorm">
+<span class="sig-name descname"><span class="pre">rankNorm</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/celltypeu.html#CellTypeClassify.rankNorm"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.celltypeu.CellTypeClassify.rankNorm" title="Permalink to this definition">¶</a></dt>
+<dd><p>rank normalize across bits</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="Utils.celltypeu.CellTypeClassify.reset">
+<span class="sig-name descname"><span class="pre">reset</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/celltypeu.html#CellTypeClassify.reset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.celltypeu.CellTypeClassify.reset" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="Utils.celltypeu.CellTypeClassify.run">
+<span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">norm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ranknorm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_cells</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dict</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">random_state</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/celltypeu.html#CellTypeClassify.run"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.celltypeu.CellTypeClassify.run" title="Permalink to this definition">¶</a></dt>
+<dd><p>sample, normalize, classify</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="Utils.celltypeu.CellTypeClassify.run_bagging">
+<span class="sig-name descname"><span class="pre">run_bagging</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_estimators</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">norm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ranknorm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_cells</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dict</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">random_state</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/celltypeu.html#CellTypeClassify.run_bagging"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.celltypeu.CellTypeClassify.run_bagging" title="Permalink to this definition">¶</a></dt>
+<dd><p>repeat the same algorithm for different subsets of samples several time, taking the average as the results</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="Utils.celltypeu.CellTypeClassify.run_iterative_prior">
+<span class="sig-name descname"><span class="pre">run_iterative_prior</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">overall_sample_fraction</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_total_cells</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_cells</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p0</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subrun_func</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'run'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">norm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'per_bit_equalscale'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ranknorm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">random_state</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/celltypeu.html#CellTypeClassify.run_iterative_prior"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.celltypeu.CellTypeClassify.run_iterative_prior" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iteratively set up the number of cell to sample, control overall sample fraction</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="Utils.celltypeu.CellTypeClassify.run_iterative_prior_v2">
+<span class="sig-name descname"><span class="pre">run_iterative_prior_v2</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">min_cells_pertype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_ratio</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_cells</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">20</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p0</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subrun_func</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'run'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">norm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'per_bit_equalscale'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ranknorm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">random_state</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/celltypeu.html#CellTypeClassify.run_iterative_prior_v2"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.celltypeu.CellTypeClassify.run_iterative_prior_v2" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iteratively set up the number of cell to sample, control baseline number of cells</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="Utils.celltypeu.CellTypeClassify.trainModel">
+<span class="sig-name descname"><span class="pre">trainModel</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/celltypeu.html#CellTypeClassify.trainModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.celltypeu.CellTypeClassify.trainModel" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.celltypeu.iterative_classify">
+<span class="sig-prename descclassname"><span class="pre">Utils.celltypeu.</span></span><span class="sig-name descname"><span class="pre">iterative_classify</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X_refdata</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Y_refdata</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">X_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">levels</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">run_func</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'run'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">run_kwargs_perlevel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ignore_internal_failure</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/celltypeu.html#iterative_classify"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.celltypeu.iterative_classify" title="Permalink to this definition">¶</a></dt>
+<dd><p>allow kwargs per level</p>
+</dd></dl>
+
+</section>
+<section id="module-Utils.designu">
+<span id="utils-designu-module"></span><h2>Utils.designu module<a class="headerlink" href="#module-Utils.designu" title="Permalink to this heading">¶</a></h2>
+<p>Convienient functions to evaluate the neural network probe design</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.designu.get_mse_torch">
+<span class="sig-prename descclassname"><span class="pre">Utils.designu.</span></span><span class="sig-name descname"><span class="pre">get_mse_torch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tnsr_true</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tnsr_pred</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/designu.html#get_mse_torch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.designu.get_mse_torch" title="Permalink to this definition">¶</a></dt>
+<dd><p>Mean (over rows) squared error
+if no pred, returns the variance.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.designu.get_r2_torch">
+<span class="sig-prename descclassname"><span class="pre">Utils.designu.</span></span><span class="sig-name descname"><span class="pre">get_r2_torch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tnsr_true</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tnsr_pred</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">zero_tol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-10</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/designu.html#get_r2_torch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.designu.get_r2_torch" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.designu.plot_dcdx">
+<span class="sig-prename descclassname"><span class="pre">Utils.designu.</span></span><span class="sig-name descname"><span class="pre">plot_dcdx</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prjx_clsts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title1</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'decoder'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rownames</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">colnames</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_rows</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_cols</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">figsize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(4,</span> <span class="pre">8)</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/designu.html#plot_dcdx"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.designu.plot_dcdx" title="Permalink to this definition">¶</a></dt>
+<dd><p>Projection matrix (Z)
+Embedded matrix (Z_norm)
+zscored</p>
+<p>rows, cols</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.designu.plot_embx_clsts">
+<span class="sig-prename descclassname"><span class="pre">Utils.designu.</span></span><span class="sig-name descname"><span class="pre">plot_embx_clsts</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prjx_clsts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">embx_clsts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">embx_clsts_z</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title1</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'log10(mean</span> <span class="pre">(Z))'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'mean</span> <span class="pre">(Z_norm)'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title3</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'bitwise</span> <span class="pre">zscored</span> <span class="pre">[mean</span> <span class="pre">(Z_norm)]'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rownames</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">colnames</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_rows</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_cols</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">figsize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(12,</span> <span class="pre">8)</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/designu.html#plot_embx_clsts"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.designu.plot_embx_clsts" title="Permalink to this definition">¶</a></dt>
+<dd><p>Projection matrix (Z)
+Embedded matrix (Z_norm)
+zscored</p>
+<p>rows, cols</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.designu.plot_embx_clsts_v2">
+<span class="sig-prename descclassname"><span class="pre">Utils.designu.</span></span><span class="sig-name descname"><span class="pre">plot_embx_clsts_v2</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prjx_clsts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">embx_clsts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">embx_clsts_z</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dcdx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title1</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'log10(mean</span> <span class="pre">(Z))'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'mean</span> <span class="pre">(Z_norm)'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title3</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'bitwise</span> <span class="pre">zscored</span> <span class="pre">[mean</span> <span class="pre">(Z_norm)]'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title4</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'decoder'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rownames</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">colnames</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_rows</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_cols</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">figsize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(16,</span> <span class="pre">8)</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/designu.html#plot_embx_clsts_v2"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.designu.plot_embx_clsts_v2" title="Permalink to this definition">¶</a></dt>
+<dd><p>Projection matrix (Z)
+Embedded matrix (Z_norm)
+zscored</p>
+<p>rows, cols</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.designu.plot_enc">
+<span class="sig-prename descclassname"><span class="pre">Utils.designu.</span></span><span class="sig-name descname"><span class="pre">plot_enc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pmat</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/designu.html#plot_enc"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.designu.plot_enc" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.designu.plot_heatcorr">
+<span class="sig-prename descclassname"><span class="pre">Utils.designu.</span></span><span class="sig-name descname"><span class="pre">plot_heatcorr</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">embx_clsts_corr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vmin</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vmax</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cbar_ax</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cmap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'rocket_r'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metric_label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'Pearson</span> <span class="pre">corr.'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/designu.html#plot_heatcorr"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.designu.plot_heatcorr" title="Permalink to this definition">¶</a></dt>
+<dd><p>clst-clst corr</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.designu.plot_intn">
+<span class="sig-prename descclassname"><span class="pre">Utils.designu.</span></span><span class="sig-name descname"><span class="pre">plot_intn</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prjx</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/designu.html#plot_intn"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.designu.plot_intn" title="Permalink to this definition">¶</a></dt>
+<dd><p># intensity across bits</p>
+</dd></dl>
+
+</section>
+<section id="module-Utils.miscu">
+<span id="utils-miscu-module"></span><h2>Utils.miscu module<a class="headerlink" href="#module-Utils.miscu" title="Permalink to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.miscu.build_feature_graph_knnlite">
+<span class="sig-prename descclassname"><span class="pre">Utils.miscu.</span></span><span class="sig-name descname"><span class="pre">build_feature_graph_knnlite</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ftrs_mat</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">15</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metric</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cosine'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/miscu.html#build_feature_graph_knnlite"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.miscu.build_feature_graph_knnlite" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.miscu.is_in_polygon">
+<span class="sig-prename descclassname"><span class="pre">Utils.miscu.</span></span><span class="sig-name descname"><span class="pre">is_in_polygon</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">poly</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ps</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/miscu.html#is_in_polygon"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.miscu.is_in_polygon" title="Permalink to this definition">¶</a></dt>
+<dd><p>test if each point is in the defined polygon
+poly: array-like (m,2)
+ps: array-like (n,2)</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.miscu.leiden">
+<span class="sig-prename descclassname"><span class="pre">Utils.miscu.</span></span><span class="sig-name descname"><span class="pre">leiden</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">G</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cells</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">resolution</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_iteration</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/miscu.html#leiden"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.miscu.leiden" title="Permalink to this definition">¶</a></dt>
+<dd><p>cells are in order of the Graph node order – whatever it is</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.miscu.order_by_hc">
+<span class="sig-prename descclassname"><span class="pre">Utils.miscu.</span></span><span class="sig-name descname"><span class="pre">order_by_hc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/miscu.html#order_by_hc"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.miscu.order_by_hc" title="Permalink to this definition">¶</a></dt>
+<dd><p>X - (# sample, # feature)
+gives order to samples by hierarical clustering</p>
+</dd></dl>
+
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Utils package</a><ul>
+<li><a class="reference internal" href="#module-Utils.basicu">Utils.basicu module</a><ul>
+<li><a class="reference internal" href="#Utils.basicu.clip_by_percentile"><code class="docutils literal notranslate"><span class="pre">clip_by_percentile()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.basicu.corr_paired_rows_fast"><code class="docutils literal notranslate"><span class="pre">corr_paired_rows_fast()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.basicu.corr_paired_rows_fast2"><code class="docutils literal notranslate"><span class="pre">corr_paired_rows_fast2()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.basicu.diag_matrix"><code class="docutils literal notranslate"><span class="pre">diag_matrix()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.basicu.diag_matrix_cols"><code class="docutils literal notranslate"><span class="pre">diag_matrix_cols()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.basicu.diag_matrix_rows"><code class="docutils literal notranslate"><span class="pre">diag_matrix_rows()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.basicu.encode_mat"><code class="docutils literal notranslate"><span class="pre">encode_mat()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.basicu.get_index_from_array"><code class="docutils literal notranslate"><span class="pre">get_index_from_array()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.basicu.group_mean"><code class="docutils literal notranslate"><span class="pre">group_mean()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.basicu.group_sum"><code class="docutils literal notranslate"><span class="pre">group_sum()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.basicu.libsize_norm"><code class="docutils literal notranslate"><span class="pre">libsize_norm()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.basicu.normalize_fishdata"><code class="docutils literal notranslate"><span class="pre">normalize_fishdata()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.basicu.normalize_fishdata_logrowmedian"><code class="docutils literal notranslate"><span class="pre">normalize_fishdata_logrowmedian()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.basicu.rank"><code class="docutils literal notranslate"><span class="pre">rank()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.basicu.rank_array"><code class="docutils literal notranslate"><span class="pre">rank_array()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.basicu.rank_rows"><code class="docutils literal notranslate"><span class="pre">rank_rows()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.basicu.reset_logging"><code class="docutils literal notranslate"><span class="pre">reset_logging()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.basicu.sparse_libsize_norm"><code class="docutils literal notranslate"><span class="pre">sparse_libsize_norm()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.basicu.spearman_corrcoef"><code class="docutils literal notranslate"><span class="pre">spearman_corrcoef()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.basicu.spearmanr_paired_rows"><code class="docutils literal notranslate"><span class="pre">spearmanr_paired_rows()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.basicu.stratified_sample"><code class="docutils literal notranslate"><span class="pre">stratified_sample()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.basicu.stratified_sample_withrep"><code class="docutils literal notranslate"><span class="pre">stratified_sample_withrep()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.basicu.swap_mask"><code class="docutils literal notranslate"><span class="pre">swap_mask()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.basicu.zscore"><code class="docutils literal notranslate"><span class="pre">zscore()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-Utils.celltypeu">Utils.celltypeu module</a><ul>
+<li><a class="reference internal" href="#Utils.celltypeu.CellTypeClassify"><code class="docutils literal notranslate"><span class="pre">CellTypeClassify</span></code></a><ul>
+<li><a class="reference internal" href="#Utils.celltypeu.CellTypeClassify.backup"><code class="docutils literal notranslate"><span class="pre">CellTypeClassify.backup()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.celltypeu.CellTypeClassify.buildModel"><code class="docutils literal notranslate"><span class="pre">CellTypeClassify.buildModel()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.celltypeu.CellTypeClassify.classBalance"><code class="docutils literal notranslate"><span class="pre">CellTypeClassify.classBalance()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.celltypeu.CellTypeClassify.normalizeData"><code class="docutils literal notranslate"><span class="pre">CellTypeClassify.normalizeData()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.celltypeu.CellTypeClassify.predictLabels"><code class="docutils literal notranslate"><span class="pre">CellTypeClassify.predictLabels()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.celltypeu.CellTypeClassify.rankNorm"><code class="docutils literal notranslate"><span class="pre">CellTypeClassify.rankNorm()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.celltypeu.CellTypeClassify.reset"><code class="docutils literal notranslate"><span class="pre">CellTypeClassify.reset()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.celltypeu.CellTypeClassify.run"><code class="docutils literal notranslate"><span class="pre">CellTypeClassify.run()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.celltypeu.CellTypeClassify.run_bagging"><code class="docutils literal notranslate"><span class="pre">CellTypeClassify.run_bagging()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.celltypeu.CellTypeClassify.run_iterative_prior"><code class="docutils literal notranslate"><span class="pre">CellTypeClassify.run_iterative_prior()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.celltypeu.CellTypeClassify.run_iterative_prior_v2"><code class="docutils literal notranslate"><span class="pre">CellTypeClassify.run_iterative_prior_v2()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.celltypeu.CellTypeClassify.trainModel"><code class="docutils literal notranslate"><span class="pre">CellTypeClassify.trainModel()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#Utils.celltypeu.iterative_classify"><code class="docutils literal notranslate"><span class="pre">iterative_classify()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-Utils.designu">Utils.designu module</a><ul>
+<li><a class="reference internal" href="#Utils.designu.get_mse_torch"><code class="docutils literal notranslate"><span class="pre">get_mse_torch()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.designu.get_r2_torch"><code class="docutils literal notranslate"><span class="pre">get_r2_torch()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.designu.plot_dcdx"><code class="docutils literal notranslate"><span class="pre">plot_dcdx()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.designu.plot_embx_clsts"><code class="docutils literal notranslate"><span class="pre">plot_embx_clsts()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.designu.plot_embx_clsts_v2"><code class="docutils literal notranslate"><span class="pre">plot_embx_clsts_v2()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.designu.plot_enc"><code class="docutils literal notranslate"><span class="pre">plot_enc()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.designu.plot_heatcorr"><code class="docutils literal notranslate"><span class="pre">plot_heatcorr()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.designu.plot_intn"><code class="docutils literal notranslate"><span class="pre">plot_intn()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-Utils.miscu">Utils.miscu module</a><ul>
+<li><a class="reference internal" href="#Utils.miscu.build_feature_graph_knnlite"><code class="docutils literal notranslate"><span class="pre">build_feature_graph_knnlite()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.miscu.is_in_polygon"><code class="docutils literal notranslate"><span class="pre">is_in_polygon()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.miscu.leiden"><code class="docutils literal notranslate"><span class="pre">leiden()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.miscu.order_by_hc"><code class="docutils literal notranslate"><span class="pre">order_by_hc()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="Design.html"
+                          title="previous chapter">Design package</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/Utils.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="Design.html" title="Design package"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">dredFISH  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Utils package</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2022, Wollman lab.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 6.0.0.
+    </div>
+  </body>
+</html>

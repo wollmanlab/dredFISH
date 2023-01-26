@@ -1,0 +1,489 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Utils.celltypeu &#8212; dredFISH  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sphinxdoc.css" />
+    <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+    <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/sphinx_highlight.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">dredFISH  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Utils.celltypeu</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for Utils.celltypeu</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Union</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">from</span> <span class="nn">scipy</span> <span class="kn">import</span> <span class="n">stats</span>
+<span class="kn">from</span> <span class="nn">sklearn.neighbors</span> <span class="kn">import</span> <span class="n">KNeighborsClassifier</span>
+<span class="kn">import</span> <span class="nn">scanpy</span> <span class="k">as</span> <span class="nn">sc</span>
+<span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+
+<span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">basicu</span>
+
+<div class="viewcode-block" id="CellTypeClassify"><a class="viewcode-back" href="../../Utils.html#Utils.celltypeu.CellTypeClassify">[docs]</a><span class="k">class</span> <span class="nc">CellTypeClassify</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+                 <span class="n">X_refdata</span><span class="p">,</span>
+                 <span class="n">y_refdata</span><span class="p">,</span>
+                 <span class="n">X_data</span><span class="p">,</span>
+                 <span class="n">model</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                 <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">verbose</span> <span class="o">=</span> <span class="n">verbose</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="n">model</span>
+        
+        <span class="c1"># input</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">X_refdata</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">X_refdata</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">y_refdata</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">y_refdata</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span> 
+        <span class="bp">self</span><span class="o">.</span><span class="n">X_data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">X_data</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        
+        <span class="c1"># # got at the end of the run</span>
+        <span class="c1"># self.y_data</span>
+        
+<div class="viewcode-block" id="CellTypeClassify.backup"><a class="viewcode-back" href="../../Utils.html#Utils.celltypeu.CellTypeClassify.backup">[docs]</a>    <span class="k">def</span> <span class="nf">backup</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;save a copy</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bck_X_refdata</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">X_refdata</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bck_X_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">X_data</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bck_y_refdata</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y_refdata</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span></div>
+    
+<div class="viewcode-block" id="CellTypeClassify.reset"><a class="viewcode-back" href="../../Utils.html#Utils.celltypeu.CellTypeClassify.reset">[docs]</a>    <span class="k">def</span> <span class="nf">reset</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;reset</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">X_refdata</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bck_X_refdata</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">X_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bck_X_data</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">y_refdata</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bck_y_refdata</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="CellTypeClassify.buildModel"><a class="viewcode-back" href="../../Utils.html#Utils.celltypeu.CellTypeClassify.buildModel">[docs]</a>    <span class="k">def</span> <span class="nf">buildModel</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># default model</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="o">==</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="n">KNeighborsClassifier</span><span class="p">(</span><span class="n">n_neighbors</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span> <span class="n">metric</span><span class="o">=</span><span class="s1">&#39;correlation&#39;</span><span class="p">)</span></div>
+        <span class="c1"># otherwise uses the user input</span>
+        
+<div class="viewcode-block" id="CellTypeClassify.normalizeData"><a class="viewcode-back" href="../../Utils.html#Utils.celltypeu.CellTypeClassify.normalizeData">[docs]</a>    <span class="k">def</span> <span class="nf">normalizeData</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">norm</span><span class="o">=</span><span class="s1">&#39;per_bit&#39;</span><span class="p">):</span>
+        <span class="c1"># interprete (back compatible)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">norm</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">norm</span><span class="p">:</span>
+                <span class="n">norm</span> <span class="o">=</span> <span class="s1">&#39;per_bit&#39;</span> <span class="c1"># norm=True -&gt; norm = &#39;per_bit&#39;</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">norm</span> <span class="o">=</span> <span class="s1">&#39;per_cell&#39;</span>
+        <span class="k">assert</span> <span class="n">norm</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;per_cell&#39;</span><span class="p">,</span> <span class="s1">&#39;per_bit_equalscale&#39;</span><span class="p">,</span> <span class="s1">&#39;per_bit_refscale&#39;</span><span class="p">,</span> <span class="s1">&#39;per_bit_fscale&#39;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">norm</span> <span class="o">==</span> <span class="s1">&#39;per_cell&#39;</span><span class="p">:</span>
+            <span class="c1"># each row sums to 1</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">X_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">X_data</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">X_data</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">X_refdata</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">X_refdata</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">X_refdata</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">norm</span> <span class="o">==</span> <span class="s1">&#39;per_bit_equalscale&#39;</span><span class="p">:</span>
+            <span class="c1"># each col sums to 0, std 1</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">X_data</span> <span class="o">=</span> <span class="n">basicu</span><span class="o">.</span><span class="n">zscore</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">X_data</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">X_refdata</span> <span class="o">=</span> <span class="n">basicu</span><span class="o">.</span><span class="n">zscore</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">X_refdata</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="c1"># across rows (0) for each column</span>
+
+        <span class="k">elif</span> <span class="n">norm</span> <span class="o">==</span> <span class="s1">&#39;per_bit_refscale&#39;</span><span class="p">:</span>
+            <span class="c1"># align each dredFISH col to the mean and std of the corresponding scRNA-seq col</span>
+            <span class="n">mu1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">X_data</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+            <span class="n">sigma1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">X_data</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+            <span class="n">mu2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">X_refdata</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+            <span class="n">sigma2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">X_refdata</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">X_data</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">X_data</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">X_data</span> <span class="o">-</span> <span class="n">mu1</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span><span class="o">*</span><span class="p">(</span><span class="n">sigma2</span><span class="o">/</span><span class="n">sigma1</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="n">mu2</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span> <span class="c1"># edge case: only 1 cell</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">X_data</span> <span class="o">=</span> <span class="n">mu2</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="n">norm</span> <span class="o">==</span> <span class="s1">&#39;per_bit_fscale&#39;</span><span class="p">:</span>
+            <span class="c1"># rescale each bit by F statistics </span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">X_data</span> <span class="o">=</span> <span class="n">basicu</span><span class="o">.</span><span class="n">zscore</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">X_data</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">X_refdata</span> <span class="o">=</span> <span class="n">basicu</span><span class="o">.</span><span class="n">zscore</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">X_refdata</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="c1"># across rows (0) for each column</span>
+
+            <span class="n">clsts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y_refdata</span><span class="p">)</span> <span class="c1"># guaranteed more than 1 clusters</span>
+            <span class="n">X_refclsts</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">clst</span> <span class="ow">in</span> <span class="n">clsts</span><span class="p">:</span>
+                <span class="n">X_refclst</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">X_refdata</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">y_refdata</span> <span class="o">==</span> <span class="n">clst</span><span class="p">,:]</span>
+                <span class="n">X_refclsts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">X_refclst</span><span class="p">)</span>
+
+            <span class="n">f_stats</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">X_refdata</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span> <span class="c1"># iterate over bits</span>
+                <span class="n">f</span><span class="p">,</span> <span class="n">p</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">f_oneway</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">X_refclst</span><span class="p">[:,</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">X_refclst</span> <span class="ow">in</span> <span class="n">X_refclsts</span><span class="p">])</span>
+                <span class="n">f_stats</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+            <span class="n">f_stats</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">f_stats</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">X_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">X_data</span><span class="o">*</span><span class="n">f_stats</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">X_refdata</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">X_refdata</span><span class="o">*</span><span class="n">f_stats</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">verbose</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span> <span class="c1"># extremely verbose</span>
+                <span class="n">f_stats_formatted</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array2string</span><span class="p">(</span><span class="mi">100</span><span class="o">*</span><span class="n">f_stats</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">f_stats</span><span class="p">),</span> <span class="n">precision</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">floatmode</span><span class="o">=</span><span class="s1">&#39;fixed&#39;</span><span class="p">)</span>
+                <span class="n">expected</span> <span class="o">=</span> <span class="mi">100</span><span class="o">*</span><span class="mi">1</span><span class="o">/</span><span class="nb">len</span><span class="p">(</span><span class="n">f_stats</span><span class="p">)</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;F statistics (%): expected = </span><span class="si">{</span><span class="n">expected</span><span class="si">:</span><span class="s1">.2g</span><span class="si">}</span><span class="se">\n</span><span class="si">{</span><span class="n">f_stats_formatted</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+            <span class="k">return</span> <span class="n">f_stats</span></div>
+    
+<div class="viewcode-block" id="CellTypeClassify.rankNorm"><a class="viewcode-back" href="../../Utils.html#Utils.celltypeu.CellTypeClassify.rankNorm">[docs]</a>    <span class="k">def</span> <span class="nf">rankNorm</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;rank normalize across bits</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">X_data</span> <span class="o">=</span> <span class="n">basicu</span><span class="o">.</span><span class="n">rank</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">X_data</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span> <span class="c1"># across cols (1) for each row</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">X_refdata</span> <span class="o">=</span> <span class="n">basicu</span><span class="o">.</span><span class="n">rank</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">X_refdata</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span></div>
+            
+<div class="viewcode-block" id="CellTypeClassify.classBalance"><a class="viewcode-back" href="../../Utils.html#Utils.celltypeu.CellTypeClassify.classBalance">[docs]</a>    <span class="k">def</span> <span class="nf">classBalance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n_cells</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Class Balance  the reference data </span>
+<span class="sd">        select `n_cells` from each cluster without replacement</span>
+<span class="sd">        if n_cells &gt; cluster size, it selects **all** cells </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># sample</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">n_cells</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">n_cells</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span> <span class="c1"># use all cells</span>
+                <span class="k">pass</span> 
+            <span class="k">elif</span> <span class="n">n_cells</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="c1"># select equal number of cells</span>
+                <span class="n">_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y_refdata</span><span class="p">)</span><span class="o">.</span><span class="n">to_frame</span><span class="p">(</span><span class="s1">&#39;label&#39;</span><span class="p">)</span>
+                <span class="n">idx</span> <span class="o">=</span> <span class="n">basicu</span><span class="o">.</span><span class="n">stratified_sample</span><span class="p">(</span><span class="n">_df</span><span class="p">,</span> <span class="s1">&#39;label&#39;</span><span class="p">,</span> <span class="n">n_cells</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="n">random_state</span><span class="p">)</span><span class="o">.</span><span class="n">sort_index</span><span class="p">()</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">values</span>
+
+                <span class="bp">self</span><span class="o">.</span><span class="n">X_refdata</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">X_refdata</span><span class="p">[</span><span class="n">idx</span><span class="p">,:]</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">y_refdata</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y_refdata</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+                
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">n_cells</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span> <span class="c1"># non-equal number of cells</span>
+            <span class="n">_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y_refdata</span><span class="p">)</span><span class="o">.</span><span class="n">to_frame</span><span class="p">(</span><span class="s1">&#39;label&#39;</span><span class="p">)</span>
+            <span class="n">idx</span> <span class="o">=</span> <span class="n">basicu</span><span class="o">.</span><span class="n">stratified_sample</span><span class="p">(</span><span class="n">_df</span><span class="p">,</span> <span class="s1">&#39;label&#39;</span><span class="p">,</span> <span class="n">n_cells</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="n">random_state</span><span class="p">)</span><span class="o">.</span><span class="n">sort_index</span><span class="p">()</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">values</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">X_refdata</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">X_refdata</span><span class="p">[</span><span class="n">idx</span><span class="p">,:]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">y_refdata</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y_refdata</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span></div>
+        
+<div class="viewcode-block" id="CellTypeClassify.trainModel"><a class="viewcode-back" href="../../Utils.html#Utils.celltypeu.CellTypeClassify.trainModel">[docs]</a>    <span class="k">def</span> <span class="nf">trainModel</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">X_refdata</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">y_refdata</span><span class="p">)</span></div>
+        
+<div class="viewcode-block" id="CellTypeClassify.predictLabels"><a class="viewcode-back" href="../../Utils.html#Utils.celltypeu.CellTypeClassify.predictLabels">[docs]</a>    <span class="k">def</span> <span class="nf">predictLabels</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">y_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">X_data</span><span class="p">)</span></div>
+
+    <span class="c1">############################</span>
+<div class="viewcode-block" id="CellTypeClassify.run"><a class="viewcode-back" href="../../Utils.html#Utils.celltypeu.CellTypeClassify.run">[docs]</a>    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">norm</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ranknorm</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">n_cells</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> 
+        <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+        <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; sample, normalize, classify</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">classBalance</span><span class="p">(</span><span class="n">n_cells</span><span class="o">=</span><span class="n">n_cells</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="n">random_state</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">normalizeData</span><span class="p">(</span><span class="n">norm</span><span class="o">=</span><span class="n">norm</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">ranknorm</span><span class="p">:</span> 
+            <span class="bp">self</span><span class="o">.</span><span class="n">rankNorm</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">buildModel</span><span class="p">()</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">trainModel</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">predictLabels</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">y_data</span></div>
+
+    <span class="c1">############################</span>
+<div class="viewcode-block" id="CellTypeClassify.run_bagging"><a class="viewcode-back" href="../../Utils.html#Utils.celltypeu.CellTypeClassify.run_bagging">[docs]</a>    <span class="k">def</span> <span class="nf">run_bagging</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n_estimators</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">norm</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ranknorm</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">n_cells</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> 
+        <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+        <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;repeat the same algorithm for different subsets of samples several time, taking the average as the results</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># backup</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">backup</span><span class="p">()</span>
+
+        <span class="n">ensem_res</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i_estimate</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_estimators</span><span class="p">):</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">classBalance</span><span class="p">(</span><span class="n">n_cells</span><span class="o">=</span><span class="n">n_cells</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="n">random_state</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">normalizeData</span><span class="p">(</span><span class="n">norm</span><span class="o">=</span><span class="n">norm</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">ranknorm</span><span class="p">:</span> 
+                <span class="bp">self</span><span class="o">.</span><span class="n">rankNorm</span><span class="p">()</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">buildModel</span><span class="p">()</span>
+            
+            <span class="bp">self</span><span class="o">.</span><span class="n">trainModel</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">predictLabels</span><span class="p">()</span>
+
+            <span class="n">ensem_res</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y_data</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+
+        <span class="n">ensem_res</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">ensem_res</span><span class="p">)</span> <span class="c1"># (#ensem, #cells)</span>
+        <span class="n">labels</span><span class="p">,</span> <span class="n">idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">ensem_res</span><span class="p">,</span> <span class="n">return_inverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">idx</span> <span class="o">=</span> <span class="n">idx</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">ensem_res</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+        <span class="n">mode</span><span class="p">,</span> <span class="n">count</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">mode</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">count</span> <span class="o">==</span> <span class="n">n_estimators</span><span class="p">):</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Warning: all estimators are the same -- check random seed!!&quot;</span><span class="p">)</span>
+        <span class="c1"># else:</span>
+        <span class="c1">#     logging.info(&quot;looking good!&quot;)</span>
+        <span class="n">y_data</span> <span class="o">=</span> <span class="n">labels</span><span class="p">[</span><span class="n">mode</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">y_data</span> <span class="o">=</span> <span class="n">y_data</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">y_data</span></div>
+        
+<div class="viewcode-block" id="CellTypeClassify.run_iterative_prior"><a class="viewcode-back" href="../../Utils.html#Utils.celltypeu.CellTypeClassify.run_iterative_prior">[docs]</a>    <span class="k">def</span> <span class="nf">run_iterative_prior</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+                            <span class="n">overall_sample_fraction</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
+                            <span class="n">min_total_cells</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+                            <span class="n">min_cells</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+                            <span class="n">p0</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="c1"># no momentum</span>
+                            <span class="n">subrun_func</span><span class="o">=</span><span class="s1">&#39;run&#39;</span><span class="p">,</span>
+                            <span class="n">norm</span><span class="o">=</span><span class="s1">&#39;per_bit_equalscale&#39;</span><span class="p">,</span>
+                            <span class="n">ranknorm</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                            <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+                            <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Iteratively set up the number of cell to sample, control overall sample fraction</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># backup</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">backup</span><span class="p">()</span>
+        
+        <span class="n">total_cells</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">overall_sample_fraction</span><span class="o">*</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y_refdata</span><span class="p">))</span> <span class="c1"># sample this many</span>
+        <span class="k">if</span> <span class="n">total_cells</span> <span class="o">&lt;</span> <span class="n">min_total_cells</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Small dataset, sampling </span><span class="si">{</span><span class="n">overall_sample_fraction</span><span class="si">:</span><span class="s2">.2g</span><span class="si">}</span><span class="s2"> is too few, use </span><span class="si">{</span><span class="n">min_total_cells</span><span class="si">}</span><span class="s2"> cells instead&quot;</span><span class="p">)</span>
+            <span class="n">total_cells</span> <span class="o">=</span> <span class="n">min_total_cells</span>
+        
+        <span class="c1"># initialize</span>
+        <span class="n">types</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y_refdata</span><span class="p">,</span> <span class="n">return_counts</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">size_vec</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">repeat</span><span class="p">([</span><span class="mi">1</span><span class="o">/</span><span class="nb">len</span><span class="p">(</span><span class="n">types</span><span class="p">)],</span> <span class="nb">len</span><span class="p">(</span><span class="n">types</span><span class="p">))</span>
+        <span class="n">n_cells</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">((</span><span class="n">total_cells</span><span class="o">*</span><span class="n">size_vec</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">),</span> <span class="n">index</span><span class="o">=</span><span class="n">types</span><span class="p">)</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+
+        <span class="n">diff</span> <span class="o">=</span> <span class="mi">1</span> 
+        <span class="n">i_iter</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">type_composition_th</span> <span class="o">=</span> <span class="mf">1e-2</span>
+        <span class="n">n_max_iter</span> <span class="o">=</span> <span class="mi">10</span>
+
+        <span class="k">while</span> <span class="p">(</span><span class="n">diff</span> <span class="o">&gt;</span> <span class="n">type_composition_th</span> <span class="ow">and</span> <span class="n">i_iter</span> <span class="o">&lt;</span> <span class="n">n_max_iter</span><span class="p">):</span>
+            <span class="n">i_iter</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">p</span> <span class="o">=</span> <span class="n">p0</span><span class="o">/</span><span class="n">i_iter</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Re-sample iteration </span><span class="si">{</span><span class="n">i_iter</span><span class="si">}</span><span class="s2">, diff </span><span class="si">{</span><span class="n">diff</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="c1"># run </span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">y_data</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">subrun_func</span><span class="p">)(</span><span class="n">n_cells</span><span class="o">=</span><span class="n">n_cells</span><span class="p">,</span> <span class="n">norm</span><span class="o">=</span><span class="n">norm</span><span class="p">,</span> <span class="n">ranknorm</span><span class="o">=</span><span class="n">ranknorm</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="n">random_state</span><span class="p">)</span> <span class="c1"># note that n_cells are auto-generated</span>
+            <span class="n">_types</span><span class="p">,</span> <span class="n">_counts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y_refdata</span><span class="p">,</span> <span class="n">return_counts</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Reference (scRNA-seq) sampled: </span><span class="si">{</span><span class="n">_types</span><span class="si">}</span><span class="s2"> </span><span class="se">\n</span><span class="s2"> </span><span class="si">{</span><span class="n">_counts</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">_types</span><span class="p">,</span> <span class="n">_counts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y_data</span><span class="p">,</span> <span class="n">return_counts</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Prediction (dredFISH) sampled: </span><span class="si">{</span><span class="n">_types</span><span class="si">}</span><span class="s2"> </span><span class="se">\n</span><span class="s2"> </span><span class="si">{</span><span class="n">_counts</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="c1"># retrieve cluster sizses</span>
+            <span class="n">types_new</span><span class="p">,</span> <span class="n">sizes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y_data</span><span class="p">,</span> <span class="n">return_counts</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">types_new_idx</span> <span class="o">=</span> <span class="n">basicu</span><span class="o">.</span><span class="n">get_index_from_array</span><span class="p">(</span><span class="n">types_new</span><span class="p">,</span> <span class="n">types</span><span class="p">)</span>
+            <span class="n">sizes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">([</span><span class="n">sizes</span><span class="p">,</span> <span class="mi">0</span><span class="p">])[</span><span class="n">types_new_idx</span><span class="p">]</span> <span class="c1"># this is to handle zero case</span>
+            <span class="n">size_vec_next</span> <span class="o">=</span> <span class="n">sizes</span><span class="o">/</span><span class="n">sizes</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+            <span class="n">size_vec_next</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="n">p</span><span class="p">)</span><span class="o">*</span><span class="n">size_vec_next</span> <span class="o">+</span> <span class="n">p</span><span class="o">*</span><span class="n">size_vec</span> <span class="c1"># momentum term</span>
+            <span class="n">n_cells</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">((</span><span class="n">total_cells</span><span class="o">*</span><span class="n">size_vec_next</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">),</span> <span class="n">min_cells</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span> 
+                                <span class="n">index</span><span class="o">=</span><span class="n">types</span><span class="p">)</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+
+            <span class="c1"># update and reset</span>
+            <span class="n">diff</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">size_vec_next</span> <span class="o">-</span> <span class="n">size_vec</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+            <span class="n">size_vec</span> <span class="o">=</span> <span class="n">size_vec_next</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+
+        <span class="c1"># catch the last one</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;final diff </span><span class="si">{</span><span class="n">diff</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">y_data</span></div>
+    
+<div class="viewcode-block" id="CellTypeClassify.run_iterative_prior_v2"><a class="viewcode-back" href="../../Utils.html#Utils.celltypeu.CellTypeClassify.run_iterative_prior_v2">[docs]</a>    <span class="k">def</span> <span class="nf">run_iterative_prior_v2</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+                            <span class="n">min_cells_pertype</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+                            <span class="n">max_ratio</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+                            <span class="n">min_cells</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
+                            <span class="n">p0</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="c1"># no momentum</span>
+                            <span class="n">subrun_func</span><span class="o">=</span><span class="s1">&#39;run&#39;</span><span class="p">,</span>
+                            <span class="n">norm</span><span class="o">=</span><span class="s1">&#39;per_bit_equalscale&#39;</span><span class="p">,</span>
+                            <span class="n">ranknorm</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                            <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+                            <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Iteratively set up the number of cell to sample, control baseline number of cells</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># backup</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">backup</span><span class="p">()</span>
+        
+        <span class="c1"># initialize</span>
+        <span class="n">types</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y_refdata</span><span class="p">,</span> <span class="n">return_counts</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">size_vec</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">repeat</span><span class="p">([</span><span class="mi">1</span><span class="o">/</span><span class="nb">len</span><span class="p">(</span><span class="n">types</span><span class="p">)],</span> <span class="nb">len</span><span class="p">(</span><span class="n">types</span><span class="p">))</span>
+        <span class="n">size_ratio</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">size_vec</span><span class="o">/</span><span class="n">size_vec</span><span class="o">.</span><span class="n">min</span><span class="p">(),</span> <span class="mi">0</span><span class="p">,</span> <span class="n">max_ratio</span><span class="p">)</span>
+        <span class="n">n_cells</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">((</span><span class="n">min_cells_pertype</span><span class="o">*</span><span class="n">size_ratio</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">),</span> <span class="n">index</span><span class="o">=</span><span class="n">types</span><span class="p">)</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+
+        <span class="n">diff</span> <span class="o">=</span> <span class="mi">1</span> 
+        <span class="n">i_iter</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">type_composition_th</span> <span class="o">=</span> <span class="mf">1e-2</span>
+        <span class="n">n_max_iter</span> <span class="o">=</span> <span class="mi">10</span>
+
+        <span class="k">while</span> <span class="p">(</span><span class="n">diff</span> <span class="o">&gt;</span> <span class="n">type_composition_th</span> <span class="ow">and</span> <span class="n">i_iter</span> <span class="o">&lt;</span> <span class="n">n_max_iter</span><span class="p">):</span>
+            <span class="n">i_iter</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">p</span> <span class="o">=</span> <span class="n">p0</span><span class="o">/</span><span class="n">i_iter</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Re-sample iteration </span><span class="si">{</span><span class="n">i_iter</span><span class="si">}</span><span class="s2">, diff </span><span class="si">{</span><span class="n">diff</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="c1"># run </span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">y_data</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">subrun_func</span><span class="p">)(</span><span class="n">n_cells</span><span class="o">=</span><span class="n">n_cells</span><span class="p">,</span> <span class="n">norm</span><span class="o">=</span><span class="n">norm</span><span class="p">,</span> <span class="n">ranknorm</span><span class="o">=</span><span class="n">ranknorm</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="n">random_state</span><span class="p">)</span> <span class="c1"># note that n_cells are auto-generated</span>
+            <span class="n">_types</span><span class="p">,</span> <span class="n">_counts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y_refdata</span><span class="p">,</span> <span class="n">return_counts</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Reference (scRNA-seq) sampled: </span><span class="si">{</span><span class="n">_types</span><span class="si">}</span><span class="s2"> </span><span class="se">\n</span><span class="s2"> </span><span class="si">{</span><span class="n">_counts</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">_types</span><span class="p">,</span> <span class="n">_counts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y_data</span><span class="p">,</span> <span class="n">return_counts</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Prediction (dredFISH) sampled: </span><span class="si">{</span><span class="n">_types</span><span class="si">}</span><span class="s2"> </span><span class="se">\n</span><span class="s2"> </span><span class="si">{</span><span class="n">_counts</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="c1"># retrieve cluster sizses</span>
+            <span class="n">types_new</span><span class="p">,</span> <span class="n">sizes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y_data</span><span class="p">,</span> <span class="n">return_counts</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">types_new_idx</span> <span class="o">=</span> <span class="n">basicu</span><span class="o">.</span><span class="n">get_index_from_array</span><span class="p">(</span><span class="n">types_new</span><span class="p">,</span> <span class="n">types</span><span class="p">)</span>
+            <span class="n">sizes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">([</span><span class="n">sizes</span><span class="p">,</span> <span class="mi">0</span><span class="p">])[</span><span class="n">types_new_idx</span><span class="p">]</span> <span class="c1"># this is to handle zero case</span>
+            <span class="n">size_vec_next</span> <span class="o">=</span> <span class="n">sizes</span><span class="o">/</span><span class="n">sizes</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+            <span class="n">size_vec_next</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="n">p</span><span class="p">)</span><span class="o">*</span><span class="n">size_vec_next</span> <span class="o">+</span> <span class="n">p</span><span class="o">*</span><span class="n">size_vec</span> <span class="c1"># momentum term</span>
+            <span class="n">size_ratio_next</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">size_vec_next</span><span class="o">/</span><span class="n">size_vec_next</span><span class="o">.</span><span class="n">min</span><span class="p">(),</span> <span class="mi">0</span><span class="p">,</span> <span class="n">max_ratio</span><span class="p">)</span>
+            <span class="n">n_cells</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">((</span><span class="n">min_cells_pertype</span><span class="o">*</span><span class="n">size_ratio_next</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">),</span> <span class="n">min_cells</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span> 
+                                <span class="n">index</span><span class="o">=</span><span class="n">types</span><span class="p">)</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+
+            <span class="c1"># update and reset</span>
+            <span class="n">diff</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">size_vec_next</span> <span class="o">-</span> <span class="n">size_vec</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+            <span class="n">size_vec</span> <span class="o">=</span> <span class="n">size_vec_next</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+
+        <span class="c1"># catch the last one</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;final diff </span><span class="si">{</span><span class="n">diff</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">y_data</span></div></div>
+
+<div class="viewcode-block" id="iterative_classify"><a class="viewcode-back" href="../../Utils.html#Utils.celltypeu.iterative_classify">[docs]</a><span class="k">def</span> <span class="nf">iterative_classify</span><span class="p">(</span>
+                 <span class="n">X_refdata</span><span class="p">,</span>
+                 <span class="n">Y_refdata</span><span class="p">,</span>
+                 <span class="n">X_data</span><span class="p">,</span>
+                 <span class="n">levels</span><span class="p">,</span>
+                 <span class="n">run_func</span><span class="o">=</span><span class="s1">&#39;run&#39;</span><span class="p">,</span>
+                 <span class="n">run_kwargs_perlevel</span><span class="o">=</span><span class="p">[],</span>
+                 <span class="n">model</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                 <span class="n">ignore_internal_failure</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                 <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                 <span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;allow kwargs per level</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">y_data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">X_data</span><span class="p">),</span><span class="nb">len</span><span class="p">(</span><span class="n">levels</span><span class="p">)),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">object</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">run_kwargs_perlevel</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">run_kwargs_perlevel</span> <span class="o">=</span> <span class="p">[</span><span class="nb">dict</span><span class="p">()]</span><span class="o">*</span><span class="nb">len</span><span class="p">(</span><span class="n">levels</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">run_kwargs_perlevel</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">run_kwargs_perlevel</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">run_kwargs_perlevel</span><span class="p">)</span><span class="o">*</span><span class="nb">len</span><span class="p">(</span><span class="n">levels</span><span class="p">)</span>
+
+    <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">run_kwargs_perlevel</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">levels</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">_iter</span><span class="p">,</span> <span class="p">(</span><span class="n">level</span><span class="p">,</span> <span class="n">run_kwargs</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">levels</span><span class="p">,</span> <span class="n">run_kwargs_perlevel</span><span class="p">)):</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;iteration </span><span class="si">{</span><span class="n">_iter</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s1">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">levels</span><span class="p">)</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="c1">### one iteration</span>
+        <span class="k">if</span> <span class="n">_iter</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">next_rounds</span>  <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s1">&#39;level_</span><span class="si">{</span><span class="n">_iter</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">]</span>
+            <span class="n">next_rounds_idx_refdata</span> <span class="o">=</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">X_refdata</span><span class="p">))]</span>
+            <span class="n">next_rounds_idx_data</span> <span class="o">=</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">X_data</span><span class="p">))]</span>
+
+        <span class="c1"># update current to next</span>
+        <span class="n">curr_rounds</span> <span class="o">=</span> <span class="n">next_rounds</span>
+        <span class="n">curr_rounds_idx_refdata</span> <span class="o">=</span> <span class="n">next_rounds_idx_refdata</span>
+        <span class="n">curr_rounds_idx_data</span> <span class="o">=</span> <span class="n">next_rounds_idx_data</span>
+
+        <span class="c1"># update next to empty</span>
+        <span class="n">next_rounds</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">next_rounds_idx_refdata</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">next_rounds_idx_data</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># go over each current round</span>
+        <span class="k">for</span> <span class="n">_round</span><span class="p">,</span> <span class="n">idx_refdata</span><span class="p">,</span> <span class="n">idx_data</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">curr_rounds</span><span class="p">,</span> 
+                                                 <span class="n">curr_rounds_idx_refdata</span><span class="p">,</span>
+                                                 <span class="n">curr_rounds_idx_data</span><span class="p">,</span>
+                                                <span class="p">):</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Current round: </span><span class="si">{</span><span class="n">_round</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="c1"># this round</span>
+            
+            <span class="c1"># initialize</span>
+            <span class="n">local_X_refdata</span> <span class="o">=</span> <span class="n">X_refdata</span><span class="p">[</span><span class="n">idx_refdata</span><span class="p">,:]</span>
+            <span class="n">local_y_refdata</span> <span class="o">=</span> <span class="n">Y_refdata</span><span class="p">[:,</span><span class="n">_iter</span><span class="p">][</span><span class="n">idx_refdata</span><span class="p">]</span>
+            <span class="n">local_X_data</span> <span class="o">=</span> <span class="n">X_data</span><span class="p">[</span><span class="n">idx_data</span><span class="p">,:]</span>
+
+            <span class="n">nclsts</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">local_y_refdata</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">nclsts</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">local_y_data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">local_y_refdata</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="nb">len</span><span class="p">(</span><span class="n">local_X_data</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span> <span class="c1"># nclsts &gt; 1</span>
+                <span class="n">rc</span> <span class="o">=</span> <span class="n">CellTypeClassify</span><span class="p">(</span>
+                                <span class="n">local_X_refdata</span><span class="p">,</span>
+                                <span class="n">local_y_refdata</span><span class="p">,</span>
+                                <span class="n">local_X_data</span><span class="p">,</span>
+                                <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+                                <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">,</span>
+                                <span class="p">)</span>
+                <span class="c1"># run</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">ignore_internal_failure</span><span class="p">:</span>
+                    <span class="c1"># run</span>
+                    <span class="n">local_y_data</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">rc</span><span class="p">,</span> <span class="n">run_func</span><span class="p">)(</span><span class="o">**</span><span class="n">run_kwargs</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="c1"># run</span>
+                        <span class="n">local_y_data</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">rc</span><span class="p">,</span> <span class="n">run_func</span><span class="p">)(</span><span class="o">**</span><span class="n">run_kwargs</span><span class="p">)</span>
+                    <span class="k">except</span><span class="p">:</span>
+                        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Failed splitting: </span><span class="si">{</span><span class="n">_round</span><span class="si">}</span><span class="s1"> </span><span class="se">\n</span><span class="s1"> </span><span class="si">{</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+                        <span class="n">local_y_data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="s1">&#39;failed&#39;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">local_X_data</span><span class="p">))</span>
+                        
+            <span class="c1"># catch results</span>
+            <span class="n">y_data</span><span class="p">[</span><span class="n">idx_data</span><span class="p">,</span> <span class="n">_iter</span><span class="p">]</span> <span class="o">=</span> <span class="n">local_y_data</span>
+
+            <span class="c1"># set up for the next round</span>
+            <span class="n">y_data_unique</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">local_y_data</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">cluster</span> <span class="ow">in</span> <span class="n">y_data_unique</span><span class="p">:</span>
+                <span class="n">next_rounds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;level_</span><span class="si">{</span><span class="n">_iter</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s1">_cluster_</span><span class="si">{</span><span class="n">cluster</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+                <span class="n">next_rounds_idx_refdata</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">idx_refdata</span><span class="p">[(</span><span class="n">local_y_refdata</span> <span class="o">==</span> <span class="n">cluster</span><span class="p">)])</span>
+                <span class="n">next_rounds_idx_data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">idx_data</span><span class="p">[(</span><span class="n">local_y_data</span> <span class="o">==</span> <span class="n">cluster</span><span class="p">)])</span>
+                
+    <span class="k">return</span> <span class="n">y_data</span></div>
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">dredFISH  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Utils.celltypeu</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2022, Wollman lab.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 6.0.0.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,220 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Processing.putils &#8212; dredFISH  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sphinxdoc.css" />
+    <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+    <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/sphinx_highlight.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">dredFISH  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Processing.putils</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for Processing.putils</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot; Max Projection&quot;&quot;&quot;</span>
+<span class="kn">from</span> <span class="nn">PIL</span> <span class="kn">import</span> <span class="n">Image</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">multiprocessing</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">partial</span>
+<span class="kn">from</span> <span class="nn">scipy.ndimage</span> <span class="kn">import</span> <span class="n">gaussian_filter</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">from</span> <span class="nn">PIL</span> <span class="kn">import</span> <span class="n">Image</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">tqdm</span> <span class="kn">import</span> <span class="n">tqdm</span>
+
+<div class="viewcode-block" id="generate_img"><a class="viewcode-back" href="../../Processing.html#Processing.putils.generate_img">[docs]</a><span class="k">def</span> <span class="nf">generate_img</span><span class="p">(</span><span class="n">data</span><span class="p">,</span><span class="n">FF</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">):</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">acq</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;acq&#39;</span><span class="p">]</span>
+        <span class="n">posname</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;posname&#39;</span><span class="p">]</span>
+        <span class="n">image_metadata</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;image_metadata&#39;</span><span class="p">]</span>
+        <span class="n">channel</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;channel&#39;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="s1">&#39;hybe&#39;</span> <span class="ow">in</span> <span class="n">acq</span><span class="p">:</span>
+            <span class="n">strip</span> <span class="o">=</span> <span class="s1">&#39;strip&#39;</span> <span class="o">+</span> <span class="n">acq</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;hybe&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;_&#39;</span> <span class="o">+</span><span class="nb">str</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">acq</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">])</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span><span class="s1">&#39;nucstain&#39;</span> <span class="ow">in</span> <span class="n">acq</span><span class="p">)</span><span class="o">&amp;</span><span class="p">(</span><span class="n">channel</span><span class="o">!=</span><span class="s1">&#39;DeepBlue&#39;</span><span class="p">):</span>
+            <span class="n">strip</span> <span class="o">=</span> <span class="s1">&#39;backround&#39;</span> <span class="o">+</span> <span class="n">acq</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;nucstain&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;_&#39;</span> <span class="o">+</span><span class="nb">str</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">acq</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">])</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">FF</span><span class="p">,</span><span class="nb">str</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;exposure&#39;</span><span class="p">]</span><span class="o">!=</span><span class="s1">&#39;&#39;</span><span class="p">:</span>
+                <span class="n">img</span> <span class="o">=</span> <span class="n">FF</span><span class="o">*</span><span class="n">image_metadata</span><span class="o">.</span><span class="n">stkread</span><span class="p">(</span><span class="n">Position</span><span class="o">=</span><span class="n">posname</span><span class="p">,</span><span class="n">Channel</span><span class="o">=</span><span class="n">channel</span><span class="p">,</span><span class="n">acq</span><span class="o">=</span><span class="n">acq</span><span class="p">,</span><span class="n">Exposure</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;exposure&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">img</span> <span class="o">=</span> <span class="n">FF</span><span class="o">*</span><span class="n">image_metadata</span><span class="o">.</span><span class="n">stkread</span><span class="p">(</span><span class="n">Position</span><span class="o">=</span><span class="n">posname</span><span class="p">,</span><span class="n">Channel</span><span class="o">=</span><span class="n">channel</span><span class="p">,</span><span class="n">acq</span><span class="o">=</span><span class="n">acq</span><span class="p">)</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;exposure&#39;</span><span class="p">]</span><span class="o">!=</span><span class="s1">&#39;&#39;</span><span class="p">:</span>
+                <span class="n">img</span> <span class="o">=</span> <span class="n">image_metadata</span><span class="o">.</span><span class="n">stkread</span><span class="p">(</span><span class="n">Position</span><span class="o">=</span><span class="n">posname</span><span class="p">,</span><span class="n">Channel</span><span class="o">=</span><span class="n">channel</span><span class="p">,</span><span class="n">acq</span><span class="o">=</span><span class="n">acq</span><span class="p">,</span><span class="n">Exposure</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;exposure&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">img</span> <span class="o">=</span> <span class="n">image_metadata</span><span class="o">.</span><span class="n">stkread</span><span class="p">(</span><span class="n">Position</span><span class="o">=</span><span class="n">posname</span><span class="p">,</span><span class="n">Channel</span><span class="o">=</span><span class="n">channel</span><span class="p">,</span><span class="n">acq</span><span class="o">=</span><span class="n">acq</span><span class="p">)</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+            <span class="k">if</span> <span class="s1">&#39;hybe&#39;</span> <span class="ow">in</span> <span class="n">acq</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;exposure&#39;</span><span class="p">]</span><span class="o">!=</span><span class="s1">&#39;&#39;</span><span class="p">:</span>
+                    <span class="n">bkg</span> <span class="o">=</span> <span class="n">image_metadata</span><span class="o">.</span><span class="n">stkread</span><span class="p">(</span><span class="n">Position</span><span class="o">=</span><span class="n">posname</span><span class="p">,</span><span class="n">Channel</span><span class="o">=</span><span class="n">channel</span><span class="p">,</span><span class="n">acq</span><span class="o">=</span><span class="n">strip</span><span class="p">,</span><span class="n">Exposure</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;exposure&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">bkg</span> <span class="o">=</span> <span class="n">image_metadata</span><span class="o">.</span><span class="n">stkread</span><span class="p">(</span><span class="n">Position</span><span class="o">=</span><span class="n">posname</span><span class="p">,</span><span class="n">Channel</span><span class="o">=</span><span class="n">channel</span><span class="p">,</span><span class="n">acq</span><span class="o">=</span><span class="n">strip</span><span class="p">)</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+                <span class="n">img</span> <span class="o">=</span> <span class="n">img</span><span class="o">-</span><span class="n">bkg</span>
+        <span class="k">return</span> <span class="n">posname</span><span class="p">,</span><span class="n">img</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">posname</span><span class="p">)</span>
+        <span class="n">img</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">([</span><span class="mi">2048</span><span class="p">,</span> <span class="mi">2448</span><span class="p">])</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">posname</span><span class="p">,</span><span class="n">img</span></div>
+    
+<div class="viewcode-block" id="generate_FF"><a class="viewcode-back" href="../../Processing.html#Processing.putils.generate_FF">[docs]</a><span class="k">def</span> <span class="nf">generate_FF</span><span class="p">(</span><span class="n">image_metadata</span><span class="p">,</span><span class="n">acq</span><span class="p">,</span><span class="n">channel</span><span class="p">):</span>
+    <span class="n">posnames</span> <span class="o">=</span> <span class="n">image_metadata</span><span class="o">.</span><span class="n">image_table</span><span class="p">[</span><span class="n">image_metadata</span><span class="o">.</span><span class="n">image_table</span><span class="o">.</span><span class="n">acq</span><span class="o">==</span><span class="n">acq</span><span class="p">]</span><span class="o">.</span><span class="n">Position</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span>
+    <span class="n">random_posnames</span> <span class="o">=</span> <span class="n">posnames</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">20</span><span class="p">]</span>
+    <span class="n">FF</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">dstack</span><span class="p">([</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">image_metadata</span><span class="o">.</span><span class="n">stkread</span><span class="p">(</span><span class="n">Position</span><span class="o">=</span><span class="n">posname</span><span class="p">,</span><span class="n">Channel</span><span class="o">=</span><span class="n">channel</span><span class="p">,</span><span class="n">acq</span><span class="o">=</span><span class="n">acq</span><span class="p">)</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">))</span> <span class="k">for</span> <span class="n">posname</span> <span class="ow">in</span> <span class="n">random_posnames</span><span class="p">])</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">values</span>
+    <span class="n">FF</span> <span class="o">=</span> <span class="n">gaussian_filter</span><span class="p">(</span><span class="n">FF</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span><span class="mi">5</span><span class="p">)</span>
+    <span class="n">FF</span> <span class="o">=</span> <span class="n">FF</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">/</span><span class="n">FF</span>
+    <span class="k">return</span> <span class="n">FF</span></div>
+
+<div class="viewcode-block" id="generate_stitched"><a class="viewcode-back" href="../../Processing.html#Processing.putils.generate_stitched">[docs]</a><span class="k">def</span> <span class="nf">generate_stitched</span><span class="p">(</span><span class="n">image_metadata</span><span class="p">,</span>
+                      <span class="n">acq</span><span class="p">,</span><span class="n">channel</span><span class="p">,</span>
+                      <span class="n">pixel_size</span><span class="o">=</span><span class="mf">0.495</span><span class="p">,</span>
+                      <span class="n">n_pixels</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">2448</span><span class="p">,</span> <span class="mi">2048</span><span class="p">]),</span>
+                      <span class="n">exposure</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span>
+                      <span class="n">rotate</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+                      <span class="n">flipud</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                      <span class="n">fliplr</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                      <span class="n">dtype</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+                      <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                      <span class="n">posnames</span><span class="o">=</span><span class="p">[]):</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">posnames</span><span class="p">)</span><span class="o">==</span><span class="mi">0</span><span class="p">:</span>
+        <span class="n">posnames</span> <span class="o">=</span> <span class="n">image_metadata</span><span class="o">.</span><span class="n">image_table</span><span class="p">[</span><span class="n">image_metadata</span><span class="o">.</span><span class="n">image_table</span><span class="o">.</span><span class="n">acq</span><span class="o">==</span><span class="n">acq</span><span class="p">]</span><span class="o">.</span><span class="n">Position</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span>
+    <span class="n">FF</span> <span class="o">=</span> <span class="n">generate_FF</span><span class="p">(</span><span class="n">image_metadata</span><span class="p">,</span><span class="n">acq</span><span class="p">,</span><span class="n">channel</span><span class="p">)</span>
+    <span class="n">coordinates</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">posname</span> <span class="ow">in</span> <span class="n">posnames</span><span class="p">:</span>
+        <span class="n">coordinates</span><span class="p">[</span><span class="n">posname</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">image_metadata</span><span class="o">.</span><span class="n">image_table</span><span class="p">[(</span><span class="n">image_metadata</span><span class="o">.</span><span class="n">image_table</span><span class="o">.</span><span class="n">acq</span><span class="o">==</span><span class="n">acq</span><span class="p">)</span><span class="o">&amp;</span>
+                                                           <span class="p">(</span><span class="n">image_metadata</span><span class="o">.</span><span class="n">image_table</span><span class="o">.</span><span class="n">Position</span><span class="o">==</span><span class="n">posname</span><span class="p">)]</span><span class="o">.</span><span class="n">XY</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">/</span><span class="n">pixel_size</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+    <span class="n">xy</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">pxy</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span><span class="n">pxy</span> <span class="ow">in</span> <span class="n">coordinates</span><span class="o">.</span><span class="n">items</span><span class="p">()])</span>
+    <span class="n">y_min</span><span class="p">,</span><span class="n">x_min</span> <span class="o">=</span> <span class="n">xy</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">-</span><span class="n">n_pixels</span>
+    <span class="n">y_max</span><span class="p">,</span><span class="n">x_max</span> <span class="o">=</span> <span class="n">xy</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">+</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">n_pixels</span><span class="p">)</span>
+    <span class="n">x_range</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">x_min</span><span class="p">,</span><span class="n">x_max</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+    <span class="n">y_range</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">y_min</span><span class="p">,</span><span class="n">y_max</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+    <span class="n">stitched</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">([</span><span class="nb">len</span><span class="p">(</span><span class="n">x_range</span><span class="p">),</span><span class="nb">len</span><span class="p">(</span><span class="n">y_range</span><span class="p">)]),</span><span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+    <span class="n">img_dict</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">Input</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">posname</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">posnames</span><span class="p">):</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">data</span><span class="p">[</span><span class="s1">&#39;acq&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">acq</span>
+        <span class="n">data</span><span class="p">[</span><span class="s1">&#39;posname&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">posname</span>
+        <span class="n">data</span><span class="p">[</span><span class="s1">&#39;image_metadata&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">image_metadata</span>
+        <span class="n">data</span><span class="p">[</span><span class="s1">&#39;channel&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">channel</span>
+        <span class="n">data</span><span class="p">[</span><span class="s1">&#39;exposure&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">exposure</span>
+        <span class="n">Input</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+    <span class="n">pfunc</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span><span class="n">generate_img</span><span class="p">,</span><span class="n">FF</span><span class="o">=</span><span class="n">FF</span><span class="p">)</span>
+    <span class="k">with</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">Pool</span><span class="p">(</span><span class="mi">60</span><span class="p">)</span> <span class="k">as</span> <span class="n">p</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+            <span class="n">iterable</span> <span class="o">=</span> <span class="n">tqdm</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">imap</span><span class="p">(</span><span class="n">pfunc</span><span class="p">,</span><span class="n">Input</span><span class="p">),</span><span class="n">total</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">Input</span><span class="p">),</span><span class="n">desc</span><span class="o">=</span><span class="s1">&#39;Generate Images &#39;</span><span class="o">+</span><span class="n">acq</span><span class="o">+</span><span class="s1">&#39;_&#39;</span><span class="o">+</span><span class="n">channel</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">iterable</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">imap</span><span class="p">(</span><span class="n">pfunc</span><span class="p">,</span><span class="n">Input</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">posname</span><span class="p">,</span><span class="n">image</span> <span class="ow">in</span> <span class="n">iterable</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">position_y</span><span class="p">,</span><span class="n">position_x</span> <span class="o">=</span> <span class="n">coordinates</span><span class="p">[</span><span class="n">posname</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">rotate</span><span class="o">!=</span><span class="mi">0</span><span class="p">:</span>
+                    <span class="n">image</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">rot90</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">image</span><span class="p">),</span><span class="n">rotate</span><span class="p">)</span> <span class="c1">#3</span>
+                <span class="k">if</span> <span class="n">flipud</span><span class="p">:</span>
+                    <span class="n">image</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flipud</span><span class="p">(</span><span class="n">image</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">fliplr</span><span class="p">:</span>
+                    <span class="n">image</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">fliplr</span><span class="p">(</span><span class="n">image</span><span class="p">)</span>
+                <span class="n">img</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">image</span><span class="p">),</span><span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+                <span class="n">img_x_min</span> <span class="o">=</span> <span class="n">position_x</span><span class="o">-</span><span class="n">x_min</span>
+                <span class="n">img_x_max</span> <span class="o">=</span> <span class="p">(</span><span class="n">position_x</span><span class="o">-</span><span class="n">x_min</span><span class="p">)</span><span class="o">+</span><span class="n">img</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">img_y_min</span> <span class="o">=</span> <span class="n">position_y</span><span class="o">-</span><span class="n">y_min</span>
+                <span class="n">img_y_max</span> <span class="o">=</span> <span class="p">(</span><span class="n">position_y</span><span class="o">-</span><span class="n">y_min</span><span class="p">)</span><span class="o">+</span><span class="n">img</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+                <span class="n">img</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">img</span><span class="p">,</span><span class="n">stitched</span><span class="p">[</span><span class="n">img_x_min</span><span class="p">:</span><span class="n">img_x_max</span><span class="p">,</span><span class="n">img_y_min</span><span class="p">:</span><span class="n">img_y_max</span><span class="p">]])</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">values</span>
+                <span class="n">stitched</span><span class="p">[</span><span class="n">img_x_min</span><span class="p">:</span><span class="n">img_x_max</span><span class="p">,</span><span class="n">img_y_min</span><span class="p">:</span><span class="n">img_y_max</span><span class="p">]</span> <span class="o">=</span> <span class="n">img</span><span class="o">.</span><span class="n">type</span><span class="p">(</span><span class="n">dtype</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+                <span class="nb">print</span><span class="p">(</span><span class="n">posname</span><span class="p">)</span>
+                <span class="c1"># raise</span>
+                <span class="k">continue</span>
+    <span class="k">return</span> <span class="n">stitched</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="colorize_segmented_image"><a class="viewcode-back" href="../../Processing.html#Processing.putils.colorize_segmented_image">[docs]</a><span class="k">def</span> <span class="nf">colorize_segmented_image</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="n">color_type</span><span class="o">=</span><span class="s1">&#39;rgb&#39;</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Returns a randomly colorized segmented image for display purposes.</span>
+<span class="sd">    :param img: Should be a numpy array of dtype np.int and 2D shape segmented</span>
+<span class="sd">    :param color_type: &#39;rg&#39; for red green gradient, &#39;rb&#39; = red blue, &#39;bg&#39; = blue green</span>
+<span class="sd">    :return: Randomly colorized, segmented image (shape=(n,m,3))</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># get empty rgb_img as a skeleton to add colors</span>
+    <span class="n">rgb_img</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">img</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">img</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="mi">3</span><span class="p">))</span>
+
+    <span class="c1"># make your colors</span>
+    <span class="n">num_cells</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">img</span><span class="p">)</span>  <span class="c1"># find the number of cells so you know how many colors to make</span>
+    <span class="n">colors</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">255</span><span class="p">,</span> <span class="p">(</span><span class="n">num_cells</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="s1">&#39;r&#39;</span> <span class="ow">in</span> <span class="n">color_type</span><span class="p">:</span>
+        <span class="n">colors</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># remove red</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="s1">&#39;g&#39;</span> <span class="ow">in</span> <span class="n">color_type</span><span class="p">:</span>
+        <span class="n">colors</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># remove green</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="s1">&#39;b&#39;</span> <span class="ow">in</span> <span class="n">color_type</span><span class="p">:</span>
+        <span class="n">colors</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># remove blue</span>
+
+    <span class="n">regions</span> <span class="o">=</span> <span class="n">regionprops</span><span class="p">(</span><span class="n">img</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">regions</span><span class="p">)):</span>  <span class="c1"># start at 1 because no need to replace background (0s already)</span>
+        <span class="n">rgb_img</span><span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="n">regions</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">coords</span><span class="o">.</span><span class="n">T</span><span class="p">)]</span> <span class="o">=</span> <span class="n">colors</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>  <span class="c1"># won&#39;t use the 1st color</span>
+
+    <span class="k">return</span> <span class="n">rgb_img</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int</span><span class="p">)</span></div>
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">dredFISH  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Processing.putils</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2022, Wollman lab.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 6.0.0.
+    </div>
+  </body>
+</html>

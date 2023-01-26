@@ -9,10 +9,8 @@
     <link rel="stylesheet" type="text/css" href="../../_static/pygments.css" />
     <link rel="stylesheet" type="text/css" href="../../_static/sphinxdoc.css" />
     <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
-    <script src="../../_static/jquery.js"></script>
-    <script src="../../_static/underscore.js"></script>
-    <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
     <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/sphinx_highlight.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" /> 
   </head><body>
@@ -44,31 +42,34 @@
 <span class="sd">abstract methods (train and classify) that any subclass will have to implement. </span>
 
 <span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">abc</span>
+<span class="kn">from</span> <span class="nn">signal</span> <span class="kn">import</span> <span class="n">valid_signals</span>
+<span class="kn">import</span> <span class="nn">string</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">itertools</span>
+<span class="kn">from</span> <span class="nn">multiprocessing</span> <span class="kn">import</span> <span class="n">Pool</span>
 
-<span class="kn">from</span> <span class="nn">scipy.stats</span> <span class="kn">import</span> <span class="n">mode</span>
+<span class="kn">from</span> <span class="nn">scipy.stats</span> <span class="kn">import</span> <span class="n">entropy</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">median_abs_deviation</span>
 <span class="kn">from</span> <span class="nn">scipy.spatial.distance</span> <span class="kn">import</span> <span class="n">squareform</span>
 <span class="kn">from</span> <span class="nn">scipy.optimize</span> <span class="kn">import</span> <span class="n">minimize_scalar</span>
+
 <span class="kn">from</span> <span class="nn">sklearn.metrics</span> <span class="kn">import</span> <span class="n">adjusted_rand_score</span><span class="p">,</span> <span class="n">adjusted_mutual_info_score</span> 
+<span class="kn">from</span> <span class="nn">sklearn.decomposition</span> <span class="kn">import</span> <span class="n">LatentDirichletAllocation</span>
+<span class="c1"># from sklearn.neighbors import NearestNeighbors</span>
+<span class="kn">from</span> <span class="nn">sklearn.neighbors</span> <span class="kn">import</span> <span class="n">KNeighborsClassifier</span>
+<span class="kn">from</span> <span class="nn">sklearn</span> <span class="kn">import</span> <span class="n">svm</span>
 <span class="kn">import</span> <span class="nn">pynndescent</span> 
+<span class="kn">import</span> <span class="nn">anndata</span>
 
+<span class="kn">from</span> <span class="nn">dredFISH.Analysis</span> <span class="kn">import</span> <span class="n">TissueGraph</span>
 
-<span class="kn">import</span> <span class="nn">os.path</span> 
-<span class="kn">import</span> <span class="nn">abc</span>
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
-<span class="kn">import</span> <span class="nn">itertools</span>
+<span class="kn">from</span> <span class="nn">dredFISH.Utils</span> <span class="kn">import</span> <span class="n">pathu</span>
+<span class="kn">from</span> <span class="nn">dredFISH.Utils</span> <span class="kn">import</span> <span class="n">basicu</span>
+<span class="kn">from</span> <span class="nn">dredFISH.Utils</span> <span class="kn">import</span> <span class="n">celltypeu</span>
 
-<span class="kn">from</span> <span class="nn">dredFISH.Analysis.TissueGraph</span> <span class="kn">import</span> <span class="o">*</span>
-<span class="kn">from</span> <span class="nn">dredFISH.Utils.basicu</span> <span class="kn">import</span> <span class="o">*</span>
-
-
-
-
-
-    
-    
 <div class="viewcode-block" id="Classifier"><a class="viewcode-back" href="../../Analysis.html#Analysis.Classification.Classifier">[docs]</a><span class="k">class</span> <span class="nc">Classifier</span><span class="p">(</span><span class="n">metaclass</span><span class="o">=</span><span class="n">abc</span><span class="o">.</span><span class="n">ABCMeta</span><span class="p">):</span> 
-    <span class="sd">&quot;&quot;&quot;Interface for classifiers </span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Interface for classifiers </span>
 
 <span class="sd">    This is an abstract class that defines the interface (i.e. methods and attributes) that all different classifiers must have. </span>
 <span class="sd">        </span>
@@ -78,8 +79,8 @@
 <span class="sd">        A taxonomy system that the classifier classifies into. </span>
 <span class="sd">    &quot;&quot;&quot;</span>
     
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">tax</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span> 
-        <span class="sd">&quot;&quot;&quot;Create a classifier</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tax</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span> 
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a classifier</span>
 <span class="sd">        </span>
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
@@ -87,27 +88,22 @@
 <span class="sd">            The taxonomical system that is used for classification. </span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">tax</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span> 
-            <span class="n">tax</span> <span class="o">=</span> <span class="n">Taxonomy</span><span class="p">(</span><span class="n">name</span> <span class="o">=</span> <span class="s1">&#39;clusters&#39;</span><span class="p">)</span>
+            <span class="n">tax</span> <span class="o">=</span> <span class="n">TissueGraph</span><span class="o">.</span><span class="n">Taxonomy</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;clusters&#39;</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">tax</span> <span class="o">=</span> <span class="n">tax</span>
-        
-        <span class="k">pass</span>
-        
     
 <div class="viewcode-block" id="Classifier.train"><a class="viewcode-back" href="../../Analysis.html#Analysis.Classification.Classifier.train">[docs]</a>    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
     <span class="k">def</span> <span class="nf">train</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Trains a classifier</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Trains a classifier</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">pass</span></div>
     
 <div class="viewcode-block" id="Classifier.classify"><a class="viewcode-back" href="../../Analysis.html#Analysis.Classification.Classifier.classify">[docs]</a>    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
     <span class="k">def</span> <span class="nf">classify</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">data</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Classifies input into types</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Classifies input into types</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">pass</span></div></div>
-    
-    
 <div class="viewcode-block" id="KNNClassifier"><a class="viewcode-back" href="../../Analysis.html#Analysis.Classification.KNNClassifier">[docs]</a><span class="k">class</span> <span class="nc">KNNClassifier</span><span class="p">(</span><span class="n">Classifier</span><span class="p">):</span> 
-    <span class="sd">&quot;&quot;&quot;k-nearest-neighbor classifier</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;k-nearest-neighbor classifier</span>
 <span class="sd">    </span>
 <span class="sd">    Attributes</span>
 <span class="sd">    ----------</span>
@@ -120,7 +116,7 @@
 <span class="sd">        </span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">k</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span><span class="n">approx_nn</span><span class="o">=</span> <span class="mi">30</span><span class="p">,</span><span class="n">metric</span> <span class="o">=</span> <span class="s1">&#39;correlation&#39;</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Define a KNN classifier</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Define a KNN classifier</span>
 <span class="sd">        </span>
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
@@ -135,21 +131,19 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">k</span> <span class="o">=</span> <span class="n">k</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">approx_nn</span> <span class="o">=</span> <span class="n">approx_nn</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">metric</span> <span class="o">=</span> <span class="n">metric</span>
-        <span class="k">pass</span>
 
-<div class="viewcode-block" id="KNNClassifier.train"><a class="viewcode-back" href="../../Analysis.html#Analysis.Classification.KNNClassifier.train">[docs]</a>    <span class="k">def</span> <span class="nf">train</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">ref_data</span><span class="p">,</span><span class="n">ref_label_id</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot; Builds approx. KNN graph for queries</span>
+<div class="viewcode-block" id="KNNClassifier.train"><a class="viewcode-back" href="../../Analysis.html#Analysis.Classification.KNNClassifier.train">[docs]</a>    <span class="k">def</span> <span class="nf">train</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_data</span><span class="p">,</span> <span class="n">ref_label_id</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Builds approx. KNN graph for queries</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_knn</span> <span class="o">=</span> <span class="n">pynndescent</span><span class="o">.</span><span class="n">NNDescent</span><span class="p">(</span><span class="n">ref_data</span><span class="p">,</span><span class="n">n_neighbors</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">approx_nn</span><span class="p">,</span> <span class="n">metric</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">metric</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_knn</span><span class="o">.</span><span class="n">prepare</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_ref_label_id</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">ref_label_id</span><span class="p">)</span>
         
         <span class="c1"># update the taxonomy</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">tax</span><span class="o">.</span><span class="n">add_types</span><span class="p">(</span><span class="n">ref_label_id</span><span class="p">,</span><span class="n">ref_data</span><span class="p">)</span>
-        <span class="k">pass</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tax</span><span class="o">.</span><span class="n">add_types</span><span class="p">(</span><span class="n">ref_label_id</span><span class="p">,</span><span class="n">ref_data</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="KNNClassifier.classify"><a class="viewcode-back" href="../../Analysis.html#Analysis.Classification.KNNClassifier.classify">[docs]</a>    <span class="k">def</span> <span class="nf">classify</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">data</span><span class="p">):</span> 
-        <span class="sd">&quot;&quot;&quot;Find class of rows in data based on approx. KNN</span>
+<div class="viewcode-block" id="KNNClassifier.classify"><a class="viewcode-back" href="../../Analysis.html#Analysis.Classification.KNNClassifier.classify">[docs]</a>    <span class="k">def</span> <span class="nf">classify</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span> 
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Find class of rows in data based on approx. KNN</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="c1"># get indices and remove self. </span>
         <span class="n">indices</span><span class="p">,</span><span class="n">distances</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_knn</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">data</span><span class="p">,</span><span class="n">k</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">k</span><span class="p">)</span>
@@ -159,32 +153,29 @@
             <span class="n">kids</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ref_label_id</span><span class="p">[</span><span class="n">indices</span><span class="p">]</span>
             <span class="n">ids</span> <span class="o">=</span> <span class="n">mode</span><span class="p">(</span><span class="n">kids</span><span class="p">,</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">ids</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span></div></div>
-    
-
 <div class="viewcode-block" id="OptimalLeidenKNNClassifier"><a class="viewcode-back" href="../../Analysis.html#Analysis.Classification.OptimalLeidenKNNClassifier">[docs]</a><span class="k">class</span> <span class="nc">OptimalLeidenKNNClassifier</span><span class="p">(</span><span class="n">KNNClassifier</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Classifiy cells based on unsupervized Leiden </span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Classifiy cells based on unsupervized Leiden </span>
 <span class="sd">    </span>
 <span class="sd">    This classifiers is trained using unsupervized learning with later classification done by knn (k=1)</span>
-<span class="sd">    the implementations uses the same classify method is KNNClassifier.  </span>
+<span class="sd">    the implementations uses the same classify method as KNNClassifier.  </span>
 <span class="sd">    The overladed train method does the unsupervized learning before calling super().train to create the KNN index.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">TG</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">TG</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
 <span class="sd">        TG : TissueGraph</span>
 <span class="sd">            Required parameter - the TissueGraph object we&#39;re going to use for unsupervised clustering. </span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">TG</span><span class="p">,</span><span class="n">TissueGraph</span><span class="p">):</span> 
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">TG</span><span class="p">,</span> <span class="n">TissueGraph</span><span class="o">.</span><span class="n">TissueGraph</span><span class="p">):</span> 
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;OptimalLeidenKNNClassifier requires a TissueGraph object as input&quot;</span><span class="p">)</span>
             
         <span class="c1">#set up the KNN portion</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">k</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span><span class="n">approx_nn</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span><span class="n">metric</span> <span class="o">=</span> <span class="s1">&#39;correlation&#39;</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_TG</span> <span class="o">=</span> <span class="n">TG</span>
-        <span class="k">pass</span>
     
-<div class="viewcode-block" id="OptimalLeidenKNNClassifier.train"><a class="viewcode-back" href="../../Analysis.html#Analysis.Classification.OptimalLeidenKNNClassifier.train">[docs]</a>    <span class="k">def</span> <span class="nf">train</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">opt_res</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">opt_params</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;iters&#39;</span> <span class="p">:</span> <span class="mi">10</span><span class="p">,</span> <span class="s1">&#39;n_consensus&#39;</span> <span class="p">:</span> <span class="mi">50</span><span class="p">}):</span>
-        <span class="sd">&quot;&quot;&quot;training for this class is performing optimal leiden clustering </span>
+<div class="viewcode-block" id="OptimalLeidenKNNClassifier.train"><a class="viewcode-back" href="../../Analysis.html#Analysis.Classification.OptimalLeidenKNNClassifier.train">[docs]</a>    <span class="k">def</span> <span class="nf">train</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">opt_res</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">opt_params</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;iters&#39;</span> <span class="p">:</span> <span class="mi">10</span><span class="p">,</span> <span class="s1">&#39;n_consensus&#39;</span> <span class="p">:</span> <span class="mi">50</span><span class="p">}):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;training for this class is performing optimal leiden clustering </span>
 <span class="sd">        </span>
 <span class="sd">        Optimization is done over resolution parameter trying to maximize the TG conditional entropy. </span>
 <span class="sd">        The analysis uses the two graphs (spatial and features) and finds a resolution parameters that will maximize </span>
@@ -199,10 +190,8 @@
 <span class="sd">            &#39;n_consensus&#39; is the number of times to do the final clustering with optimal resolution.   </span>
 <span class="sd">            </span>
 <span class="sd">        &quot;&quot;&quot;</span>
-            
-
-        <span class="k">def</span> <span class="nf">ObjFunLeidenRes</span><span class="p">(</span><span class="n">res</span><span class="p">,</span><span class="n">return_types</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
-            <span class="sd">&quot;&quot;&quot;</span>
+        <span class="k">def</span> <span class="nf">ObjFunLeidenRes</span><span class="p">(</span><span class="n">res</span><span class="p">,</span> <span class="n">return_types</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">            </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">            Basic optimization routine for Leiden resolution parameter. </span>
 <span class="sd">            Implemented using igraph leiden community detection</span>
 <span class="sd">            &quot;&quot;&quot;</span>
@@ -214,9 +203,9 @@
                 <span class="n">EntropyVec</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_TG</span><span class="o">.</span><span class="n">contract_graph</span><span class="p">(</span><span class="n">TypeVec</span><span class="p">)</span><span class="o">.</span><span class="n">cond_entropy</span><span class="p">()</span>
             <span class="n">Entropy</span> <span class="o">=</span> <span class="n">EntropyVec</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
             <span class="k">if</span> <span class="n">return_types</span><span class="p">:</span> 
-                <span class="k">return</span> <span class="o">-</span><span class="n">Entropy</span><span class="p">,</span><span class="n">TypeVec</span>
+                <span class="k">return</span> <span class="p">(</span><span class="o">-</span><span class="n">Entropy</span><span class="p">,</span> <span class="n">TypeVec</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="k">return</span><span class="p">(</span><span class="o">-</span><span class="n">Entropy</span><span class="p">)</span>
+                <span class="k">return</span> <span class="p">(</span><span class="o">-</span><span class="n">Entropy</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">opt_res</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span> 
             <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Calling initial optimization&quot;</span><span class="p">)</span>
@@ -234,7 +223,7 @@
         <span class="c1"># consensus clustering</span>
         <span class="n">TypeVec</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">_TG</span><span class="o">.</span><span class="n">N</span><span class="p">,</span><span class="n">opt_params</span><span class="p">[</span><span class="s1">&#39;n_consensus&#39;</span><span class="p">]))</span>
         <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">opt_params</span><span class="p">[</span><span class="s1">&#39;n_consensus&#39;</span><span class="p">]):</span>
-            <span class="n">ent</span><span class="p">,</span><span class="n">TypeVec</span><span class="p">[:,</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">ObjFunLeidenRes</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_opt_res</span><span class="p">,</span><span class="n">return_types</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span>
+            <span class="n">ent</span><span class="p">,</span> <span class="n">TypeVec</span><span class="p">[:,</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">ObjFunLeidenRes</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_opt_res</span><span class="p">,</span> <span class="n">return_types</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
             
         <span class="k">if</span> <span class="n">opt_params</span><span class="p">[</span><span class="s1">&#39;n_consensus&#39;</span><span class="p">]</span><span class="o">&gt;</span><span class="mi">1</span><span class="p">:</span>
             <span class="n">cmb</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">itertools</span><span class="o">.</span><span class="n">combinations</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">opt_params</span><span class="p">[</span><span class="s1">&#39;n_consensus&#39;</span><span class="p">]),</span> <span class="n">r</span><span class="o">=</span><span class="mi">2</span><span class="p">)))</span>
@@ -245,32 +234,29 @@
             <span class="n">total_rand_scr</span> <span class="o">=</span> <span class="n">rand_scr</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
             <span class="n">TypeVec</span> <span class="o">=</span> <span class="n">TypeVec</span><span class="p">[:,</span><span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">total_rand_scr</span><span class="p">)]</span>
                                                   
-
         <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Number of types: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">TypeVec</span><span class="p">))</span><span class="si">}</span><span class="s2"> initial entropy: </span><span class="si">{</span><span class="n">ent</span><span class="si">}</span><span class="s2"> number of evals: </span><span class="si">{</span><span class="n">evls</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">TypeVec</span> <span class="o">=</span> <span class="n">TypeVec</span></div>
         
+        <span class="c1"># return self._TG.feature_mat, TypeVec</span>
         <span class="c1"># train the KNN classifier using the types we found</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_TG</span><span class="o">.</span><span class="n">feature_mat</span><span class="p">,</span><span class="n">TypeVec</span><span class="p">)</span>
-        
+        <span class="c1"># super().train(self._TG.feature_mat, TypeVec)</span>
         <span class="c1"># train doesn&#39;t return anything. </span>
-        <span class="k">pass</span></div></div>
 
-
-
+<div class="viewcode-block" id="OptimalLeidenKNNClassifier.classify"><a class="viewcode-back" href="../../Analysis.html#Analysis.Classification.OptimalLeidenKNNClassifier.classify">[docs]</a>    <span class="k">def</span> <span class="nf">classify</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">TypeVec</span></div></div>
 <div class="viewcode-block" id="TopicClassifier"><a class="viewcode-back" href="../../Analysis.html#Analysis.Classification.TopicClassifier">[docs]</a><span class="k">class</span> <span class="nc">TopicClassifier</span><span class="p">(</span><span class="n">Classifier</span><span class="p">):</span> 
-    <span class="sd">&quot;&quot;&quot;Uses Latent Dirichlet Allocation to classify cells into regions types. </span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Uses Latent Dirichlet Allocation to classify cells into regions types. </span>
 
 <span class="sd">    Decision on number of topics comes from maximizing overall entropy. </span>
 <span class="sd">    &quot;&quot;&quot;</span>
-
-
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">TG</span><span class="p">,</span> <span class="n">ordr</span> <span class="o">=</span> <span class="mi">4</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">TG</span><span class="p">,</span> <span class="n">ordr</span><span class="o">=</span><span class="mi">4</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
 <span class="sd">        TG : TissueGraph</span>
 <span class="sd">            Required parameter - the TissueGraph object we&#39;re going to use for unsupervised clustering. </span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">TG</span><span class="p">,</span><span class="n">TissueGraph</span><span class="p">):</span> 
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">TG</span><span class="p">,</span> <span class="n">TissueGraph</span><span class="o">.</span><span class="n">TissueGraph</span><span class="p">):</span> 
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;TopicClassifier requires a (cell level) TissueGraph object as input&quot;</span><span class="p">)</span>
 
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">tax</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span>
@@ -282,65 +268,130 @@
         <span class="n">Env</span> <span class="o">=</span> <span class="n">Env</span><span class="o">/</span><span class="n">row_sums</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">Env</span> <span class="o">=</span> <span class="n">Env</span>
 
-
-<div class="viewcode-block" id="TopicClassifier.train"><a class="viewcode-back" href="../../Analysis.html#Analysis.Classification.TopicClassifier.train">[docs]</a>    <span class="k">def</span> <span class="nf">train</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">use_parallel</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span><span class="n">max_num_of_topics</span> <span class="o">=</span> <span class="mi">100</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;fit multiple LDA models and chose the one with highest type entropy</span>
+<div class="viewcode-block" id="TopicClassifier.lda_fit"><a class="viewcode-back" href="../../Analysis.html#Analysis.Classification.TopicClassifier.lda_fit">[docs]</a>    <span class="k">def</span> <span class="nf">lda_fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n_topics</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;This cannot be nested inside</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        
-        <span class="n">Ntopics</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="n">max_num_of_topics</span><span class="p">)</span>  
-        
-        <span class="k">if</span> <span class="n">use_parallel</span><span class="p">:</span> 
-            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Running LDA in parallel&quot;</span><span class="p">)</span>
-            <span class="c1"># define function handle</span>
-            <span class="k">def</span> <span class="nf">lda_fit</span><span class="p">(</span><span class="n">n_topics</span><span class="p">,</span><span class="n">Env</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
-                <span class="n">lda</span> <span class="o">=</span> <span class="n">LatentDirichletAllocation</span><span class="p">(</span><span class="n">n_components</span><span class="o">=</span><span class="n">n_topics</span><span class="p">)</span>
-                <span class="n">B</span> <span class="o">=</span> <span class="n">lda</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">Env</span><span class="p">)</span>
-                <span class="n">T</span> <span class="o">=</span> <span class="n">lda</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">Env</span><span class="p">)</span>
-                <span class="k">return</span> <span class="p">(</span><span class="n">B</span><span class="p">,</span><span class="n">T</span><span class="p">)</span>
+        <span class="n">Env</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Env</span>
 
-            <span class="c1"># start parallel engine</span>
-            <span class="n">rc</span> <span class="o">=</span> <span class="n">ipp</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
-            <span class="n">dview</span> <span class="o">=</span> <span class="n">rc</span><span class="p">[:]</span>
-            <span class="n">dview</span><span class="o">.</span><span class="n">push</span><span class="p">({</span><span class="s1">&#39;Env&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">Env</span><span class="p">})</span>
-            <span class="k">with</span> <span class="n">dview</span><span class="o">.</span><span class="n">sync_imports</span><span class="p">():</span>
-                <span class="kn">import</span> <span class="nn">sklearn.decomposition</span>
-            <span class="c1"># add env to lda_fit to create new function handle we can use in parallel</span>
-            <span class="n">g</span> <span class="o">=</span> <span class="n">functools</span><span class="o">.</span><span class="n">partial</span><span class="p">(</span><span class="n">lda_fit</span><span class="p">,</span> <span class="n">Env</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">Env</span><span class="p">)</span>
-            <span class="n">result</span> <span class="o">=</span> <span class="n">dview</span><span class="o">.</span><span class="n">map_sync</span><span class="p">(</span><span class="n">g</span><span class="p">,</span><span class="n">Ntopics</span><span class="p">)</span>
+        <span class="n">lda</span> <span class="o">=</span> <span class="n">LatentDirichletAllocation</span><span class="p">(</span><span class="n">n_components</span><span class="o">=</span><span class="n">n_topics</span><span class="p">)</span>
+        <span class="n">B</span> <span class="o">=</span> <span class="n">lda</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">Env</span><span class="p">)</span>
+        <span class="n">T</span> <span class="o">=</span> <span class="n">lda</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">Env</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">B</span><span class="p">,</span><span class="n">T</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="TopicClassifier.train"><a class="viewcode-back" href="../../Analysis.html#Analysis.Classification.TopicClassifier.train">[docs]</a>    <span class="k">def</span> <span class="nf">train</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+        <span class="n">n_topics_list</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">geomspace</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="mi">100</span><span class="p">,</span><span class="n">num</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">),</span> 
+        <span class="n">n_procs</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;fit multiple LDA models and chose the one with highest type entropy</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># define function handle</span>
+        <span class="k">if</span> <span class="n">n_procs</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span> 
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Running LDA in serial&quot;</span><span class="p">)</span> 
+            <span class="n">results</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">lda_fit</span><span class="p">(</span><span class="n">n_topics</span><span class="p">)</span> <span class="k">for</span> <span class="n">n_topics</span> <span class="ow">in</span> <span class="n">n_topics_list</span><span class="p">]</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Running LDA n serial&quot;</span><span class="p">)</span> 
-            <span class="n">result</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
-            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">Ntopics</span><span class="p">)):</span>
-                <span class="n">lda</span> <span class="o">=</span> <span class="n">LatentDirichletAllocation</span><span class="p">(</span><span class="n">n_components</span><span class="o">=</span><span class="n">Ntopics</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
-                <span class="n">B</span> <span class="o">=</span> <span class="n">lda</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Env</span><span class="p">)</span>
-                <span class="n">T</span> <span class="o">=</span> <span class="n">lda</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Env</span><span class="p">)</span>
-                <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">B</span><span class="p">,</span><span class="n">T</span><span class="p">))</span>
-                
-        <span class="n">IDs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">_TG</span><span class="o">.</span><span class="n">N</span><span class="p">,</span><span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">)))</span>
-        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">)):</span>
-            <span class="n">IDs</span><span class="p">[:,</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">result</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">1</span><span class="p">],</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">n_procs</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">n_procs</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">n_topics_list</span><span class="p">))</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Running LDA in parallel with </span><span class="si">{</span><span class="n">n_procs</span><span class="si">}</span><span class="s2"> cores&quot;</span><span class="p">)</span>
+            <span class="k">with</span> <span class="n">Pool</span><span class="p">(</span><span class="n">n_procs</span><span class="p">)</span> <span class="k">as</span> <span class="n">pl</span><span class="p">:</span>
+                <span class="n">results</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">lda_fit</span><span class="p">,</span> <span class="n">n_topics_list</span><span class="p">)</span>
+
+        <span class="n">IDs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">_TG</span><span class="o">.</span><span class="n">N</span><span class="p">,</span><span class="nb">len</span><span class="p">(</span><span class="n">results</span><span class="p">)))</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">results</span><span class="p">)):</span>
+            <span class="n">IDs</span><span class="p">[:,</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">results</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">1</span><span class="p">],</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
         <span class="n">Type_entropy</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">IDs</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
         <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">IDs</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
             <span class="n">_</span><span class="p">,</span><span class="n">cnt</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">IDs</span><span class="p">[:,</span><span class="n">i</span><span class="p">],</span><span class="n">return_counts</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
             <span class="n">cnt</span><span class="o">=</span><span class="n">cnt</span><span class="o">/</span><span class="n">cnt</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
             <span class="n">Type_entropy</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">entropy</span><span class="p">(</span><span class="n">cnt</span><span class="p">,</span><span class="n">base</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span> 
 
-        <span class="bp">self</span><span class="o">.</span><span class="n">_lda</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">Type_entropy</span><span class="p">)][</span><span class="mi">0</span><span class="p">]</span>
-
+        <span class="bp">self</span><span class="o">.</span><span class="n">_lda</span> <span class="o">=</span> <span class="n">results</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">Type_entropy</span><span class="p">)][</span><span class="mi">0</span><span class="p">]</span>
         <span class="k">return</span> <span class="bp">self</span></div>
 
-
 <div class="viewcode-block" id="TopicClassifier.classify"><a class="viewcode-back" href="../../Analysis.html#Analysis.Classification.TopicClassifier.classify">[docs]</a>    <span class="k">def</span> <span class="nf">classify</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">data</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;classify based on fitted LDA&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;classify based on fitted LDA&quot;&quot;&quot;</span>
         <span class="n">topics_prob</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lda</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
-        <span class="n">topics</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">topics_prob</span><span class="p">,</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">topics</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">topics_prob</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 
         <span class="c1"># renumber topics </span>
-        <span class="n">unq</span><span class="p">,</span><span class="n">ix</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">topics</span><span class="p">,</span><span class="n">return_inverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">unq</span><span class="p">,</span><span class="n">ix</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">topics</span><span class="p">,</span> <span class="n">return_inverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="nb">id</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">unq</span><span class="p">))</span>
         <span class="n">topics</span> <span class="o">=</span> <span class="nb">id</span><span class="p">[</span><span class="n">ix</span><span class="p">]</span>
-
         <span class="k">return</span> <span class="n">topics</span></div></div>
+    
+<div class="viewcode-block" id="KnownCellTypeClassifier"><a class="viewcode-back" href="../../Analysis.html#Analysis.Classification.KnownCellTypeClassifier">[docs]</a><span class="k">class</span> <span class="nc">KnownCellTypeClassifier</span><span class="p">(</span><span class="n">Classifier</span><span class="p">):</span> 
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">TG</span><span class="p">,</span> 
+        <span class="n">tax_name</span><span class="o">=</span><span class="s1">&#39;known_celltypes&#39;</span><span class="p">,</span>
+        <span class="n">ref</span><span class="o">=</span><span class="s1">&#39;allen_smrt_dpnmf&#39;</span><span class="p">,</span> 
+        <span class="n">ref_levels</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;class_label&#39;</span><span class="p">,</span> <span class="s1">&#39;neighborhood_label&#39;</span><span class="p">,</span> <span class="s1">&#39;subclass_label&#39;</span><span class="p">,</span> <span class="s1">&#39;cluster_label&#39;</span><span class="p">],</span> 
+        <span class="n">model</span><span class="o">=</span><span class="s1">&#39;knn&#39;</span><span class="p">,</span>
+        <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        TG : TissueGraph</span>
+<span class="sd">            Required parameter - the TissueGraph object we&#39;re going to use for unsupervised clustering. </span>
+<span class="sd">            The TG is required to have a `TG.adata.layers[&#39;raw&#39;]` matrix</span>
+<span class="sd">        ref : </span>
+<span class="sd">            tag of a reference dataset, or path to a reference dataset (.h5ad)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># specific packages to this task</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">TG</span><span class="p">,</span> <span class="n">TissueGraph</span><span class="o">.</span><span class="n">TissueGraph</span><span class="p">):</span> 
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;This Classifier requires a (cell level) TissueGraph object as input&quot;</span><span class="p">)</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">tax</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tax</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">tax_name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_TG</span> <span class="o">=</span> <span class="n">TG</span> <span class="c1"># data</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ref_path</span> <span class="o">=</span> <span class="n">pathu</span><span class="o">.</span><span class="n">get_path</span><span class="p">(</span><span class="n">ref</span><span class="p">,</span> <span class="n">check</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="c1"># refdata</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ref_levels</span> <span class="o">=</span> <span class="n">ref_levels</span> 
+
+        <span class="c1"># model could be a string or simply sklearn classifier (many kinds)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s1">&#39;knn&#39;</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="n">KNeighborsClassifier</span><span class="p">(</span><span class="n">n_neighbors</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span> <span class="n">metric</span><span class="o">=</span><span class="s1">&#39;correlation&#39;</span><span class="p">)</span> <span class="c1"># metric &#39;cosine&#39; is also good</span>
+            <span class="k">elif</span> <span class="n">model</span> <span class="o">==</span> <span class="s1">&#39;svm&#39;</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="n">svm</span><span class="o">.</span><span class="n">SVC</span><span class="p">(</span><span class="n">kernel</span><span class="o">=</span><span class="s1">&#39;rbf&#39;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Need to choose from: `knn`, `svm`&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="n">model</span>
+
+        <span class="c1">#### TODO: subselect data by brain regions</span>
+
+        <span class="c1">#### preproc data</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Loading and preprocessing data&quot;</span><span class="p">)</span>
+        <span class="c1"># get ref data features</span>
+        <span class="n">ref_adata</span> <span class="o">=</span> <span class="n">anndata</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ref_path</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ref_ftrs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">ref_adata</span><span class="o">.</span><span class="n">X</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ref_lbls</span> <span class="o">=</span> <span class="n">ref_adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">ref_levels</span><span class="p">]</span><span class="o">.</span><span class="n">values</span> <span class="c1"># multiple levels</span>
+
+        <span class="c1"># pre normalize to get features</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ftrs</span> <span class="o">=</span> <span class="n">basicu</span><span class="o">.</span><span class="n">normalize_fishdata</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_TG</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">layers</span><span class="p">[</span><span class="s1">&#39;raw&#39;</span><span class="p">],</span> <span class="n">norm_cell</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">norm_basis</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> 
+
+
+<div class="viewcode-block" id="KnownCellTypeClassifier.train"><a class="viewcode-back" href="../../Analysis.html#Analysis.Classification.KnownCellTypeClassifier.train">[docs]</a>    <span class="k">def</span> <span class="nf">train</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+        <span class="n">run_func</span><span class="o">=</span><span class="s1">&#39;run&#39;</span><span class="p">,</span> <span class="c1"># baseline</span>
+        <span class="n">run_kwargs_perlevel</span><span class="o">=</span><span class="p">[</span><span class="nb">dict</span><span class="p">(</span><span class="n">norm</span><span class="o">=</span><span class="s1">&#39;per_bit_equalscale&#39;</span><span class="p">,</span> <span class="n">ranknorm</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">n_cells</span><span class="o">=</span><span class="mi">100</span><span class="p">)],</span> 
+        <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">ignore_internal_failure</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">lbls</span> <span class="o">=</span> <span class="n">celltypeu</span><span class="o">.</span><span class="n">iterative_classify</span><span class="p">(</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">ref_ftrs</span><span class="p">,</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">ref_lbls</span><span class="p">,</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">ftrs</span><span class="p">,</span>
+                        <span class="n">levels</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">ref_levels</span><span class="p">,</span> <span class="c1"># levels of cell types</span>
+                        <span class="n">run_func</span><span class="o">=</span><span class="n">run_func</span><span class="p">,</span> <span class="c1"># baseline</span>
+                        <span class="n">run_kwargs_perlevel</span><span class="o">=</span><span class="n">run_kwargs_perlevel</span><span class="p">,</span> 
+                        <span class="n">model</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">,</span>
+                        <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">,</span>
+                        <span class="n">ignore_internal_failure</span><span class="o">=</span><span class="n">ignore_internal_failure</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">TypeVec</span> <span class="o">=</span> <span class="n">lbls</span></div>
+        
+<div class="viewcode-block" id="KnownCellTypeClassifier.classify"><a class="viewcode-back" href="../../Analysis.html#Analysis.Classification.KnownCellTypeClassifier.classify">[docs]</a>    <span class="k">def</span> <span class="nf">classify</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">TypeVec</span></div></div>
 </pre></div>
 
             <div class="clearer"></div>
@@ -379,7 +430,7 @@
     </div>
     <div class="footer" role="contentinfo">
         &#169; Copyright 2022, Wollman lab.
-      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 5.0.1.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 6.0.0.
     </div>
   </body>
 </html>
