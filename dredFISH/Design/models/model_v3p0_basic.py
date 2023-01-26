@@ -433,12 +433,6 @@ class CellTypeNet(nn.Module):
                 self.train()
         return learning_crvs
 
-    """
-    Takes a nn.Module as input; initialize its weights depending on its type
-    In our case, only two basic components: Linear and Embedding
-    Embedding layers were initialized by N(0,1)
-    Linear layers (combined with ReLU) will be initialized below by He initialization (He et al. 2015)
-    """
 def init_weights(m):
     """
     Takes a nn.Module as input; initialize its weights depending on its type
