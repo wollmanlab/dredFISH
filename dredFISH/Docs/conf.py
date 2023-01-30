@@ -86,6 +86,8 @@ autodoc_mock_imports = [
     # 'torch.utils',
     # 'torch.utils.data',
     'zarr',
+
+    'nupack',
 ]
 
 # -- General configuration ---------------------------------------------------
