@@ -506,7 +506,7 @@ def check_run(XY,
     ccf_annot, 
     ccf_maps,
     idx_ccf, 
-    dataset="",
+    name="",
     flip=False, 
     plot=True,
     ):
@@ -514,7 +514,7 @@ def check_run(XY,
     ccf_template and ccf_annot are 3-dimensional matrices of the same shape
     """
     # initiation
-    data = RegData(dataset, XY)
+    data = RegData(name, XY)
     # rotate
     data.pca_rotate()
     if flip:
@@ -541,7 +541,7 @@ def real_run(XY,
     ccf_maps,
     idx_ccf, 
     flip=False, # depending on the check run -- do you need to flip it?
-    dataset='FISHdata', # a name
+    name='', # a name
     outprefix='', # output
     force=False, # force overwrite
     type_of_transform='SyNOnly', # SyNCC (CC) or SyNOnly (MI)
@@ -567,8 +567,8 @@ def real_run(XY,
     
     # outputs
     outprefix_affine = outprefix + 'affine_'
-    outprefix_syn = outprefix + 'syn_'
-    output = outprefix + 'registered.hdf5'
+    outprefix_syn    = outprefix + 'syn_'
+    output           = outprefix + 'registered.hdf5'
     logging.info(f"To generate: {outprefix_affine}\n {outprefix_syn}\n {output}")
 
     # preproc
@@ -577,7 +577,7 @@ def real_run(XY,
         ccf_annot, 
         ccf_maps,
         idx_ccf, 
-        dataset=dataset,
+        name=name,
         flip=flip, 
         plot=False,
     )
@@ -603,7 +603,7 @@ def real_run(XY,
     # add region ids to cells
     mask = data.img_ccf_annot
     region_ids = data.assign_region_ids(mask, mode='moved') # inv transform mask back to image (rotated and padded)
-    region_colors = basicu.encode_mat(region_ids, ccf_maps['colorhex'])
+    region_colors   = basicu.encode_mat(region_ids, ccf_maps['colorhex'])
     region_acronyms = basicu.encode_mat(region_ids, ccf_maps['acronym'])
 
     # change from "U"type strings to object so it is supported by h5py

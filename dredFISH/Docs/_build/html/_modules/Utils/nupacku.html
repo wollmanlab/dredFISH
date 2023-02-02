@@ -1,0 +1,241 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Utils.nupacku &#8212; dredFISH  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sphinxdoc.css" />
+    <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+    <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/sphinx_highlight.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">dredFISH  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Utils.nupacku</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for Utils.nupacku</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">nupack</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">Bio.Seq</span> <span class="kn">import</span> <span class="n">Seq</span>
+<span class="kn">from</span> <span class="nn">dredFISH.Utils</span> <span class="kn">import</span> <span class="n">sequ</span>
+
+<div class="viewcode-block" id="tabulate_results"><a class="viewcode-back" href="../../Utils.html#Utils.nupacku.tabulate_results">[docs]</a><span class="k">def</span> <span class="nf">tabulate_results</span><span class="p">(</span><span class="n">tube_results</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;t1&#39;</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Turn nupack output into a pandas Series</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        tube_results (nupack.named.Result): nupack result object</span>
+<span class="sd">        name (str, optional): tube name (input to nupack). Defaults to &#39;t1&#39;.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        pandas.series: concentration for each complex</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">conc</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">({</span><span class="n">key</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s2">&quot;()&quot;</span><span class="p">):</span> <span class="n">item</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">item</span> <span class="ow">in</span> 
+            <span class="n">tube_results</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">complex_concentrations</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+           <span class="p">})</span>
+    <span class="k">return</span> <span class="n">conc</span></div>
+    
+<div class="viewcode-block" id="summarize"><a class="viewcode-back" href="../../Utils.html#Utils.nupacku.summarize">[docs]</a><span class="k">def</span> <span class="nf">summarize</span><span class="p">(</span><span class="n">conc</span><span class="p">,</span> <span class="n">readout_i</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;summarize the nupack result Series</span>
+<span class="sd">    it assumes a pair-wise simulation with the following initial elements:</span>
+<span class="sd">        - e0, e1, e2, ..., ej, ....</span>
+<span class="sd">        - r{i}</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        conc (pandas.Series): concentrations for each complex; assumed to have r{i}+e{j} etc...</span>
+<span class="sd">        readout_i (int): which type of labels to pull statistics from</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple: (precision, usage, recall)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">lbl_signal</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;r</span><span class="si">{</span><span class="n">readout_i</span><span class="si">}</span><span class="s1">+e</span><span class="si">{</span><span class="n">readout_i</span><span class="si">}</span><span class="s1">&#39;</span>
+    <span class="n">lbl_signal2</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;e</span><span class="si">{</span><span class="n">readout_i</span><span class="si">}</span><span class="s1">+r</span><span class="si">{</span><span class="n">readout_i</span><span class="si">}</span><span class="s1">&#39;</span>
+    
+    <span class="n">lbl_floating</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s1">&#39;r</span><span class="si">{</span><span class="n">readout_i</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span>
+                    <span class="sa">f</span><span class="s1">&#39;r</span><span class="si">{</span><span class="n">readout_i</span><span class="si">}</span><span class="s1">+r</span><span class="si">{</span><span class="n">readout_i</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span>
+                   <span class="p">]</span>
+    
+    <span class="c1">### this was flawed</span>
+    <span class="n">total</span>   <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span>
+                <span class="n">conc</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">regex</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;^r</span><span class="si">{</span><span class="n">readout_i</span><span class="si">}</span><span class="s1">\+&#39;</span><span class="p">),</span>
+                <span class="n">conc</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">regex</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;\+r</span><span class="si">{</span><span class="n">readout_i</span><span class="si">}</span><span class="s1">$&#39;</span><span class="p">),</span>
+                <span class="n">conc</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">regex</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;^r</span><span class="si">{</span><span class="n">readout_i</span><span class="si">}</span><span class="s1">$&#39;</span><span class="p">),</span>
+                <span class="p">])</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>  <span class="c1"># all terms with r</span>
+    
+    <span class="n">total_e</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span>
+                <span class="n">conc</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">regex</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;^e</span><span class="si">{</span><span class="n">readout_i</span><span class="si">}</span><span class="s1">\+&#39;</span><span class="p">),</span>
+                <span class="n">conc</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">regex</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;\+e</span><span class="si">{</span><span class="n">readout_i</span><span class="si">}</span><span class="s1">$&#39;</span><span class="p">),</span>
+                <span class="n">conc</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">regex</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;^e</span><span class="si">{</span><span class="n">readout_i</span><span class="si">}</span><span class="s1">$&#39;</span><span class="p">),</span>
+                <span class="p">])</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>  <span class="c1"># all terms with e</span>
+    <span class="c1">### this was flawed </span>
+    
+    <span class="k">if</span> <span class="n">lbl_signal</span> <span class="ow">in</span> <span class="n">conc</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">values</span><span class="p">:</span>
+        <span class="n">signal</span> <span class="o">=</span> <span class="n">conc</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">lbl_signal</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="n">lbl_signal2</span> <span class="ow">in</span> <span class="n">conc</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">values</span><span class="p">:</span>
+        <span class="n">signal</span> <span class="o">=</span> <span class="n">conc</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">lbl_signal2</span><span class="p">]</span>
+        
+    <span class="n">floating</span> <span class="o">=</span> <span class="n">conc</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">lbl_floating</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    
+    <span class="n">usage</span> <span class="o">=</span> <span class="n">signal</span><span class="o">/</span><span class="n">total</span> <span class="c1"># fraction of provided r that goes to signal</span>
+    <span class="n">precision</span> <span class="o">=</span> <span class="n">signal</span><span class="o">/</span><span class="p">(</span><span class="n">total</span><span class="o">-</span><span class="n">floating</span><span class="p">)</span> <span class="c1"># fraction of correct binding</span>
+    <span class="n">recall</span> <span class="o">=</span> <span class="n">signal</span><span class="o">/</span><span class="n">total_e</span>
+    
+    <span class="k">return</span> <span class="n">precision</span><span class="p">,</span> <span class="n">usage</span><span class="p">,</span> <span class="n">recall</span></div>
+
+<div class="viewcode-block" id="summarize_heatmap_fast"><a class="viewcode-back" href="../../Utils.html#Utils.nupacku.summarize_heatmap_fast">[docs]</a><span class="k">def</span> <span class="nf">summarize_heatmap_fast</span><span class="p">(</span><span class="n">conc</span><span class="p">,</span> <span class="n">readout_i</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;get r{i}+e{j} where j goes from 0 to n</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        conc (pandas.Series): _description_</span>
+<span class="sd">        readout_i (int): _description_</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        numpy.ndarray: r{i} vs e{j} with all j</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">case1</span> <span class="o">=</span> <span class="n">conc</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">regex</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;^r</span><span class="si">{</span><span class="n">readout_i</span><span class="si">}</span><span class="s1">\+e&#39;</span><span class="p">)</span>  <span class="c1"># r0+e...</span>
+    <span class="n">newidx1</span> <span class="o">=</span> <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">lbl</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;+&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">:])</span> <span class="k">for</span> <span class="n">lbl</span> <span class="ow">in</span> <span class="n">case1</span><span class="o">.</span><span class="n">index</span><span class="p">]</span>
+    
+    <span class="n">case2</span> <span class="o">=</span> <span class="n">conc</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">regex</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;^e[0-9]+\+r</span><span class="si">{</span><span class="n">readout_i</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span> <span class="c1"># e..+r0</span>
+    <span class="n">newidx2</span> <span class="o">=</span> <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">lbl</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;+&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">:])</span> <span class="k">for</span> <span class="n">lbl</span> <span class="ow">in</span> <span class="n">case2</span><span class="o">.</span><span class="n">index</span><span class="p">]</span>
+    
+    <span class="n">vec</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">case1</span><span class="p">)</span><span class="o">+</span><span class="nb">len</span><span class="p">(</span><span class="n">case2</span><span class="p">))</span>
+    <span class="n">vec</span><span class="p">[</span><span class="n">newidx1</span><span class="p">]</span> <span class="o">=</span> <span class="n">case1</span><span class="o">.</span><span class="n">values</span>
+    <span class="n">vec</span><span class="p">[</span><span class="n">newidx2</span><span class="p">]</span> <span class="o">=</span> <span class="n">case2</span><span class="o">.</span><span class="n">values</span>
+    <span class="k">return</span> <span class="n">vec</span></div>
+
+<div class="viewcode-block" id="run_n_readouts"><a class="viewcode-back" href="../../Utils.html#Utils.nupacku.run_n_readouts">[docs]</a><span class="k">def</span> <span class="nf">run_n_readouts</span><span class="p">(</span><span class="n">seqs_rdt</span><span class="p">,</span> <span class="n">seqs_enc</span><span class="p">,</span> <span class="n">seqs_tag</span><span class="p">,</span> <span class="n">conc_r</span><span class="p">,</span> <span class="n">conc_e</span><span class="p">,</span> 
+                   <span class="n">ts</span><span class="o">=</span><span class="p">[</span><span class="mi">25</span><span class="p">,</span> <span class="mi">30</span><span class="p">,</span> <span class="mi">35</span><span class="p">,</span> <span class="mi">40</span><span class="p">,</span> <span class="mi">45</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">55</span><span class="p">,</span> <span class="mi">60</span><span class="p">,</span> <span class="mi">65</span><span class="p">,</span> <span class="mi">70</span><span class="p">,</span> <span class="mi">75</span><span class="p">],</span>
+                   <span class="n">adaptive</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Run n readouts one at a time.</span>
+<span class="sd">    Each tube has all the encoding probes (e{j} with all js) and one readout probe r{i}</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        seqs_rdt (numpy.ndarray): a string array</span>
+<span class="sd">        seqs_enc (numpy.ndarray): a string array -- complementary to the above</span>
+<span class="sd">        seqs_tag (numpy.ndarray): names for each seq pair</span>
+<span class="sd">        conc_r (float): concentration, in M (molar)</span>
+<span class="sd">        conc_e (float): concentration, in M (molar)</span>
+<span class="sd">        ts (list, optional): list of temperatures (Celsius) to test. Defaults to [25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75].</span>
+<span class="sd">        adaptive (bool, optional): _description_. Defaults to False.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple: (res, emap) -- results pandas DataFrame; numpy array for Ri-Ej</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">num_tubes</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">seqs_rdt</span><span class="p">)</span>
+    
+    <span class="c1"># specify strands</span>
+    <span class="n">strands_e</span> <span class="o">=</span> <span class="p">[</span><span class="n">nupack</span><span class="o">.</span><span class="n">Strand</span><span class="p">(</span><span class="n">seq_enc</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;e</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> 
+                 <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">seq_enc</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">seqs_enc</span><span class="p">)]</span>
+    
+    <span class="n">tubes</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">tube_idx</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">num_tubes</span><span class="p">):</span>
+        <span class="n">readout_i</span> <span class="o">=</span> <span class="n">tube_idx</span>
+        <span class="n">tube_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;tube</span><span class="si">{</span><span class="n">tube_idx</span><span class="si">}</span><span class="s1">&#39;</span>
+        <span class="n">strand_r</span> <span class="o">=</span> <span class="n">nupack</span><span class="o">.</span><span class="n">Strand</span><span class="p">(</span><span class="n">seqs_rdt</span><span class="p">[</span><span class="n">readout_i</span><span class="p">],</span> <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;r</span><span class="si">{</span><span class="n">readout_i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">adaptive</span><span class="p">:</span>
+            <span class="n">strands_tube</span> <span class="o">=</span> <span class="p">{</span><span class="n">strand</span><span class="p">:</span> <span class="n">conc_e</span> <span class="k">for</span> <span class="n">strand</span> <span class="ow">in</span> 
+                            <span class="n">strands_e</span><span class="p">[</span><span class="n">readout_i</span><span class="p">:]}</span> <span class="c1"># exclude previous</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">strands_tube</span> <span class="o">=</span> <span class="p">{</span><span class="n">strand</span><span class="p">:</span> <span class="n">conc_e</span> <span class="k">for</span> <span class="n">strand</span> <span class="ow">in</span> 
+                            <span class="n">strands_e</span><span class="p">}</span> <span class="c1"># include all</span>
+        <span class="n">strands_tube</span><span class="p">[</span><span class="n">strand_r</span><span class="p">]</span> <span class="o">=</span> <span class="n">conc_r</span>
+        <span class="n">tube</span> <span class="o">=</span> <span class="n">nupack</span><span class="o">.</span><span class="n">Tube</span><span class="p">(</span><span class="n">strands</span><span class="o">=</span><span class="n">strands_tube</span><span class="p">,</span>  
+                         <span class="n">complexes</span><span class="o">=</span><span class="n">nupack</span><span class="o">.</span><span class="n">SetSpec</span><span class="p">(</span><span class="n">max_size</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span> 
+                         <span class="n">name</span><span class="o">=</span><span class="n">tube_name</span><span class="p">)</span>
+        <span class="n">tubes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">tube</span><span class="p">)</span>
+    
+    <span class="c1"># analyze with different model temperatures</span>
+    <span class="n">res</span> <span class="o">=</span> <span class="p">[]</span> 
+    <span class="n">emaps</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">ts</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;&gt;&#39;</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">)</span>
+        <span class="n">emaps</span><span class="p">[</span><span class="n">t</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="n">nupack</span><span class="o">.</span><span class="n">Model</span><span class="p">(</span><span class="n">material</span><span class="o">=</span><span class="s1">&#39;dna&#39;</span><span class="p">,</span> 
+                              <span class="n">celsius</span><span class="o">=</span><span class="n">t</span><span class="p">,</span>
+                              <span class="n">sodium</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span>
+                             <span class="p">)</span>
+        <span class="n">tube_results</span> <span class="o">=</span> <span class="n">nupack</span><span class="o">.</span><span class="n">tube_analysis</span><span class="p">(</span><span class="n">tubes</span><span class="o">=</span><span class="n">tubes</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">)</span>
+        
+        <span class="k">for</span> <span class="n">tube_idx</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">num_tubes</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">)</span>
+            <span class="n">readout_i</span> <span class="o">=</span> <span class="n">tube_idx</span>
+            <span class="n">tube_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;tube</span><span class="si">{</span><span class="n">tube_idx</span><span class="si">}</span><span class="s1">&#39;</span>
+            <span class="n">conc</span> <span class="o">=</span> <span class="n">tabulate_results</span><span class="p">(</span><span class="n">tube_results</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">tube_name</span><span class="p">)</span>
+            <span class="n">precision</span><span class="p">,</span> <span class="n">usage</span><span class="p">,</span> <span class="n">recall</span> <span class="o">=</span> <span class="n">summarize</span><span class="p">(</span><span class="n">conc</span><span class="p">,</span> <span class="n">readout_i</span><span class="p">)</span>
+            <span class="n">emap</span> <span class="o">=</span> <span class="n">summarize_heatmap_fast</span><span class="p">(</span><span class="n">conc</span><span class="p">,</span> <span class="n">readout_i</span><span class="p">)</span>
+            <span class="n">emaps</span><span class="p">[</span><span class="n">t</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">emap</span><span class="p">)</span>
+            <span class="n">res</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s1">&#39;t&#39;</span><span class="p">:</span> <span class="n">t</span><span class="p">,</span>
+                        <span class="s1">&#39;index&#39;</span><span class="p">:</span> <span class="n">tube_idx</span><span class="p">,</span>
+                        <span class="s1">&#39;tube&#39;</span><span class="p">:</span> <span class="n">tube_name</span><span class="p">,</span>
+                        <span class="s1">&#39;hybe&#39;</span><span class="p">:</span> <span class="n">seqs_tag</span><span class="p">[</span><span class="n">readout_i</span><span class="p">],</span>
+                        <span class="s1">&#39;precision&#39;</span><span class="p">:</span> <span class="n">precision</span><span class="p">,</span>
+                        <span class="s1">&#39;usage&#39;</span><span class="p">:</span> <span class="n">usage</span><span class="p">,</span>
+                        <span class="s1">&#39;recall&#39;</span><span class="p">:</span> <span class="n">recall</span><span class="p">,</span>
+                       <span class="p">})</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+
+    <span class="n">res</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">res</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">res</span><span class="p">,</span> <span class="n">emaps</span></div>
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">dredFISH  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Utils.nupacku</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2022, Wollman lab.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 6.0.0.
+    </div>
+  </body>
+</html>

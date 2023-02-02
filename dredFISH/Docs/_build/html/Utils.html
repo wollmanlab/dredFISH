@@ -204,6 +204,102 @@ axis=1 # zscore across cols for each row  (if v is 2-dimensional)</p>
 </dd></dl>
 
 </section>
+<section id="module-Utils.nupacku">
+<span id="utils-nupacku"></span><h2>Utils.nupacku<a class="headerlink" href="#module-Utils.nupacku" title="Permalink to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.nupacku.run_n_readouts">
+<span class="sig-prename descclassname"><span class="pre">Utils.nupacku.</span></span><span class="sig-name descname"><span class="pre">run_n_readouts</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">seqs_rdt</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seqs_enc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seqs_tag</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conc_r</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conc_e</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ts</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[25,</span> <span class="pre">30,</span> <span class="pre">35,</span> <span class="pre">40,</span> <span class="pre">45,</span> <span class="pre">50,</span> <span class="pre">55,</span> <span class="pre">60,</span> <span class="pre">65,</span> <span class="pre">70,</span> <span class="pre">75]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">adaptive</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/nupacku.html#run_n_readouts"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.nupacku.run_n_readouts" title="Permalink to this definition">¶</a></dt>
+<dd><p>Run n readouts one at a time.
+Each tube has all the encoding probes (e{j} with all js) and one readout probe r{i}</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>seqs_rdt</strong> (<em>numpy.ndarray</em>) – a string array</p></li>
+<li><p><strong>seqs_enc</strong> (<em>numpy.ndarray</em>) – a string array – complementary to the above</p></li>
+<li><p><strong>seqs_tag</strong> (<em>numpy.ndarray</em>) – names for each seq pair</p></li>
+<li><p><strong>conc_r</strong> (<em>float</em>) – concentration, in M (molar)</p></li>
+<li><p><strong>conc_e</strong> (<em>float</em>) – concentration, in M (molar)</p></li>
+<li><p><strong>ts</strong> (<em>list</em><em>, </em><em>optional</em>) – list of temperatures (Celsius) to test. Defaults to [25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75].</p></li>
+<li><p><strong>adaptive</strong> (<em>bool</em><em>, </em><em>optional</em>) – _description_. Defaults to False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>(res, emap) – results pandas DataFrame; numpy array for Ri-Ej</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.nupacku.summarize">
+<span class="sig-prename descclassname"><span class="pre">Utils.nupacku.</span></span><span class="sig-name descname"><span class="pre">summarize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">readout_i</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/nupacku.html#summarize"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.nupacku.summarize" title="Permalink to this definition">¶</a></dt>
+<dd><p>summarize the nupack result Series
+it assumes a pair-wise simulation with the following initial elements:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>e0, e1, e2, …, ej, ….</p></li>
+<li><p>r{i}</p></li>
+</ul>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>conc</strong> (<em>pandas.Series</em>) – concentrations for each complex; assumed to have r{i}+e{j} etc…</p></li>
+<li><p><strong>readout_i</strong> (<em>int</em>) – which type of labels to pull statistics from</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>(precision, usage, recall)</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.nupacku.summarize_heatmap_fast">
+<span class="sig-prename descclassname"><span class="pre">Utils.nupacku.</span></span><span class="sig-name descname"><span class="pre">summarize_heatmap_fast</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">readout_i</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/nupacku.html#summarize_heatmap_fast"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.nupacku.summarize_heatmap_fast" title="Permalink to this definition">¶</a></dt>
+<dd><p>get r{i}+e{j} where j goes from 0 to n</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>conc</strong> (<em>pandas.Series</em>) – _description_</p></li>
+<li><p><strong>readout_i</strong> (<em>int</em>) – _description_</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>r{i} vs e{j} with all j</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>numpy.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="Utils.nupacku.tabulate_results">
+<span class="sig-prename descclassname"><span class="pre">Utils.nupacku.</span></span><span class="sig-name descname"><span class="pre">tabulate_results</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tube_results</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'t1'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/Utils/nupacku.html#tabulate_results"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#Utils.nupacku.tabulate_results" title="Permalink to this definition">¶</a></dt>
+<dd><p>Turn nupack output into a pandas Series</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>tube_results</strong> (<em>nupack.named.Result</em>) – nupack result object</p></li>
+<li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – tube name (input to nupack). Defaults to ‘t1’.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>concentration for each complex</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pandas.series</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
 <section id="module-Utils.celltypeu">
 <span id="utils-celltypeu"></span><h2>Utils.celltypeu<a class="headerlink" href="#module-Utils.celltypeu" title="Permalink to this heading">¶</a></h2>
 <dl class="py class">
@@ -415,6 +511,13 @@ gives order to samples by hierarical clustering</p>
 <li><a class="reference internal" href="#Utils.basicu.stratified_sample_withrep"><code class="docutils literal notranslate"><span class="pre">stratified_sample_withrep()</span></code></a></li>
 <li><a class="reference internal" href="#Utils.basicu.swap_mask"><code class="docutils literal notranslate"><span class="pre">swap_mask()</span></code></a></li>
 <li><a class="reference internal" href="#Utils.basicu.zscore"><code class="docutils literal notranslate"><span class="pre">zscore()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-Utils.nupacku">Utils.nupacku</a><ul>
+<li><a class="reference internal" href="#Utils.nupacku.run_n_readouts"><code class="docutils literal notranslate"><span class="pre">run_n_readouts()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.nupacku.summarize"><code class="docutils literal notranslate"><span class="pre">summarize()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.nupacku.summarize_heatmap_fast"><code class="docutils literal notranslate"><span class="pre">summarize_heatmap_fast()</span></code></a></li>
+<li><a class="reference internal" href="#Utils.nupacku.tabulate_results"><code class="docutils literal notranslate"><span class="pre">tabulate_results()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#module-Utils.celltypeu">Utils.celltypeu</a><ul>

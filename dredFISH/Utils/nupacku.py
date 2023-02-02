@@ -2,7 +2,32 @@ import nupack
 import pandas as pd
 import numpy as np
 from Bio.Seq import Seq
+from scipy.special import comb
+
 from dredFISH.Utils import sequ
+
+
+def get_num_combinations(n):
+    """get number of expected complex
+
+    Args:
+        n (int): number of ingredients
+
+    Returns:
+        float: number of resulting complex (single, self-bind, cross-bind)
+    """
+    return n+n+comb(n,2)
+
+def get_rcseq(seq):
+    """reverse complement
+
+    Args:
+        seq (str): _description_
+
+    Returns:
+        str: _description_
+    """
+    return str(Seq(seq).reverse_complement())
 
 def tabulate_results(tube_results, name='t1'):
     """Turn nupack output into a pandas Series
@@ -18,6 +43,42 @@ def tabulate_results(tube_results, name='t1'):
             tube_results[name].complex_concentrations.items()
            })
     return conc
+
+def assign_group(index):
+    """_summary_
+
+    Args:
+        index (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    if "+" not in index:
+        label = "single"
+    else:
+        a, b = index.split('+')
+        if a == b:
+            label = "self-bind"
+        else:
+            label = "cross-bind"
+            
+    return label
+
+def organize_raw_conc_table(conc, baseconc):
+    """_summary_
+
+    Args:
+        conc (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    resfancy = conc.sort_values(ascending=False).to_frame("conc")
+    resfancy['order'] = np.arange(len(resfancy))
+    resfancy["log10frac"] = np.log10(resfancy['conc']/baseconc)
+    resfancy["group"] = [assign_group(idx) for idx in resfancy.index.values]
+
+    return resfancy
     
 def summarize(conc, readout_i):
     """summarize the nupack result Series
@@ -87,34 +148,86 @@ def summarize_heatmap_fast(conc, readout_i):
     vec[newidx2] = case2.values
     return vec
 
-def run_n_readouts(seqs_rdt, seqs_enc, seqs_tag, conc_r, conc_e, 
-                   ts=[25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75],
-                   adaptive=False):
-    """Run n readouts one at a time.
-    Each tube has all the encoding probes (e{j} with all js) and one readout probe r{i}
+def simulate_nupack(seqs_enc, readout_i, conc_r, conc_e, t=37, sodium=0.3, tube_name='t1'):
+    """Run 1 simulation
+    with many encodings; 1 readout (complement to 1 of the encodings)
+    The tube has all the encoding probes (e{j} with all js) and one readout probe r{i}
 
     Args:
-        seqs_rdt (numpy.ndarray): a string array
         seqs_enc (numpy.ndarray): a string array -- complementary to the above
-        seqs_tag (numpy.ndarray): names for each seq pair
+        readout_i (int): index in seqs_enc whose reverse complement will be added
         conc_r (float): concentration, in M (molar)
         conc_e (float): concentration, in M (molar)
-        ts (list, optional): list of temperatures (Celsius) to test. Defaults to [25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75].
+        sodium (float, optional): concentration, in M. Defaults to 0.3.
+        t (int, optional): temperature in Celsius. Defaults to 37.
+
+    Returns:
+        _type_: _description_
+    """
+    # specify strands
+    seq_rdt = get_rcseq(seqs_enc[readout_i])
+
+    strands_e = [nupack.Strand(seq_enc, name=f"e{i}") 
+                 for i, seq_enc in enumerate(seqs_enc)]
+    strand_r = nupack.Strand(seq_rdt, name=f"r{readout_i}")
+
+    strands_tube = {strand: conc_e for strand in 
+                    strands_e} # include all
+    strands_tube[strand_r] = conc_r
+
+    tube = nupack.Tube(strands=strands_tube,  
+                        complexes=nupack.SetSpec(max_size=2), 
+                        name=tube_name)
+    
+    # analyze with different model temperatures
+    model = nupack.Model(material='dna', 
+                            celsius=t,
+                            sodium=sodium,
+                            )
+    tube_results = nupack.tube_analysis(tubes=[tube], model=model)
+    # res = tabulate_results_fancy(tube_results, name=tube_name)
+
+    return tube_results 
+
+def simulate_cross_binding(
+                    seqs_enc, 
+                    seqs_tag=None, 
+                    conc_e=1e-11,
+                    conc_r=1e-9,
+                    temps=[37], # [25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75],
+                    sodium=0.3,
+                    material='dna',
+                    adaptive=False):
+    """Given a list of sequences, we simulate the scenario where
+    all those sequences are present in a tube (encoding probes), while introducing the reverse complement (readout)
+    one at a time in separate tubes.
+
+    Each tube has all the encoding probes (e{j} for all js) and one readout probe r{i}.
+
+    Args:
+        seqs_enc (numpy.ndarray): a list of string
+        seqs_tag (numpy.ndarray, optional): names for each seq, defaults to None.
+        conc_e (float, optional): concentration, in M (molar), defaults to 1e-11 (0.01 nM)
+        conc_r (float, optional): concentration, in M (molar), defaults to 1e-9  (1 nM)
+        temps (list, optional): list of temperatures (Celsius) to test. Defaults to [25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75].
+        sodium (float, optional): sodium concentration, in M (molar).
         adaptive (bool, optional): _description_. Defaults to False.
 
     Returns:
-        tuple: (res, emap) -- results pandas DataFrame; numpy array for Ri-Ej
+        tuple: (res, emap, raw_concs, tms) results pandas DataFrame; numpy array for Ri-Ej; dictionary of raw concentrations.
     """
-    num_tubes = len(seqs_rdt)
-    
-    # specify strands
+    num_tubes = len(seqs_enc)
+    if seqs_tag is None:
+        seqs_tag = np.arange(num_tubes)
+
+    seqs_rdt = np.array([get_rcseq(seq_enc) for seq_enc in seqs_enc])
+    # one readout probe per tube
     strands_e = [nupack.Strand(seq_enc, name=f"e{i}") 
                  for i, seq_enc in enumerate(seqs_enc)]
-    
+
+    tms = [sequ.get_tm(x, Na=sodium*1e3, dnac1=conc_r*1e9, dnac2=conc_e*1e9, fmd=0) for x in seqs_enc]
     tubes = []
-    for tube_idx in np.arange(num_tubes):
-        readout_i = tube_idx
-        tube_name = f'tube{tube_idx}'
+    for readout_i in np.arange(num_tubes):
         strand_r = nupack.Strand(seqs_rdt[readout_i], name=f"r{readout_i}")
         if adaptive:
             strands_tube = {strand: conc_e for strand in 
@@ -125,33 +238,37 @@ def run_n_readouts(seqs_rdt, seqs_enc, seqs_tag, conc_r, conc_e,
         strands_tube[strand_r] = conc_r
         tube = nupack.Tube(strands=strands_tube,  
                          complexes=nupack.SetSpec(max_size=2), 
-                         name=tube_name)
+                         name=f'tube{readout_i}')
         tubes.append(tube)
     
     # analyze with different model temperatures
     res = [] 
     emaps = {}
-    for t in ts:
+    raw_concs = {}
+    for t in temps:
         print('>', end='')
+        raw_concs[t] = {}
         emaps[t] = []
-        model = nupack.Model(material='dna', 
-                              celsius=t,
-                              sodium=0.3,
-                             )
+        model = nupack.Model(material=material, 
+                             celsius=t,
+                             sodium=sodium,
+                            )
         tube_results = nupack.tube_analysis(tubes=tubes, model=model)
         
-        for tube_idx in np.arange(num_tubes):
+        for readout_i in np.arange(num_tubes):
             print('.', end='')
-            readout_i = tube_idx
-            tube_name = f'tube{tube_idx}'
-            conc = tabulate_results(tube_results, name=tube_name)
-            precision, usage, recall = summarize(conc, readout_i)
+            conc = tabulate_results(tube_results, name=f'tube{readout_i}')
             emap = summarize_heatmap_fast(conc, readout_i)
+            precision, usage, recall = summarize(conc, readout_i)
+            conc_fancy = organize_raw_conc_table(conc, conc_e)
+
+            raw_concs[t][readout_i] = conc_fancy
             emaps[t].append(emap)
-            res.append({'t': t,
-                        'index': tube_idx,
-                        'tube': tube_name,
-                        'hybe': seqs_tag[readout_i],
+            res.append({
+                        'readout_idx': readout_i,
+                        'readout_tag': seqs_tag[readout_i],
+                        'tm': tms[readout_i],
+                        't': t,
                         'precision': precision,
                         'usage': usage,
                         'recall': recall,
@@ -159,4 +276,4 @@ def run_n_readouts(seqs_rdt, seqs_enc, seqs_tag, conc_r, conc_e,
         print("")
 
     res = pd.DataFrame(res)
-    return res, emaps
+    return res, emaps, raw_concs, tms

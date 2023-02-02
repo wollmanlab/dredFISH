@@ -88,6 +88,7 @@ autodoc_mock_imports = [
     'zarr',
 
     'nupack',
+    'Bio',
 ]
 
 # -- General configuration ---------------------------------------------------

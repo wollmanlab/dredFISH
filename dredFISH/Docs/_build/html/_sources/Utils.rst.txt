@@ -8,6 +8,13 @@ Utils.basicu
    :undoc-members:
    :show-inheritance:
 
+Utils.nupacku
+------------------------
+.. automodule:: Utils.nupacku
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Utils.celltypeu
 ------------------------
 .. automodule:: Utils.celltypeu

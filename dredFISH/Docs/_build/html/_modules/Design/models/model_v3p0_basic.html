@@ -468,14 +468,8 @@
                                     <span class="s1">&#39;fine_acc_eval&#39;</span><span class="p">:</span> <span class="n">fine_acc_eval</span><span class="o">.</span><span class="n">item</span><span class="p">(),</span>
                                 <span class="p">}</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
-        <span class="k">return</span> <span class="n">learning_crvs</span></div>
+        <span class="k">return</span> <span class="n">learning_crvs</span></div></div>
 
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Takes a nn.Module as input; initialize its weights depending on its type</span>
-<span class="sd">    In our case, only two basic components: Linear and Embedding</span>
-<span class="sd">    Embedding layers were initialized by N(0,1)</span>
-<span class="sd">    Linear layers (combined with ReLU) will be initialized below by He initialization (He et al. 2015)</span>
-<span class="sd">    &quot;&quot;&quot;</span></div>
 <div class="viewcode-block" id="init_weights"><a class="viewcode-back" href="../../../Design.html#Design.models.model_v3p0_basic.init_weights">[docs]</a><span class="k">def</span> <span class="nf">init_weights</span><span class="p">(</span><span class="n">m</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Takes a nn.Module as input; initialize its weights depending on its type</span>
