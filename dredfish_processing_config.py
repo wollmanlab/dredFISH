@@ -1,4 +1,5 @@
 import numpy as np
+import logging
 # Basic parameters of imaging
 bitmap = [('RS0109_cy5', 'hybe2', 'FarRed'),
          ('RS0175_cy5', 'hybe3', 'FarRed'),
@@ -30,21 +31,17 @@ bitmap = [('RS0109_cy5', 'hybe2', 'FarRed'),
 nbits = len(bitmap)
 parameters = {}
 # """ Old Microscope Setup"""
-# parameters['camera_direction'] = [-1,-1] # NEW [-1,1] # OLD [-1,-1]
 # parameters['pixel_size'] = 0.327 # um 490 or 330
 # parameters['stitch_rotate'] = 1 # NEW 0
 # parameters['stitch_flipud'] = False# NEW False
 # parameters['stitch_fliplr'] = True# NEW True
-# parameters['flipxy'] = True
 # parameters['register_stitch_reference'] = False
 
 """ New Microscope Setup"""
-parameters['camera_direction'] = [-1,1] # NEW [-1,1] # OLD [-1,-1]
 parameters['pixel_size'] =0.490# 0.490#0.327#0.490 # um 490 or 330
 parameters['stitch_rotate'] = 0# NEW0 # NEW 0
 parameters['stitch_flipud'] = False# NEW False
 parameters['stitch_fliplr'] = True# NEW True
-parameters['flipxy'] = False# NEW False # OLD True
 parameters['register_stitch_reference'] = True
 
 parameters['segment_gpu'] = False
@@ -55,34 +52,20 @@ parameters['segment_diameter'] = parameters['diameter']/parameters['pixel_size']
 parameters['nucstain_channel'] = 'DeepBlue'
 parameters['nucstain_acq'] = 'hybe1'
 parameters['total_channel'] = 'FarRed'
-parameters['total_acq'] = 'all' #'hybe25'
+parameters['total_acq'] = 'hybe25' #'hybe25'
 parameters['overwrite'] = False #False
 parameters['segment_overwrite'] = False #False
-parameters['non_cell_overwrite'] = False #False
 parameters['vector_overwrite'] = False #False
-parameters['batches'] = 2000 #"Number of batches"
-parameters['ncpu'] = 3#5 #"Number of threads"
-parameters['nregions'] = 2#4 #"Number of Regions/Sections"
-parameters['results'] = 'Results' #"Path to save data"
-parameters['outpath'] = '/bigstore/GeneralStorage/Data/dredFISH/' #"Path to save data"
-parameters['resolution'] = 100 #"resolution to round centroid before naming regions"
-parameters['flip'] = False #"Flip Section when centering and rotating"
-parameters['non_cell_percentile'] = 5 # Percentile of Image that can be assumed to be non cell
-parameters['save_processed_images'] = False
-parameters['save_stitched_images'] = False
+parameters['outpath'] = '/greendata/GeneralStorage/Data/dredFISH/' #"Path to save data"
 parameters['nuclei_size_threshold'] = parameters['segment_diameter']*2
-parameters['section'] = ''
-parameters['signal_method'] = 'median'
 parameters['ratio'] = parameters['pixel_size']/parameters['QC_pixel_size']
-parameters['visualize'] = False 
 parameters['n_pixels']=np.array([2448, 2048])
 parameters['border'] = 1000
-parameters['segment_type'] = 'cyto2'#'cyto2'
 parameters['highpass_sigma'] = 25
 parameters['highpass_function'] = 'rolling_ball'
 parameters['highpass_smooth_function'] = 'rolling_ball'
-parameters['strip'] = False
+parameters['strip'] = True
 parameters['highpass_smooth'] = 1
-parameters['FF'] = True
 parameters['model_types'] = ['total','nuclei','cytoplasm']
-parameters['dapi_thresh'] = 5000
+parameters['dapi_thresh'] = 100
+parameters['processing_log_level'] = logging.DEBUG
