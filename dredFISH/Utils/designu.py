@@ -27,7 +27,7 @@ def get_r2_torch(tnsr_true, tnsr_pred, zero_tol=1e-10):
     r2 = 1-mse/torch.clamp(var, min=zero_tol)
     return r2
 
-def plot_enc(pmat, fpmat, title=""):
+def plot_enc(pmat, title=""):
     """
     """
     pm = sns.color_palette('husl', n_colors=pmat.shape[1])
@@ -37,6 +37,7 @@ def plot_enc(pmat, fpmat, title=""):
         ax_dict = fig.subplot_mosaic("AACBBB")
         ax = ax_dict['A']
         # fig, ax = plt.subplots(figsize=(6,8))
+        fpmat = pmat.divide(pmat.sum(axis=0), axis=1)
         _mat, _row, _col = basicu.diag_matrix_rows(fpmat.values)
         nmat = len(_mat)
         sns.heatmap(pd.DataFrame(_mat, columns=_col), 
@@ -49,7 +50,7 @@ def plot_enc(pmat, fpmat, title=""):
         ax.set_xlabel('Basis')
         ax.set_ylabel('Genes')
         ax.set_yticks([nmat])
-        ax.set_title(f"Total #: {int(np.sum(pmat.values))}")
+        ax.set_title(f"Total #: {int(np.sum(pmat.values)):,}")
         ax.text(0, nmat, nmat, ha='right')
         
         ax = ax_dict['B']
@@ -136,7 +137,7 @@ def plot_embx_clsts(
     cbar_kws = dict(shrink=0.7, orientation='horizontal', fraction=0.02, pad=0.15)
     fig, axs = plt.subplots(1,3,figsize=figsize)
     ax = axs[0]
-    sns.heatmap(np.log10(prjx_clsts)[_rows][:,_cols], 
+    sns.heatmap(np.log10(prjx_clsts+1)[_rows][:,_cols], 
                 yticklabels=rownames[_rows],
                 xticklabels=colnames[_cols],
                 cmap='coolwarm', 
@@ -282,7 +283,7 @@ def plot_embx_clsts_v2(
     cbar_kws = dict(shrink=0.7, orientation='horizontal', fraction=0.02, pad=0.15)
     fig, axs = plt.subplots(1,4,figsize=figsize)
     ax = axs[0]
-    sns.heatmap(np.log10(prjx_clsts)[_rows][:,_cols], 
+    sns.heatmap(np.log10(prjx_clsts+1)[_rows][:,_cols], 
                 yticklabels=rownames[_rows],
                 xticklabels=colnames[_cols],
                 cmap='coolwarm', 

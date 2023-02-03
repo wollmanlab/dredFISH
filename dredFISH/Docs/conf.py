@@ -22,6 +22,75 @@ copyright = '2022, Wollman lab'
 author = 'Wollman lab'
 
 
+# -- mock imports ---------------------------------------------------
+autodoc_mock_imports = [
+    'numpy', 
+    'pandas', 
+    'igraph', 
+    'pynndescent',
+    'scipy', 
+    'scipy.stats', 
+    'scipy.optimize',
+    'scipy.spatial', 
+    'scipy.spatial.distance',
+    'scipy.spatial.transform',
+    'scipy.sparse.csgraph', 
+    'scipy.ndimage',
+    'scipy.cluster',
+    'scipy.cluster.hierarchy',
+    'rasterio',
+    'rasterio.features',
+    'IPython',
+    'skimage',
+    'skimage.morphology',
+    'skimage.filters',
+    'shapely',
+    'shapely.geometry',
+    'shapely.ops',
+    'scanpy',
+    'anndata', 
+
+    'sklearn',
+    'sklearn.metrics',
+    'sklearn.decomposition',
+    'sklearn.neighbors',
+    'sklearn.manifold',
+
+    'matplotlib', 
+    'matplotlib.pyplot',
+    'matplotlib.gridspec',
+    'matplotlib.cm',
+    'matplotlib.colors',
+    'matplotlib.collections',
+    'matplotlib.patches',
+
+    'colorcet',
+    'seaborn',
+
+    'colormath',
+    'colormath.color_objects',
+    'colormath.color_conversions',
+
+    'PIL',
+    'pyemd',
+    'leidenalg',
+    'tqdm',
+    'metadata',
+    'ashlar',
+    'ashlar.utils',
+    'cv2',
+    'cellpose',
+    'pywt',
+    # 'torch',  # this was commented out because of class inheritance issues in sphinx
+    # 'torch.nn',
+    # 'torch.utils',
+    # 'torch.utils.data',
+    'zarr',
+
+    'nupack',
+    'Bio',
+]
+
 # -- General configuration ---------------------------------------------------
 
 # Add any Sphinx extension module names here, as strings. They can be

@@ -1,5 +1,8 @@
 # untrack some large testing notebooks
+dredFISH/Docs/_build
 dredFISH/Processing/Notebooks/Test
+dredFISH/Visualization/Notebooks/Test
+*.log
 
 # R packages
 packrat/

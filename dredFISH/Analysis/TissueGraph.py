@@ -56,7 +56,7 @@ import re
 # for debuding mostly
 import warnings
 import time
-from IPython import embed
+# from IPython import embed
 
 class TissueMultiGraph: 
     """Main class used to manage the creation of multi-layer graph representation of tissues. 
