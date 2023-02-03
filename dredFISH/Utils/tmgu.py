@@ -53,6 +53,27 @@ def adjacency_to_igraph(adj_mtx, weighted=False, directed=True, simplify=True):
         G.simplify() # simplify inplace; remove duplicated and self connection (Important to avoid double counting from adj_mtx)
     return G
 
+def split_spatial_graph_to_sections(graph_csr,section_ids):
+    """
+    splits a spatial graph into components based on section information
+    """
+    
+    # if input is iGraph, convert to sparse csr: 
+    if isinstance(graph_csr,igraph.Graph):
+        graph_csr = graph_csr.get_adjacency_sparse()
+    
+    unqS,countS = np.unique(section_ids,return_counts = True)
+    SG = [None] * len(unqS)
+                
+    # break this sparse matrix into components, one per section:
+    strt=0 
+    for i in range(len(unqS)):
+        sg_section = graph_csr[strt:strt+countS[i],strt:strt+countS[i]]
+        strt=strt+countS[i]
+        SG = adjacency_to_igraph(sg_section, directed=False)
+
+    return SG
+
 def get_local_type_abundance(
     types, 
     edgelist=None, 
@@ -103,3 +124,4 @@ def get_local_type_abundance(
     env_mat = np.nan_to_num(env_mat, 0)
     
     return env_mat
+

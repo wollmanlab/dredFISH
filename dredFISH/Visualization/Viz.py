@@ -7,24 +7,29 @@ View acts as:
 #. container of different Panels. 
 
 The Panel hierarchy is where the specific graphics are created. 
-The base class (Panel) is an abstract class with two abstract methods users have to overload: 
-#. set_view : do all calculations here
-#. plot : actual plotting of the panel
+The base class (Panel) is an abstract class with an abstract plot method users have to overload: 
 
 All Panels include a few important properties: 
 #. V : a pointer to the View that this Panel belogs to. This also acts as the link to TMG (self.V.TMG)
-#. Styles : dataframes with information  
 #. Data : a dict container for any data required for Viz, 
-# either given as input during __init__ or calculated by the Panel in set_view()
+#. ax
+# either given as input during __init__ 
 
 A specific type of Panel that is important in the hierarchy is Map which is dedicated to spatial plotting of a TMG section. 
 
-Other panels (UMAP, Historgram, LogLogPlot) etc do what you think they do... 
+Other panels (Scatter, Historgram, LogLogPlot) etc are there for convinent so that View maintains 
+"""
+
+"""
+TODO: 
+1. Finish with legends and pie/wedge legens. 
+2. clean dependencies
+3. move UMAP color to coloru
+4. move ploting from geomu to powerplots (?)
 """
 
 from matplotlib.gridspec import GridSpec, SubplotSpec
 import matplotlib.cm as cm
-import matplotlib
 from matplotlib.colors import ListedColormap
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection, PolyCollection, PatchCollection
@@ -32,9 +37,9 @@ from matplotlib.patches import Wedge, Circle
 from matplotlib.patches import Rectangle as pRectangle
 import colorcet as cc
 
-import pickle
-import io
-import copy
+import umap
+import xycmap
+
 import abc
 
 import seaborn as sns
@@ -43,24 +48,14 @@ from scipy import optimize
 from scipy.cluster.hierarchy import linkage, optimal_leaf_ordering
 from scipy.spatial.distance import jensenshannon, pdist, squareform
 
-from sklearn.manifold import MDS
-from rasterio.features import rasterize
-
-# for debuding mostly
-import warnings
-import time
-from IPython import embed
-
-from dredFISH.Visualization.cell_colors import *
-from dredFISH.Utils.geomu import *
+from dredFISH.Utils import geomu
+from dredFISH.Utils import coloru 
 from dredFISH.Analysis.TissueGraph import *
-from dataclasses import dataclass
 
 """
 TODO: 
 * Add scale-bar to Map and all subclasses (pixel size)
 * Add colorbar to Colorpleth (but not to RandomColorpleth...)
-* Add UMAP Panel class
 * Fix Circle-legend w/o wedges 
 * Fix TypeMap to the new non-stype format
 * Add RegionMaps that shows regions as boundaries and cells as types. 
@@ -80,22 +75,13 @@ class View:
         self.Panels = list()
         
         self.figsize = figsize
+        self.fig = plt.figure(figsize = self.figsize)
         
-    def add_panel(self, P):
-        """
-        add a panel to the view and initialized it by calling Panel's method set_view() 
-        """
-        P.V = self
-        P.set_view()
-        self.Panels.append(P)
-                
-    def show(self,**kwargs):
+    def show(self):
         """
         plot all panels. 
         """
-        # set figures
-        self.figsize = self.figsize
-        self.fig = plt.figure(figsize = self.figsize)
+        # Add all panels to figure
         for i in range(len(self.Panels)): 
             # add an axes
             if isinstance(self.Panels[i].pos,SubplotSpec):
@@ -106,24 +92,140 @@ class View:
             plt.sca(ax)
             self.Panels[i].plot()
 
+class BasisView(View):
+    def __init__(self,TMG,section = None, basis = np.arange(24), qntl = (0.025,0.975),colormaps="jet",subplot_layout = [1,1],**kwargs):
+        super().__init__(TMG,name = "View basis",figsize=(15,10))
+
+        # decide the subplot layout, that keepw a 2x3 design
+        # this will only run if the subplot_layout is smaller then needed 
+        while np.prod(subplot_layout)<len(basis):
+            subplot_layout[1] += 1
+            if np.prod(subplot_layout)>=len(basis): 
+                break
+            if subplot_layout[1]/subplot_layout[0] > 1.5:
+                subplot_layout[0] += 1
+
+        # set up subpanels
+        gs = self.fig.add_gridspec(subplot_layout[0],subplot_layout[1],wspace = 0.01,hspace = 0.01) 
+        # add 24 Colorpleths
+        feature_mat = self.TMG.Layers[0].get_feature_mat(section = section)
+        feature_mat = feature_mat[:,basis]
+        for i in range(len(basis)):
+            P = Colorpleth(feature_mat[:,i],V = self,section = section,colormaps = colormaps,pos = gs[i],**kwargs,qntl = qntl)
+
+class SingleMapView(View):
+    """
+    A view that has only a single map in it. 
+    map_type is one of 'type', 'colorpleth', 'random'
+    """
+    def __init__(self, TMG, section = None,level_type = "cell",map_type = "type", val_to_map = None, figsize=(11, 11),**kwargs):
+        super().__init__(TMG, "Map", figsize)
+        
+        geom_type = TMG.layer_to_geom_type_mapping[level_type]
+        if map_type == 'type':
+            Pmap = TypeMap(geom_type,V=self,section = section,**kwargs)
+        elif map_type == 'colorpleth': 
+            if val_to_map == None: 
+                raise ValueError("Must provide val_to_map if map_type is colorpleth")
+            Pmap = Colorpleth(val_to_map,V=self,section = section,**kwargs)
+        elif map_type == 'random':
+            Pmap = RandomColorMap(geom_type,V=self,section=section,**kwargs)
+        
+
+class UMAPwithSpatialMap(View):
+    """
+    TODO: 
+    1. add support multi-section
+    2. allow coloring by cell types taken from TMG. 
+    """
+    def __init__(self,TMG,section = None, qntl = (0,1),**kwargs):
+        super().__init__(TMG,name = "UMAP with spatial map",figsize=(16,8))
+
+        # add two subplots
+        gs = self.fig.add_gridspec(1,2,wspace = 0.01)
+        basis = self.TMG.Layers[0].get_feature_mat(section = section)
+
+        for i in range(basis.shape[1]):
+            lmts = np.percentile(basis[:,i],np.array(qntl)*100)
+            basis[:,i] = np.clip(basis[:,i],lmts[0],lmts[1])
+        
+        reducer = umap.UMAP()
+        embedding = reducer.fit_transform(basis)
+        self.ump1 = embedding[:,0]
+        self.ump2 = embedding[:,1]
+
+        corner_colors = kwargs.get('corner_colors',["#d10f7c", "#53e6de", "#f4fc4e", "#4e99fc"]) #magenta, cyan, yellow, blue
+        self.cmap = xycmap.custom_xycmap(corner_colors = corner_colors, n = (100, 100))
+
+        colors = xycmap.bivariate_color(sx=embedding[:,0], sy=embedding[:,1], cmap=self.cmap)
+        clr = np.vstack(colors)
+        clr[clr>1]=1
+
+        # add the scatter plot
+        Pumap = Scatter(self,self.ump1,self.ump2,c = clr,s=0.1,name = 'umaps',pos = gs[0],
+                        xlabel = 'UMAP-1',ylabel = 'UMAP-2',xtick = [],ytick=[])
+        Pmap = Map(V = self,section = section,rgb_faces = clr,pos = gs[1],name = 'map with UMAP colors')
+
+    def show(self):
+        super().show()
+         # add legend 
+        self.legend_ax = self.fig.add_axes([0.15, 0.15, 0.05, 0.1])
+        self.legend_ax = xycmap.bivariate_legend(ax=self.legend_ax , sx=self.ump1, sy=self.ump2, cmap=self.cmap)
+        self.legend_ax.set_xticks([])
+        self.legend_ax.set_yticks([])
+
+
+class DapiValueDistributions(View):
+    def __init__(self,TMG,figsize = (16,8),min_dapi_line = None,max_dapi_line = None):
+        super().__init__(TMG,name = "Dapi per section violin",figsize = figsize)
+        if self.TMG.Nsections > 1:
+            P = Violin(V = self, cat_values = TMG.Layers[0].Section,num_values = TMG.Layers[0].adata.obs['dapi'],xlabel='Section',ylabel='Dapi')
+            self.min_dapi_line=min_dapi_line
+            self.max_dapi_line=max_dapi_line
+        else: 
+            P = Histogram(V = self,values_to_count = TMG.Layers[0].adata.obs['dapi'],xlabel='Dapi')
+            self.min_dapi_line=min_dapi_line
+            self.max_dapi_line=max_dapi_line
+
+    def show(self): 
+        super().show()
+        if self.TMG.Nsections > 1:
+            if self.min_dapi_line is not None: 
+                self.Panels[0].ax.axhline(self.min_dapi_line)
+            if self.max_dapi_line is not None: 
+                self.Panels[0].ax.axhline(self.max_dapi_line)
+        else: 
+            if self.min_dapi_line is not None: 
+                self.Panels[0].ax.axvline(self.min_dapi_line)
+            if self.max_dapi_line is not None: 
+                self.Panels[0].ax.axvline(self.max_dapi_line)
+
+""" class IsoZonesView(View):
+    # A view with two panels: a isozone colorpleth with node_size and log-log hist
+    # simple overloading of colorpleth, only different is that we're getting values from TMG 
+    # since TMG is only defined after init we pass the Data during set_view instead. 
+
+    def __init__(self, section=0, name="isozones", pos=(0,0,1,1)):
+        values_to_map = None
+        super().__init__(values_to_map, section=section, name=name, pos=pos)
+    def set_view(self):
+        self.Data['values_to_map'] = np.log10(self.V.TMG.Layers[1].node_size)
+        super().set_view() """
+
 class Panel(metaclass=abc.ABCMeta):
-    def __init__(self, name=None, pos=(0,0,1,1)):
-        self.V = None
+    def __init__(self, V = None, name = None, pos=(0,0,1,1)):
+        if not isinstance(V,View):
+            raise ValueError(f"The value of parameter V must be a View object, instead it was {type(V)}")
+        self.V = V
         self.name = name
         self.pos = pos
         self.ax = None
         self.Data = {}
-        self.Styles = {}
         self.clrmp = None
 
-    @abc.abstractmethod
-    def set_view(self):  
-        """
-        Key abstract method - has to be implemented in the subclass
-        signature should always include the TMG (and other stuff if needed)
-        """
-        pass
-    
+        # Add the Panel into the View it is linked to. 
+        self.V.Panels.append(self)
+
     @abc.abstractmethod
     def plot(self):
         """
@@ -138,29 +240,32 @@ class Map(Panel):
     This panels can plots single type of geometry from TMG based on use supplied rgb (Nx3 array) for faces and/or edges
     It does not calcualte any of the rgb maps. 
     """
-    def __init__(self, section=0, name=None, pos=(0,0,1,1), **kwargs):
-        super().__init__(name, pos)
+    def __init__(self, V = None, section=None, name=None, 
+                       pos=(0,0,1,1), geom_type = "voronoi",rgb_faces = None,
+                       rgb_edges = None, **kwargs):
+        super().__init__(V,name, pos)
         
-        if section is None: 
-            raise ValueError("Section can't be empty - create Maps for specific section")
+        # set default section to be the first in unqS, useful is there is only single section
+        if section is None:
+            section = self.V.TMG.unqS[0]
 
         # section information: which section in TMG are we plotting
         self.section = section
-
-
-    def set_view(self,geom_type,rgb_faces = None,rgb_edges = None,**kwargs): 
-        """
-        setup for a map - choose type of geometry and coloring (edges and faces) to plot
-        """
-
+        
         # Make sure one color was provided
         assert rgb_edges is not None or rgb_faces is not None,"To plot either pleaes provide RGB array (nx3) for either edges or faces "
         self.rgb_edges = rgb_edges
         self.rgb_faces = rgb_faces
+        self.geom_type = geom_type
 
         # set limits
-        mx = np.max(np.array(self.V.TMG.Geoms[self.section]['mask'].exterior.xy).T,axis=0)
-        mn = np.min(np.array(self.V.TMG.Geoms[self.section]['mask'].exterior.xy).T,axis=0)
+        # using list comperhension, get max/min per mask, then get the max/min of all of those. 
+        section_ix = np.flatnonzero(np.equal(self.V.TMG.unqS,self.section))
+        if len(section_ix) == 0:
+            raise ValueError(f"section {self.section} is not found in TMG.unqS {self.V.TMG.unqS}")
+        section_ix = section_ix[0]
+        mx = np.max([np.max(np.array(m.exterior.xy).T,axis=0) for m in self.V.TMG.Geoms[section_ix]['mask']['poly']],axis=0)
+        mn = np.min([np.min(np.array(m.exterior.xy).T,axis=0) for m in self.V.TMG.Geoms[section_ix]['mask']['poly']],axis=0)
         self.xlim = kwargs.get('xlim',None)
         self.ylim = kwargs.get('ylim',None)
         if self.xlim is None: 
@@ -168,186 +273,127 @@ class Map(Panel):
         if self.ylim is None: 
             self.ylim = [mn[1],mx[1]]
 
-        if geom_type == "points":
-            self.geom_collection = self.V.TMG.Geoms[self.section]['points']
-            self.sizes = kwargs.get("sizes",10)
-        elif geom_type == "voronoi":
-            self.geom_collection = self.V.TMG.Geoms[self.section]['voronoi']
-        elif geom_type == "cells":
-            self.geom_collection = self.V.TMG.Geoms[self.section]['cells']
+        # get the geom collection saved in appropriate TMG Geom
+        self.geom_collection = self.V.TMG.Geoms[section_ix][geom_type]['vert']
 
-               
-            # case "mask": 
-            #     self.geom_collection = self.V.TMG.Geoms[self.section]['mask']
-            #     for i in range(len(polygons.geoms)):
-            #         pnts=np.array(list(polygons.geoms[i].exterior.coords))
-            #         self.ax.plot(pnts[:,0],pnts[:,1],color=self.Styles['mask']['color'])
-            #         for inner in polygons.geoms[i].interiors:
-            #             xi, yi = zip(*inner.coords[:])
-            #             self.ax.plot(xi, yi, color=self.Styles['mask']['color']) 
-        
+        # points are the only non-polygon geom and they get sizes as proprety 
+        if geom_type == "points":
+            self.sizes = kwargs.get("sizes",10)
+
+
         return
         
-    def plot_shapely_collection(self,**kwargs):
-        rgb_edge = kwargs.get('rgb_edges',None)
-        rgb_faces = kwargs.get('rgb_faces',None)
-        sizes = kwargs.get('sizes',None)
-        ax = kwargs.get('sizes',None)
-    
-        if isinstance(self.geom_collection[0],shapely.geometry.PolyCollection):
-            geomu.plot_polygon_collection(self.geom_collection,
-                                          rgb_faces = self.rgb_faces,
-                                          rgb_edges = self.rgb_edges, 
-                                          ax = self.ax,
-                                          xlm = self.xlim,ylm = self.ylim)
-        elif isinstance(self.geom_collection[0],shapely.geometry.Poly):
+    def plot(self):
+        """
+        plot a map (list of shapely points in colors) 
+        """
+        if self.geom_type == "points": 
             geomu.plot_point_collection(self.geom_collection,
                                         self.sizes,
                                         rgb_faces = self.rgb_faces,
                                         rgb_edges = self.rgb_edges, 
                                         ax = self.ax,
                                         xlm = self.xlim,ylm = self.ylim)
-    def plot(self):
-        """
-        plot a map. 
-        """
-        self.plot_shapely_collection()
+        else: 
+            geomu.plot_polygon_collection(self.geom_collection,
+                                          rgb_faces = self.rgb_faces,
+                                          rgb_edges = self.rgb_edges, 
+                                          ax = self.ax,
+                                          xlm = self.xlim,ylm = self.ylim)
+            
+
+class TypeMap(Map):
+    """
+    plots types of given geom using UMAP color projection of types
+    """
+    def __init__(self, geom_type, V = None,section = None, name = None, 
+                                      pos = (0,0,1,1), color_assign_method = 'supervised_umap',**kwargs):
+        super().__init__(V = V,section = section, geom_type = geom_type, name = name, pos = pos,rgb_faces=[1,1,1],**kwargs)
+        
+        # find layer and tax ids
+        layer = self.V.TMG.geom_to_layer_type_mapping[geom_type]
+        layer_ix = self.V.TMG.find_layer_by_name(layer)
+        tax_ix = self.V.TMG.layer_taxonomy_mapping[layer_ix]
+        
+        # get data and rename for simplicity
+        self.Data['data'] = self.V.TMG.Taxonomies[tax_ix].feature_mat
+        self.Data['tax'] = self.V.TMG.Taxonomies[tax_ix].Type
+        self.Data['type'] = self.V.TMG.Layers[layer_ix].Type
+        types = self.Data['type']
+        target = self.Data['tax']
+        data =  self.Data['data']
+
+        # get colors and assign for each unit (cell, isozone, regions)
+        if color_assign_method == 'supervised_umap': 
+            self.rgb_by_type = coloru.type_color_using_supervized_umap(data,target)
+        if color_assign_method == 'linkage':
+            metric = kwargs.get("metric","cosine")
+            self.cmap_names = kwargs.get('colormaps', "hot")
+            self.cmap = geomu.merge_colormaps(self.cmap_names)
+            self.rgb_by_type = coloru.type_color_using_linkage(data,self.cmap,metric = metric)
+        self.rgb_faces = self.rgb_by_type[types.astype(int),:]
+
+
+class RandomColorMap(Map):
+    """
+    plots types of given geom using UMAP color projection of types
+    """
+    def __init__(self, geom_type, V = None,cmap_list = ['jet'],section = None, name = None, 
+                                      pos = (0,0,1,1), **kwargs):
+        super().__init__(V = V,section = section, geom_type = geom_type, name = name, pos = pos,rgb_faces=[1,1,1],**kwargs)
+        
+        # set colormap
+        self.cmap_names = kwargs.get('colormaps', "jet")
+        self.cmap = geomu.merge_colormaps(self.cmap_names)
+        # find layer and tax ids
+        layer = self.V.TMG.geom_to_layer_type_mapping[geom_type]
+        layer_ix = self.V.TMG.find_layer_by_name(layer)
+        self.rgb_faces = self.cmap(np.linspace(0,1,self.V.TMG.N[layer_ix]))
+        self.rgb_faces = self.rgb_faces[np.random.permutation(self.V.TMG.N[layer_ix]),:]
        
-
-class Zoom(Panel):
-    def __init__(self, panel_to_zoom, zoom_coords=np.array([0,0,1,1]), name=None, pos=(0,0,1,1)):
-        f = type(panel_to_zoom) # Type of the Panel
-        self.ZP = f()
-        
-        for attr in dir(panel_to_zoom):
-            try:
-                setattr(self.ZP , attr, getattr(panel_to_zoom, attr))
-            except:
-                print(f"cannot copy attribute: {attr}")
-
-        self.ZP.ax = None
-        self.pos = pos
-        self.name = name
-        self.zoom_coords = zoom_coords
-        self.panel_to_zoom = panel_to_zoom
-
-    def set_view(self):
-        # return super().set_view()
-        pass
-        
-    def plot(self):
-        # add boundary around zoomed area
-        self.panel_to_zoom.ax.add_patch(pRectangle((self.zoom_coords[0], self.zoom_coords[1]),
-                                   self.zoom_coords[2], self.zoom_coords[3],
-                                   fc ='none', 
-                                   ec ="w",
-                                   lw = 3))
-        self.ZP.ax = self.ax
-        self.ZP.plot()
-        self.ax.set_xlim(self.zoom_coords[0],self.zoom_coords[0]+self.zoom_coords[2])
-        self.ax.set_ylim(self.zoom_coords[1],self.zoom_coords[1]+self.zoom_coords[3])
-        
 class Colorpleth(Map):
     """
     Show a user-provided vector color coded. 
     It will choose the geomtry (voronoi,isozones,regions) from the size of the use provided values_to_map vector. 
     """
-    def __init__(self, values_to_map, section=0, name=None, pos=(0,0,1,1), **kwargs):
-        super().__init__(section=section, name=name, pos=pos, **kwargs)
+    def __init__(self, values_to_map, V = None,section = None, name = None, 
+                                      pos = (0,0,1,1), geom_type = None,qntl = (0,1),
+                                      clp = (-np.inf,np.inf), **kwargs):
+        super().__init__(V = V,section = section, name = name, pos = pos,rgb_faces=[1,1,1],**kwargs)
         self.Data['values_to_map'] = values_to_map
         
         self.cmap_names = kwargs.get('colormaps', "hot")
         self.colorbar = kwargs.get('colorbar', False)
         self.cmap = geomu.merge_colormaps(self.cmap_names)
-        self.norm = matplotlib.colors.Normalize(vmin=0, vmax=1)
-        self.scalarMap = cm.ScalarMappable(norm=self.norm, cmap=self.cmap)
         
-    def set_view(self):
         # Create the rgb_faces using self.clrmp and self.Data['values_to_map']
         scalar_mapping = self.Data['values_to_map']
+
+        # clip extreme values by value
+        scalar_mapping = np.clip(scalar_mapping,clp[0],clp[1])
+
+        # rescale usign quantiles
+        scalar_mapping[scalar_mapping < np.percentile(scalar_mapping,qntl[0]*100)]=np.percentile(scalar_mapping,qntl[0]*100)
+        scalar_mapping[scalar_mapping > np.percentile(scalar_mapping,qntl[1]*100)]=np.percentile(scalar_mapping,qntl[1]*100)
+        
+        # convert to 0-1 range to maximize colormap dynamic range
         scalar_mapping = scalar_mapping-scalar_mapping.min()
         scalar_mapping = scalar_mapping/scalar_mapping.max()
-
-        self.rgb_faces = self.scalarMap.to_rgba(scalar_mapping) 
-
-        # chose geom based on size of input vector
-        lvlarr = np.flatnonzero(np.equal(self.V.TMG.N,len(self.Data['values_to_map'])))
-        if len(lvlarr)!=1:
-            raise ValueError('number of items in values_to_map doesnt match any level size')
-        if lvlarr[0] == 0: 
-            geom_type = "voronoi"
-        elif lvlarr[0] == 1: 
-            geom_type = "isozones"
-        elif lvlarr[0] == 2: 
-            geom_type = "regions"
-         
-        super().set_view(geom_type,rgb_faces = self.rgb_faces)
         
+        self.rgb_faces = self.cmap(scalar_mapping)
         
-class RandomColorpleth(Colorpleth):
-    """
-    Show geo-units (cells, iso-zones, regions) each colored randomly. 
-    """
-    def __init__(self,id_vec = 0, section = 0, name = "Random Colorpleth" ,pos = (0,0,1,1),**kwargs):
-        if len(np.shape(id_vec))==0: # if the id_vec is pointing to a current level, give each unit it's own color 
-            name = name + " of level: " + str(id_vec)
-            id_vec = np.arange(self.V.TMG.N[id_vec])
-        super().__init__(name = name, values_to_map = id_vec,**kwargs)
-        self.cmap_name = "Random"
-        self.cmap = ListedColormap(self.rgb_faces) 
-
-        
-    def set_view(self):
-        super().set_view()
-        self.rgb_faces = self.cmap.colors
-
-class TypeMap(Colorpleth):
-    def __init__(self, cell_mapped_types,lvl=1, section=0, name="cell map", pos=(0,0,1,1), 
-                cmap_list=['Purples','Oranges','Blues','Greens','Reds','cividis'],
-                **kwargs):
-        self.lvl = lvl
-        self.Data['values_to_map'] = cell_mapped_types
-        cell_mapped_types = self.V.TMG.map_to_cell_level(self.lvl)
-        super().__init__(cell_mapped_types,section=section, name=name, pos=pos, **kwargs)
-        self.cmap_list = cmap_list 
-        
-
-    def set_view(self):
-        super().set_view()
-        
-
-
-
-        # ncolors = len(np.unique(cell_mapped_types))
-        # self.basecolors = np.array(sns.color_palette(self.cmap_list[0], ncolors))
-        # self.clr = self.basecolors[cell_mapped_types] # assuming starting from zero
-        # self.clrmp = ListedColormap(self.clr)
-
-        ### This is to use multiple CMAP to generate a color scheme; rely on ``.Type2`` (Type of Types)
-        # # reduce number of colormaps if we have very few types
-        # if self.V.TMG.Ntypes[self.lvl] < len(self.cmap_list):
-        #     self.cmap_list=self.cmap_list[:self.V.TMG.Ntypes[self.lvl]]
-        
-        # T2 = self.V.TMG.Layers[self.lvl].Type2
-        # Dsqr = self.V.TMG.Layers[self.lvl].Dtype
-        # clr = np.zeros((len(T2),4))
-        # for i in range(len(self.cmap_list)):
-        #     cmap = cm.get_cmap(self.cmap_list[i])
-        #     ix = np.flatnonzero(T2==i)
-        #     if len(ix)<3: 
-        #         value = np.linspace(0.2,1,len(ix))
-        #     else:
-        #         d = Dsqr[np.ix_(ix,ix)]
-        #         dvec = squareform(d)
-        #         z = linkage(dvec,method='average')
-        #         ordr = optimal_leaf_ordering(z,dvec)
-
-        #         n=len(ix)
-        #         shift = np.ceil(0.2*n)
-        #         value = (np.arange(len(ix))+shift+1)/(len(ix)+shift)
-        #     clr[ix,:] = cmap(value)
-        # self.type2 = T2
-        ### This is to use multiple CMAP to generate a color scheme
+        # if geom_type is None chose it based on size of input vector
+        if geom_type is None:         
+            lvlarr = np.flatnonzero(np.equal(self.V.TMG.N,len(self.Data['values_to_map'])))
+            if len(lvlarr)!=1:
+                raise ValueError('number of items in values_to_map doesnt match any level size')
+            if lvlarr[0] == 0: 
+                geom_type = "voronoi"
+            elif lvlarr[0] == 1: 
+                geom_type = "isozones"
+            elif lvlarr[0] == 2: 
+                geom_type = "regions" 
+                 
     
 """ class LegendWithCircles(Panel): 
     def __init__(self, map_panel, name=None, pos=(0,0,1,1), scale=300, **kwargs):
@@ -549,57 +595,70 @@ next section could be used to show mapping between regions and cell
         g.ax_heatmap.set_xticks(list())
         g.ax_heatmap.set_yticks(list())
         self.figs.append(fig)
-class TypeMapWithLines(TypeMap):
-    def __init__(self, 
-        lvl=2,  
-        section=0, 
-        name="neighborhood map", 
-        pos=(0,0,1,1),
-        cmap_list=['Purples','Oranges','Blues','Greens','Reds','cividis'],
-        ):
-        super().__init__(lvl=lvl, section=section, name=name, pos=pos, cmap_list=cmap_list)
-        self.lvl = lvl
-        
-    def set_view(self):
-        super().set_view()
-        region_edge = self.V.TMG.find_regions_edge_level()
-        self.Styles['line']['width'] = np.ones(len(region_edge))
-        self.Styles['line']['color'] = "#6e736f"
-        
-    def plot(self):
-        super().plot() """
-
-""" class IsoZones(Colorpleth):
-    """
-    # simple overloading of colorpleth, only different is that we're getting values from TMG 
-    # since TMG is only defined after init we pass the Data during set_view instead. 
 """
-    def __init__(self, section=0, name="isozones", pos=(0,0,1,1)):
-        values_to_map = None
-        super().__init__(values_to_map, section=section, name=name, pos=pos)
-    def set_view(self):
-        self.Data['values_to_map'] = np.log10(self.V.TMG.Layers[1].node_size)
-        super().set_view() """
+
+
+
+class Scatter(Panel):
+    def __init__(self,V,x,y,c = [0.25, 0.3, 0.95] , s = 0.1,name = 'scatter',pos = (0,0,1,1), **kwargs):
+        super().__init__(V,name=name, pos=pos)
+        self.Data['x'] = x
+        self.Data['y'] = y
+        self.Data['c'] = c
+        self.Data['s'] = s
+        self.xtick = kwargs.get('xtick',None)
+        self.ytick = kwargs.get('ytick',None)
+        self.xlabel = kwargs.get('',None)
+        self.ylabel = kwargs.get('',None)
+        self.label_font_size = kwargs.get('label_font_size',20)
+       
+    def plot(self):
+        self.ax.scatter(x=self.Data['x'],y=self.Data['y'],c=self.Data['c'],s = self.Data['s'])
+        if self.xtick is not None: 
+            self.ax.set_xticks(self.xtick)
+        if self.ytick is not None: 
+            self.ax.set_yticks(self.ytick)
+        self.ax.set_xlabel(self.xlabel,fontsize = self.label_font_size)
+        self.ax.set_ylabel(self.ylabel,fontsize = self.label_font_size)
+
+class Violin(Panel):
+    def __init__(self,V = None,cat_values = None, num_values = None,name = 'violin',pos=(0,0,1,1),**kwargs):
+        super().__init__(V,name=name, pos=pos)
+        if cat_values is None:
+            raise ValueError("Must supply categorical variable")
+        if num_values is None: 
+            raise ValueError("Must supply numerical variable")
+
+        self.Data['cat_values'] = cat_values
+        self.Data['num_values'] = num_values
+        self.xlabel = kwargs.get('',None)
+        self.ylabel = kwargs.get('',None)
+
+    def plot(self):
+        df = pd.DataFrame({'cat' : self.Data['cat_values'],
+                           'num' : self.Data['num_values']})
+        sns.violinplot(ax = self.ax,data = df,x = "cat", y = "num")
+        self.ax.set_xlabel(self.xlabel)
+        self.ax.set_ylabel(self.ylabel)
         
+
 class Histogram(Panel):
-    def __init__(self, values_to_count, name='hist', pos=(0,0,1,1), n_bins=50, **kwargs):
-        super().__init__(name=name, pos=pos)
+    def __init__(self, V = None,values_to_count = None, name='hist', pos=(0,0,1,1), n_bins=50, **kwargs):
+        if values_to_count is None: 
+            raise ValueError("Must supply values to show their distribution")
+        super().__init__(V = V,name=name, pos=pos)
         self.n_bins = n_bins 
         self.Data['values_to_count'] = values_to_count
-        self.kwargs = kwargs
-
-    def set_view(self):
-        pass
+        self.xlabel = kwargs.get('',None)
 
     def plot(self): 
-        self.ax.hist(self.Data['values_to_count'], bins=self.n_bins, **self.kwargs)
+        self.ax.hist(self.Data['values_to_count'], bins=self.n_bins)
+        self.ax.set_xlabel(self.xlabel)
+        self.ax.set_yticks([])
 
 class LogLogPlot(Histogram):
-    def __init__(self, values_to_count, name="loglog", pos=(0,0,1,1), n_bins=50, **kwargs):
+    def __init__(self, V = None,values_to_count = None, name="loglog", pos=(0,0,1,1), n_bins=50, trend_line = None,**kwargs):
         super().__init__(values_to_count, name=name, pos=pos, n_bins=n_bins, **kwargs)
-        
-    def set_view(self):
-        super().set_view()
         
         mx_sz = self.Data['values_to_count'].max()
         bins = np.logspace(0, np.ceil(np.log10(mx_sz)), self.n_bins+1)
@@ -617,8 +676,16 @@ class LogLogPlot(Histogram):
         def piecewise_linear(x, x0, y0, k1, k2):
             return np.piecewise(x, [x < x0], [lambda x:k1*x + y0-k1*x0, lambda x:k2*x + y0-k2*x0])
 
-        self.p, e = optimize.curve_fit(piecewise_linear, self.log_size, self.log_freq)
-        self.exponents = self.p[2:4]
+        self.trend_line = trend_line
+        if trend_line is None:
+            pass
+        elif self.trend_line == "piecewise_linear":
+            self.p, e = optimize.curve_fit(piecewise_linear, self.log_size, self.log_freq)
+            self.exponents = self.p[2:4]
+        elif self.trend_line == "linear": 
+            self.p = np.polyfit(self.log_size, self.log_freq, 1)
+            self.exponents = self.p[0]
+            pass
         
     def plot(self):
         def piecewise_linear(x, x0, y0, k1, k2):
@@ -628,9 +695,42 @@ class LogLogPlot(Histogram):
         self.ax.plot(10**self.log_size, 10**self.log_freq,'.')
         self.ax.set_xscale('log')
         self.ax.set_yscale('log')
-
-        self.ax.plot(10**self.log_size, 10**piecewise_linear(self.log_size, *self.p),'r-')
-
         self.ax.set_xlabel('Value',fontsize=18)
         self.ax.set_ylabel('Freq',fontsize=18)
-        self.ax.set_title(f"Exponents: {self.exponents[0]:.2f} {self.exponents[1]:.2f}")
+        if self.trend_line == "piecewise_linear": 
+            self.ax.plot(10**self.log_size, 10**piecewise_linear(self.log_size, *self.p),'r-')
+            self.ax.set_title(f"Exponents: {self.exponents[0]:.2f} {self.exponents[1]:.2f}")
+        elif self.trend_line == "linear": 
+            self.ax.plot(10**self.log_size, 10**(self.p[0]*self.log_size+self.p[1]),'r-')
+            self.ax.set_title(f"Exponent: {self.exponents[0]:.2f}")
+
+
+class Zoom(Panel):
+    def __init__(self, panel_to_zoom, zoom_coords=np.array([0,0,1,1]), name=None, pos=(0,0,1,1)):
+        f = type(panel_to_zoom) # Type of the Panel
+        self.ZP = f()
+        
+        for attr in dir(panel_to_zoom):
+            try:
+                setattr(self.ZP , attr, getattr(panel_to_zoom, attr))
+            except:
+                print(f"cannot copy attribute: {attr}")
+
+        self.ZP.ax = None
+        self.pos = pos
+        self.name = name
+        self.zoom_coords = zoom_coords
+        self.panel_to_zoom = panel_to_zoom
+
+        
+    def plot(self):
+        # add boundary around zoomed area
+        self.panel_to_zoom.ax.add_patch(pRectangle((self.zoom_coords[0], self.zoom_coords[1]),
+                                   self.zoom_coords[2], self.zoom_coords[3],
+                                   fc ='none', 
+                                   ec ="w",
+                                   lw = 3))
+        self.ZP.ax = self.ax
+        self.ZP.plot()
+        self.ax.set_xlim(self.zoom_coords[0],self.zoom_coords[0]+self.zoom_coords[2])
+        self.ax.set_ylim(self.zoom_coords[1],self.zoom_coords[1]+self.zoom_coords[3])

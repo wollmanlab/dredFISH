@@ -7,6 +7,8 @@ import pandas as pd
 from sklearn.decomposition import PCA
 import datashader as ds
 
+from skimage import io
+
 from . import powerplots
 
 
@@ -227,3 +229,12 @@ def flip_points(points):
     """
     trans_mat = np.array([[-1,0],[0,-1]])
     return np.dot(points, trans_mat)
+
+def stkread(full_file_list):
+    """
+    read a stack of images based on list of filenames
+    """
+    img1 = io.imread(full_file_list[0])
+    sz = (len(full_file_list,img1.shape[0],img1.shape[1]))
+    stk = nd.zeros(sz,dtype = img1.dtype)
+    

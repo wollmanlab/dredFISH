@@ -65,6 +65,7 @@ class Classifier(metaclass=abc.ABCMeta):
         """Classifies input into types
         """
         pass
+
 class KNNClassifier(Classifier): 
     """k-nearest-neighbor classifier
     
@@ -116,9 +117,9 @@ class KNNClassifier(Classifier):
             kids = self._ref_label_id[indices]
             ids = mode(kids,axis=1)
         return ids.flatten()
-    
+
 class OptimalLeidenKNNClassifier(KNNClassifier):
-    """Classifiy cells based on unsupervized Leiden 
+    """Classifiy cells based on unsupervized Leiden with optimal resolution 
     
     This classifiers is trained using unsupervized learning with later classification done by knn (k=1)
     the implementations uses the same classify method as KNNClassifier.  
@@ -199,15 +200,18 @@ class OptimalLeidenKNNClassifier(KNNClassifier):
             TypeVec = TypeVec[:,np.argmax(total_rand_scr)]
                                                   
         print(f"Number of types: {len(np.unique(TypeVec))} initial entropy: {ent} number of evals: {evls}")
-        self.TypeVec = TypeVec
-        
-        # return self._TG.feature_mat, TypeVec
-        # train the KNN classifier using the types we found
-        # super().train(self._TG.feature_mat, TypeVec)
-        # train doesn't return anything. 
 
-    def classify(self):
-        return self.TypeVec
+        # update the Taxonomy and create
+        # self.tax.add_types(self._TG.feature_mat,TypeVec)
+        # self.TypeVec = TypeVec
+        
+        # train the KNN classifier using the types we found
+        super().train(self._TG.feature_mat, TypeVec)
+         
+
+    # def classify(self):
+    #     return self.TypeVec
+
 class TopicClassifier(Classifier): 
     """Uses Latent Dirichlet Allocation to classify cells into regions types. 
 
@@ -267,6 +271,9 @@ class TopicClassifier(Classifier):
             Type_entropy[i] = entropy(cnt,base=2) 
 
         self._lda = results[np.argmax(Type_entropy)][0]
+        topics_prob = self._lda.transform(self.Env)
+        topics = np.argmax(topics_prob, axis=1)
+        self.tax.add_types(topics,self.Env)
         return self
 
     def classify(self,data):
@@ -274,10 +281,6 @@ class TopicClassifier(Classifier):
         topics_prob = self._lda.transform(data)
         topics = np.argmax(topics_prob, axis=1)
 
-        # renumber topics 
-        unq,ix = np.unique(topics, return_inverse=True)
-        id = np.arange(len(unq))
-        topics = id[ix]
         return topics
     
 class KnownCellTypeClassifier(Classifier): 
