@@ -240,7 +240,7 @@ class Map(Panel):
     This panels can plots single type of geometry from TMG based on use supplied rgb (Nx3 array) for faces and/or edges
     It does not calcualte any of the rgb maps. 
     """
-    def __init__(self, V = None, section=None, name=None, 
+    def __init__(self, V = None, section = None, name = None, 
                        pos=(0,0,1,1), geom_type = "voronoi",rgb_faces = None,
                        rgb_edges = None, **kwargs):
         super().__init__(V,name, pos)
@@ -258,28 +258,21 @@ class Map(Panel):
         self.rgb_faces = rgb_faces
         self.geom_type = geom_type
 
-        # set limits
-        # using list comperhension, get max/min per mask, then get the max/min of all of those. 
-        section_ix = np.flatnonzero(np.equal(self.V.TMG.unqS,self.section))
-        if len(section_ix) == 0:
+        # get limits
+        if self.V.TMG.unqS.count(self.section) == 0:
             raise ValueError(f"section {self.section} is not found in TMG.unqS {self.V.TMG.unqS}")
-        section_ix = section_ix[0]
-        mx = np.max([np.max(np.array(m.exterior.xy).T,axis=0) for m in self.V.TMG.Geoms[section_ix]['mask']['poly']],axis=0)
-        mn = np.min([np.min(np.array(m.exterior.xy).T,axis=0) for m in self.V.TMG.Geoms[section_ix]['mask']['poly']],axis=0)
+        else: 
+            section_ix = self.V.TMG.unqS.index(self.section)
+        (xlim,ylim) = self.V.TMG.Geoms[section_ix]['mask'].get_xylim()
         self.xlim = kwargs.get('xlim',None)
         self.ylim = kwargs.get('ylim',None)
         if self.xlim is None: 
-            self.xlim = [mn[0],mx[0]]
+            self.xlim = xlim
         if self.ylim is None: 
-            self.ylim = [mn[1],mx[1]]
+            self.ylim = ylim
 
         # get the geom collection saved in appropriate TMG Geom
-        self.geom_collection = self.V.TMG.Geoms[section_ix][geom_type]['vert']
-
-        # points are the only non-polygon geom and they get sizes as proprety 
-        if geom_type == "points":
-            self.sizes = kwargs.get("sizes",10)
-
+        self.geom_collection = self.V.TMG.Geoms[section_ix][geom_type].verts
 
         return
         
@@ -329,7 +322,7 @@ class TypeMap(Map):
         if color_assign_method == 'linkage':
             metric = kwargs.get("metric","cosine")
             self.cmap_names = kwargs.get('colormaps', "hot")
-            self.cmap = geomu.merge_colormaps(self.cmap_names)
+            self.cmap = coloru.merge_colormaps(self.cmap_names,range=(0.05,1))
             self.rgb_by_type = coloru.type_color_using_linkage(data,self.cmap,metric = metric)
         self.rgb_faces = self.rgb_by_type[types.astype(int),:]
 
@@ -344,7 +337,7 @@ class RandomColorMap(Map):
         
         # set colormap
         self.cmap_names = kwargs.get('colormaps', "jet")
-        self.cmap = geomu.merge_colormaps(self.cmap_names)
+        self.cmap = coloru.merge_colormaps(self.cmap_names)
         # find layer and tax ids
         layer = self.V.TMG.geom_to_layer_type_mapping[geom_type]
         layer_ix = self.V.TMG.find_layer_by_name(layer)
@@ -359,12 +352,23 @@ class Colorpleth(Map):
     def __init__(self, values_to_map, V = None,section = None, name = None, 
                                       pos = (0,0,1,1), geom_type = None,qntl = (0,1),
                                       clp = (-np.inf,np.inf), **kwargs):
-        super().__init__(V = V,section = section, name = name, pos = pos,rgb_faces=[1,1,1],**kwargs)
+                # if geom_type is None chose it based on size of input vector
+        if geom_type is None:         
+            lvlarr = np.flatnonzero(np.equal(V.TMG.N,len(values_to_map)))
+            if len(lvlarr)!=1:
+                raise ValueError('number of items in values_to_map doesnt match any level size')
+            if lvlarr[0] == 0: 
+                geom_type = "voronoi"
+            elif lvlarr[0] == 1: 
+                geom_type = "isozones"
+            elif lvlarr[0] == 2: 
+                geom_type = "regions"
+        super().__init__(V = V,section = section, name = name, pos = pos,rgb_faces=[1,1,1],geom_type=geom_type,**kwargs)
         self.Data['values_to_map'] = values_to_map
         
         self.cmap_names = kwargs.get('colormaps', "hot")
         self.colorbar = kwargs.get('colorbar', False)
-        self.cmap = geomu.merge_colormaps(self.cmap_names)
+        self.cmap = coloru.merge_colormaps(self.cmap_names)
         
         # Create the rgb_faces using self.clrmp and self.Data['values_to_map']
         scalar_mapping = self.Data['values_to_map']
@@ -382,17 +386,7 @@ class Colorpleth(Map):
         
         self.rgb_faces = self.cmap(scalar_mapping)
         
-        # if geom_type is None chose it based on size of input vector
-        if geom_type is None:         
-            lvlarr = np.flatnonzero(np.equal(self.V.TMG.N,len(self.Data['values_to_map'])))
-            if len(lvlarr)!=1:
-                raise ValueError('number of items in values_to_map doesnt match any level size')
-            if lvlarr[0] == 0: 
-                geom_type = "voronoi"
-            elif lvlarr[0] == 1: 
-                geom_type = "isozones"
-            elif lvlarr[0] == 2: 
-                geom_type = "regions" 
+ 
                  
     
 """ class LegendWithCircles(Panel): 

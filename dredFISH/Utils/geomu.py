@@ -37,7 +37,7 @@ import glob
 
 from matplotlib.collections import *
 import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+
 import matplotlib.colors
 import matplotlib.cm as cm
 from matplotlib.path import Path
@@ -245,7 +245,7 @@ def vectorize_labeled_matrix_to_polygons(imgmat,tolerance = 2):
 
     return unq_poly
 
-def get_polygons_vertices(polygons):
+def get_polygons_vertices(polygons,return_inner_verts = True):
     """
     simple utility to create list of verticies (that can be drawn with matplotlib PolygonColleciton)
     from alist of shapely polygons. 
@@ -259,13 +259,16 @@ def get_polygons_vertices(polygons):
     for i,poly in enumerate(polygons):
         xy = poly.exterior.xy
         verts.append(np.array(xy).T)
-        inner_verts.append(list())
-        for LinearRing in poly.interiors:
-            xi,yi = LinearRing.xy
-            xy = np.transpose(np.vstack((xi,yi)))
-            inner_verts[i].append(xy)
-
-    return (verts,inner_verts)
+        if return_inner_verts:
+            inner_verts.append(list())
+            for LinearRing in poly.interiors:
+                xi,yi = LinearRing.xy
+                xy = np.transpose(np.vstack((xi,yi)))
+                inner_verts[i].append(xy)
+    if return_inner_verts: 
+        return (verts,inner_verts)
+    else: 
+        return verts
 
 def plot_polygon_collection(verts_or_polys,
                             rgb_faces = None, # one per polygon
@@ -317,7 +320,7 @@ def plot_polygon_collection(verts_or_polys,
     ax.add_collection(p2)
 
     # identify boundaries for ax
-    xy = np.vstack(np.array(verts))
+    xy = np.vstack(verts)
     mx = np.max(xy,axis=0)
     mn = np.min(xy,axis=0)
     if xlm is None: 
@@ -360,31 +363,6 @@ def plot_point_collection(pnts,sizes,rgb_faces = None,rgb_edges = None,ax = None
     if ylm is None: 
         ylm = (mn[1],mx[1])
 
-def merge_colormaps(colormap_names,range = (0,1),res = 128):
-    """
-    Merge multiple matplotlib colormaps into one. 
-    range: either a tuple (same for all colormaps, or an Nx2 array with ranges to use. 
-           full range is 0-1, so to clip any side just use partial range (0.1,1)
-    """
-
-    # make colormap_names into a list (if it's just a string name)
-    if not isinstance(colormap_names,list):
-        colormap_names=[colormap_names]
-
-    # process / verify the range input
-    if not isinstance(range, np.ndarray): 
-        range = np.tile(range,(len(colormap_names),1))
-    assert range.shape[0]==len(colormap_names), "ranges dimension doesn't match colormap names"
-
-    # sample the colormaps that you want to use. Use 128 from each so we get 256
-    # colors in total
-    colors = []
-    for i,cmap_name in enumerate(colormap_names): 
-        cmap = cm.get_cmap(cmap_name, res)
-        colors.append(cmap(np.linspace(range[i,0],range[i,1],res)))
-    colors = np.vstack(colors)
-    mymap = LinearSegmentedColormap.from_list('my_colormap', colors)
-    return mymap
 
 def load_section_geometries(unqS,basepath):
     """

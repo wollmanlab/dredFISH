@@ -7,6 +7,9 @@ import numpy as np
 import umap
 import xycmap
 
+import matplotlib.cm as cm
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+
 from scipy.spatial.distance import jensenshannon, pdist, squareform
 from dredFISH.Utils.distu import *
 
@@ -84,3 +87,29 @@ def type_color_using_linkage(data,cmap,metric = "cosine"):
     rgb_by_type = rgb_by_type[1:,:]
     rgb_by_type = rgb_by_type[ordr,:]
     return rgb_by_type
+
+def merge_colormaps(colormap_names,range = (0,1),res = 128):
+    """
+    Merge multiple matplotlib colormaps into one. 
+    range: either a tuple (same for all colormaps, or an Nx2 array with ranges to use. 
+           full range is 0-1, so to clip any side just use partial range (0.1,1)
+    """
+
+    # make colormap_names into a list (if it's just a string name)
+    if not isinstance(colormap_names,list):
+        colormap_names=[colormap_names]
+
+    # process / verify the range input
+    if not isinstance(range, np.ndarray): 
+        range = np.tile(range,(len(colormap_names),1))
+    assert range.shape[0]==len(colormap_names), "ranges dimension doesn't match colormap names"
+
+    # sample the colormaps that you want to use. Use 128 from each so we get 256
+    # colors in total
+    colors = []
+    for i,cmap_name in enumerate(colormap_names): 
+        cmap = cm.get_cmap(cmap_name, res)
+        colors.append(cmap(np.linspace(range[i,0],range[i,1],res)))
+    colors = np.vstack(colors)
+    mymap = LinearSegmentedColormap.from_list('my_colormap', colors)
+    return mymap
