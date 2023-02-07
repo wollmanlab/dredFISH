@@ -4,7 +4,9 @@ import numpy as np
 from Bio.Seq import Seq
 from scipy.special import comb
 
+
 from dredFISH.Utils import sequ
+from dredFISH.Utils.__init__plots import *
 
 
 def get_num_combinations(n):
@@ -192,6 +194,7 @@ def simulate_nupack(seqs_enc, readout_i, conc_r, conc_e, t=37, sodium=0.3, tube_
 def simulate_cross_binding(
                     seqs_enc, 
                     seqs_tag=None, 
+                    seqs_token=None, # which entries in seqs_enc to introduce its reverse complement sequence as "readout"
                     conc_e=1e-11,
                     conc_r=1e-9,
                     temps=[37], # [25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75],
@@ -216,18 +219,28 @@ def simulate_cross_binding(
     Returns:
         tuple: (res, emap, raw_concs, tms) results pandas DataFrame; numpy array for Ri-Ej; dictionary of raw concentrations.
     """
-    num_tubes = len(seqs_enc)
-    if seqs_tag is None:
-        seqs_tag = np.arange(num_tubes)
 
+    seqs_enc = np.array(seqs_enc)
+    # get RC seqs
     seqs_rdt = np.array([get_rcseq(seq_enc) for seq_enc in seqs_enc])
-    # one readout probe per tube
+    # get TMs
+    tms = [sequ.get_tm(x, Na=sodium*1e3, dnac1=conc_r*1e9, dnac2=conc_e*1e9, fmd=0) for x in seqs_enc]
+    # name for each pair
+    if seqs_tag is None: 
+        seqs_tag = np.arange(len(seqs_enc))
+    assert len(seqs_tag) == len(seqs_enc)
+
+    # tokens to run tubes on
+    if seqs_token is None:
+        seqs_token = np.arange(len(seqs_enc)) # everything
+
+    # all encoding probes 
     strands_e = [nupack.Strand(seq_enc, name=f"e{i}") 
                  for i, seq_enc in enumerate(seqs_enc)]
 
-    tms = [sequ.get_tm(x, Na=sodium*1e3, dnac1=conc_r*1e9, dnac2=conc_e*1e9, fmd=0) for x in seqs_enc]
+    # one readout token per tube 
     tubes = []
-    for readout_i in np.arange(num_tubes):
+    for readout_i in seqs_token:
         strand_r = nupack.Strand(seqs_rdt[readout_i], name=f"r{readout_i}")
         if adaptive:
             strands_tube = {strand: conc_e for strand in 
@@ -255,7 +268,7 @@ def simulate_cross_binding(
                             )
         tube_results = nupack.tube_analysis(tubes=tubes, model=model)
         
-        for readout_i in np.arange(num_tubes):
+        for readout_i in seqs_token:
             print('.', end='')
             conc = tabulate_results(tube_results, name=f'tube{readout_i}')
             emap = summarize_heatmap_fast(conc, readout_i)
@@ -277,3 +290,58 @@ def simulate_cross_binding(
 
     res = pd.DataFrame(res)
     return res, emaps, raw_concs, tms
+
+
+def view_raw(res, ax=None):
+    """
+    """
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(10,3))
+    sns.scatterplot(data=res, x='order', y='log10frac', hue='group', s=10)
+    ax.legend(bbox_to_anchor=(1,1))
+    sns.despine(ax=ax)
+
+def view_emap(emap, baseconc, ax=None, title=None, vmax=0, vmin=-3):
+    """
+    """
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(5,4))
+    mat = np.log10(np.vstack(emap)/baseconc)
+    sns.heatmap(mat, 
+                xticklabels=5,
+                yticklabels=5,
+                vmax=vmax, 
+                vmin=vmin,
+                cbar_kws=dict(shrink=0.5, label=f'log10(conc/baseline)', ticks=[-3, -2,-1,0]), 
+                cmap='coolwarm',
+                ax=ax,
+               )
+    ax.set_aspect('equal')
+    if title is not None:
+        ax.set_title(title)
+
+def view_pr(resplot, ax_row, **kwargs):
+    """
+    """
+    p, r = resplot['precision'], resplot['recall']
+    minpr = np.minimum(p, r)
+    f1 = 2/(1/p+1/r)
+    
+    ax = ax_row[0]
+    ax.plot(resplot['t'], p, '-o', **kwargs)
+    ax.set_xlabel('Celsius')
+    ax.set_ylabel('Precision')
+    sns.despine(ax=ax)
+    
+    ax = ax_row[1]
+    ax.plot(resplot['t'], r, '-o', **kwargs)
+    ax.set_xlabel('Celsius')
+    ax.set_ylabel('Recall')
+    sns.despine(ax=ax)
+    
+    ax = ax_row[2]
+    ax.plot(resplot['t'], minpr, '-o', **kwargs)
+    ax.set_xlabel('Celsius')
+    ax.set_ylabel('Min (Prec., Recall)')
+    ax.set_ylim([-.05,1.1])
+    sns.despine(ax=ax)
