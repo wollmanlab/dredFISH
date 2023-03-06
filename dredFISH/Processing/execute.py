@@ -4,7 +4,9 @@ import shutil
 from datetime import datetime
 import dredFISH.Processing as Processing
 from dredFISH.Processing.Section import *
-
+"""
+conda activate dredfish_3.9; python -W ignore /home/zach/PythonRepos/dredFISH/dredFISH/Processing/execute.py /orangedata/Images2023/Gaby/dredFISH/Acrydite_77.5.A_DPNMF_97.5.B_2023Feb16/ -c dredfish_processing_config_v1; conda deactivate
+"""
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("metadata_path", type=str, help="Path to folder containing Raw Data /bigstore/Images20XX/User/Project/Dataset/")
