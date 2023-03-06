@@ -33,6 +33,8 @@ if __name__ == '__main__':
         sections = np.unique([i.split('-Pos')[0] for i in posnames if '-Pos' in i])
     else:
         sections = [args.section]
+    if sections.shape[0]==0:
+        sections = ['Section1']
 
     if args.well!='':
         sections = [i for i in sections if args.well in i]

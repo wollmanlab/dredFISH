@@ -20,6 +20,8 @@ import anndata
 import pywt
 import logging
 from dredFISH.Utils import fileu
+import shutil
+import dredFISH.Processing as Processing
 
 from skimage import (
     data, restoration, util
@@ -89,6 +91,12 @@ class Section_Class(object):
                     format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
                     datefmt='%H:%M:%S',level=self.config.parameters['processing_log_level'], force=True)
         self.log = logging.getLogger("Processing")
+
+        src = os.path.join(Processing.__file__.split('dredFISH/P')[0],self.cword_config+'.py')
+        dst = os.path.join(self.path,self.cword_config+'.py')
+        if os.path.exists(dst):
+            os.remove(dst)
+        shutil.copyfile(src, dst)
 
     def run(self):
         """
@@ -231,6 +239,9 @@ class Section_Class(object):
         self.data = self.data[mask]
                                       
     def load_metadata(self):
+        """
+        load_metadata Load Raw Data Loading Class
+        """
         if isinstance(self.image_metadata,str):
             self.update_user('Loading Metadata')
             self.image_metadata = Metadata(self.metadata_path)
@@ -238,7 +249,7 @@ class Section_Class(object):
         hybe = [i for i in self.image_metadata.acqnames if 'hybe' in i][0]
         posnames = np.unique(self.image_metadata.image_table[np.isin(self.image_metadata.image_table.acq,hybe)].Position)
         sections = np.unique([i.split('-Pos')[0] for i in posnames if '-Pos' in i])
-        
+
         if sections.shape[0] == 0:
             acqs = [i for i in self.image_metadata.acqnames if ('hybe' in i)|('strip' in i)]
             self.posnames = np.array(self.image_metadata.image_table[np.isin(self.image_metadata.image_table.acq,acqs)].Position.unique())
@@ -254,6 +265,17 @@ class Section_Class(object):
                 self.coordinates[posname] = (self.image_metadata.image_table[(self.image_metadata.image_table.Position==posname)].XY.iloc[0]/self.config.parameters['pixel_size']).astype(int)
 
     def find_acq(self,hybe,protocol='hybe'):
+        """
+        find_acq Look through acqnames to find acquisition name for desired protocol and round
+
+        :param hybe: Round of Imaging ("1","hybe1")
+        :type hybe: str
+        :param protocol: hybe or strip, defaults to 'hybe'
+        :type protocol: str, optional
+        :raises ValueError: Notify User if acq doesnt exist
+        :return: name of acquisition within Metadata.acqnames
+        :rtype: str
+        """
         if 'hybe' in hybe:
             hybe = hybe.split('hybe')[-1]
         acqs = [i for i in self.acqs if protocol+hybe+'_' in i]
@@ -263,6 +285,20 @@ class Section_Class(object):
             return acqs[-1]
 
     def stitcher(self,hybe,channel,acq='',bkg_acq=''):
+        """
+        stitcher Function to stitch indivisual images into entire sections with rigid registration correction
+
+        :param hybe: round of imaging ("1", "hybe1")
+        :type hybe: str
+        :param channel: name of channel to be stitched
+        :type channel: str
+        :param acq: name of acquisition if you dont want to infer from hybe, defaults to ''
+        :type acq: str, optional
+        :param bkg_acq: name of background acquisition if you dont want to infer from hybe, defaults to ''
+        :type bkg_acq: str, optional
+        :return:  stitched,nuclei,nuclei_down,signal,signal_down (down is downsampled for visualization)
+        :rtype: torch.tensor,torch.tensor,torch.tensor,torch.tensor,torch.tensor
+        """        
         if acq=='':
             acq = self.find_acq(hybe,protocol='hybe')
         if self.config.parameters['strip']&(bkg_acq=='')&(acq==''):
@@ -433,6 +469,9 @@ class Section_Class(object):
                 return stitched,nuclei,nuclei_down,signal,signal_down
 
     def stitch(self):
+        """
+        stitch Wrapper to stitch all rounds of imaging
+        """        
         channel = self.config.parameters['total_channel']
         acq = self.find_acq(self.config.parameters['nucstain_acq'],protocol='hybe')
         if self.config.parameters['strip']:
@@ -467,7 +506,12 @@ class Section_Class(object):
                     self.any_incomplete_hybes = True
 
     def segment(self,model_type='nuclei'):
-        """ FIGURE OUT GPU FOR SPEED"""
+        """
+        segment Using stitched images segment cells 
+
+        :param model_type: model for cellpose ('nuclei' 'total' 'cytoplasm'), defaults to 'nuclei'
+        :type model_type: str, optional
+        """        
         if (not self.config.parameters['segment_overwrite'])&self.check_existance(type='mask',model_type=model_type):
             self.mask = self.load(type='mask',model_type=model_type)
         else:
@@ -572,6 +616,12 @@ class Section_Class(object):
                     self.save(self.mask,type='mask',model_type=model_type)
 
     def pull_vectors(self,model_type='nuclei'):
+        """
+        pull_vectors Using segmented cells pull pixels for each round for each cell and summarize into vector
+
+        :param model_type: model for cellpose ('nuclei' 'total' 'cytoplasm'), defaults to 'nuclei'
+        :type model_type: str, optional
+        """        
         proceed = True
         if (not self.config.parameters['vector_overwrite'])&self.check_existance(type='anndata',model_type=model_type):
             self.data = self.load(type='anndata',model_type=model_type)
@@ -720,6 +770,18 @@ def generate_FFs(image_metadata,acq,channel,posnames=[],bkg_acq='',parameters={}
     return nuc_FF,FF
 
 def process_img(img,parameters,FF=1):
+    """
+    process_img _summary_
+
+    :param img: _description_
+    :type img: _type_
+    :param parameters: _description_
+    :type parameters: _type_
+    :param FF: _description_, defaults to 1
+    :type FF: int, optional
+    :return: _description_
+    :rtype: _type_
+    """    
     # FlatField 
     img = img*FF
     # Smooth
@@ -742,6 +804,18 @@ def process_img(img,parameters,FF=1):
     return img
 
 def preprocess_images(data,FF=1,nuc_FF=1):
+    """
+    preprocess_images _summary_
+
+    :param data: _description_
+    :type data: _type_
+    :param FF: _description_, defaults to 1
+    :type FF: int, optional
+    :param nuc_FF: _description_, defaults to 1
+    :type nuc_FF: int, optional
+    :return: _description_
+    :rtype: _type_
+    """    
     acq = data['acq']
     bkg_acq = data['bkg_acq']
     posname = data['posname']
@@ -832,6 +906,26 @@ def preprocess_images(data,FF=1,nuc_FF=1):
 
     
 def visualize_merge(img1,img2,color1=np.array([1,0,1]),color2=np.array([0,1,1]),figsize=[20,20],pvmin=5,pvmax=95,title=''):
+    """
+    visualize_merge _summary_
+
+    :param img1: _description_
+    :type img1: _type_
+    :param img2: _description_
+    :type img2: _type_
+    :param color1: _description_, defaults to np.array([1,0,1])
+    :type color1: _type_, optional
+    :param color2: _description_, defaults to np.array([0,1,1])
+    :type color2: _type_, optional
+    :param figsize: _description_, defaults to [20,20]
+    :type figsize: list, optional
+    :param pvmin: _description_, defaults to 5
+    :type pvmin: int, optional
+    :param pvmax: _description_, defaults to 95
+    :type pvmax: int, optional
+    :param title: _description_, defaults to ''
+    :type title: str, optional
+    """
     vmin,vmax = np.percentile(img1,[pvmin,pvmax])
     img1 = img1-vmin
     img1 = img1/vmax
