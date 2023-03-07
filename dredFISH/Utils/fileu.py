@@ -211,7 +211,7 @@ def update_user(message,level=20,logger=None):
     else:
         log = logging.getLogger('Unknown Logger')
     if level<=10:
-        log.debug(♦+' '+str(message))
+        log.debug(str(datetime.now().strftime("%H:%M:%S"))+' '+str(message))
     elif level==20:
         log.info(str(datetime.now().strftime("%H:%M:%S"))+' '+str(message))
     elif level==30:
