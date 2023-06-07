@@ -15,6 +15,18 @@ import time
 from IPython.display import HTML
 from dredFISH.Utils.nupacku import *
 from dredFISH.Utils.sequ import *
+from Bio.Seq import Seq
+
+def get_rcseq(seq):
+    """reverse complement
+
+    Args:
+        seq (str): _description_
+
+    Returns:
+        str: _description_
+    """
+    return str(Seq(seq).reverse_complement())
 
 
 def lev_mat(seq_list,self_dist = 0):

@@ -1,9 +1,7 @@
-import nupack
 import pandas as pd
 import numpy as np
-from Bio.Seq import Seq
 from scipy.special import comb
-
+import nupack
 
 from dredFISH.Utils import sequ
 from dredFISH.Utils.__init__plots import *
@@ -19,17 +17,6 @@ def get_num_combinations(n):
         float: number of resulting complex (single, self-bind, cross-bind)
     """
     return n+n+comb(n,2)
-
-def get_rcseq(seq):
-    """reverse complement
-
-    Args:
-        seq (str): _description_
-
-    Returns:
-        str: _description_
-    """
-    return str(Seq(seq).reverse_complement())
 
 def tabulate_results(tube_results, name='t1'):
     """Turn nupack output into a pandas Series
@@ -114,6 +101,13 @@ def summarize(conc, readout_i):
                 conc.filter(regex=f'\+e{readout_i}$'),
                 conc.filter(regex=f'^e{readout_i}$'),
                 ]).sum()  # all terms with e
+    
+    total_bound = pd.concat([
+                conc.filter(regex=f'^r{readout_i}\+'),
+                conc.filter(regex=f'\+r{readout_i}$'),
+                conc.filter(regex=f'^r{readout_i}$'),
+                ]).filter(regex='e').sum()
+
     ### this was flawed 
     
     if lbl_signal in conc.index.values:
@@ -124,7 +118,7 @@ def summarize(conc, readout_i):
     floating = conc.loc[lbl_floating].sum()
     
     usage = signal/total # fraction of provided r that goes to signal
-    precision = signal/(total-floating) # fraction of correct binding
+    precision = signal/total_bound # fraction of correct binding
     recall = signal/total_e
     
     return precision, usage, recall
@@ -345,3 +339,57 @@ def view_pr(resplot, ax_row, **kwargs):
     ax.set_ylabel('Min (Prec., Recall)')
     ax.set_ylim([-.05,1.1])
     sns.despine(ax=ax)
+
+def choose_orthogonal_subset(Seqs, requried_probes, cant_remove_ix = None, min_dist = None, plot_flag = False, vmax=0, vmin=-3, return_conc_mat = False, return_ix = False):
+    # cant_remove_ix = [24]
+    # requried_probes = 25
+    if len(Seqs)<requried_probes: 
+        raise ValueError("Please supply more seq than asked for")
+
+    Seqs = np.array(Seqs)
+    # first calculate cross bindings: 
+    res, emaps, raw_concs, tms = simulate_cross_binding(Seqs)
+    percision_mat = np.log10(np.vstack(emaps[37])/1e-11)
+    if min_dist is None: 
+        min_dist=percision_mat.min()
+
+    # create a copy of the matrix and start process of elimination
+    p_mat_2 = percision_mat.copy()
+    prb_ix = np.arange(p_mat_2.shape[0])
+    for i in range(p_mat_2.shape[0]): 
+        p_mat_2[i,i]=min_dist-1
+    while p_mat_2.shape[0]>requried_probes:
+        scr_per_probe = np.max(p_mat_2,axis=0)
+        if cant_remove_ix is not None: 
+            scr_per_probe[cant_remove_ix] = min_dist 
+        ix = np.argmax(scr_per_probe)
+        prb_ix = np.delete(prb_ix,ix)
+        p_mat_2 = np.delete(np.delete(p_mat_2,ix,0),ix,1)
+    for i in range(p_mat_2.shape[0]): 
+        p_mat_2[i,i]=0
+    
+    FinalSeqs = Seqs[prb_ix]
+
+    if plot_flag:
+        plt.figure()
+        sns.heatmap(p_mat_2, 
+                    xticklabels=5,
+                    yticklabels=5,
+                    vmax=vmax, 
+                    vmin=vmin,
+                    cbar_kws=dict(shrink=0.5, label=f'log10(conc/baseline)', ticks=[-3, -2,-1,0]), 
+                    cmap='coolwarm'
+                    )
+        plt.gca().set_aspect('equal')
+        plt.title(f"max values is: {p_mat_2[p_mat_2<0].max():.2f}\n") 
+    
+    if return_conc_mat and return_ix: 
+        return FinalSeqs,p_mat_2,prb_ix
+
+    if return_ix:
+        return FinalSeqs,prb_ix
+
+    if return_conc_mat:
+        return FinalSeqs,p_mat_2
+    
+    return FinalSeqs

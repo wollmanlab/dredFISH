@@ -8,7 +8,7 @@ def get_gc(seq):
     """
     return (seq.count('G') + seq.count('C'))/len(seq)
 
-def get_tm(seq, fmd=0, Na=1e-5, dnac1=0, dnac2=0):
+def get_tm(seq, fmd=0, Na=20, dnac1=0, dnac2=0):
     """seq is a Bio.Seq.Seq object
     myseq = Seq(mystring)
     """
