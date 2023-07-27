@@ -64,8 +64,103 @@ def lev_mat2(seq_list1,seq_list2):
         lev_dist_mat[ij[i][0],ij[i][1]]=Levenshtein.distance(seq_list1[ij[i][0]],seq_list2[ij[i][1]])
     return(lev_dist_mat)
     
+def binding_dist_oligo_mat(oligo_list_1,oligo_list_2 = None,hyb_conditions = None,return_matrices = False):
+    """
+    calculate binding properties for all pairing of oligos in list given nupacl hyb condition model.
+    uses binding_dist_oligos_lists for actual calculation
 
-def all_pairwise_pairing(oligos,my_model,avoid_self = False):
+    inputs: 
+    -------
+    oligo_list_1 : list of oligos
+    oligo_list_2 : list of oligos (could be empty and them doing oligo_list_1 vs itself)
+    
+    """
+    if oligo_list_2 is None:
+        oligo_list_1 = np.array(oligo_list_1)
+        oligo_pairs_ix = np.array([(i, j) for i, j in it.product(range(len(oligo_list_1)), repeat=2) if i <= j])
+        oligo_pairs_1 = oligo_list_1[oligo_pairs_ix[:,0]]
+        oligo_pairs_2 = oligo_list_1[oligo_pairs_ix[:,1]]
+    else: 
+        oligo_list_1 = np.array(oligo_list_1)
+        oligo_list_2 = np.array(oligo_list_2)
+        oligo_pairs_ix = np.array(list(it.product(range(len(oligo_list_1)),range(len(oligo_list_2)))))
+        oligo_pairs_1 = oligo_list_1[oligo_pairs_ix[:,0]]
+        oligo_pairs_2 = oligo_list_2[oligo_pairs_ix[:,1]]
+    bps_list,dG_list = binding_dist_oilgo_lists(oligo_pairs_1,oligo_pairs_2,hyb_conditions)
+    if return_matrices:
+        if oligo_list_2 is None: 
+            dG_mat = np.zeros((len(oligo_list_1),len(oligo_list_1)))
+        else: 
+            dG_mat = np.zeros((len(oligo_list_1),len(oligo_list_2)))
+        bps_mat = np.zeros_like(dG_mat)
+        for i in range(oligo_pairs_ix.shape[0]):
+            (ii,jj)=oligo_pairs_ix[i,:]
+            dG_mat[ii,jj] = dG_list[i]
+            bps_mat[ii,jj] = bps_list[i]
+            if oligo_list_2 is None: 
+                dG_mat[jj,ii] = dG_list[i]
+                bps_mat[jj,ii] = bps_list[i]
+        return(bps_mat,dG_mat)
+    else: 
+        return(bps_list,dG_list)
+
+
+
+def binding_dist_oilgo_lists(oligo_list_1,oligo_list_2 = '',hyb_conditions = None): 
+    """
+    calculate binding properties for set of oligos given nupacl hyb condition model. 
+
+    inputs: 
+    -------
+    oligo_list_1 : list of oligos
+    oligo_list_2 : option #1 - list of oligos to compare to 1
+                   option #2 - 'self' (analyze self binding - a single oligo at a time)
+                   option #3 - 'complement' oligo_list_1 is compared to it's complement
+                   option #4 - 'self-hetero' oligo from list 1 are comapred to themselves (2 oligos)
+    hyb_conditions : nupack model
+
+    output: 
+    -------
+    bps - number of nt that are bound to something (not free)
+    dG - reaction dG
+    """
+    # deal with special inputs values for oligo_list_2 (options #2 and #3 above)
+    single_strand_flag = False
+    if isinstance(oligo_list_2, str): 
+        if oligo_list_2 == 'self-hetero': 
+            oligo_list_2 = oligo_list_1.copy()
+        elif oligo_list_2 == 'self': 
+            single_strand_flag = True
+        elif oligo_list_2 == 'complement':
+            oligo_list_2 = [get_rcseq(o) for o in oligo_list_1]
+
+    # validate inputs
+    if not single_strand_flag and len(oligo_list_1) != len(oligo_list_2):
+        raise ValueError("Oligo lists must be the same length")
+    dGs = np.zeros(len(oligo_list_1))
+    bps = np.zeros(len(oligo_list_1))
+    for i in range(len(oligo_list_1)):
+        if single_strand_flag: 
+            strnds = [oligo_list_1[i]]
+        else:
+            strnds = [oligo_list_1[i],oligo_list_2[i]] 
+        mfe_structures = nupack.mfe(strands=strnds, model=hyb_conditions)
+        if len(mfe_structures)==0:
+            raise ValueError('something is wrong - please check')
+        dGs[i] = mfe_structures[0].energy
+        structure_mat = mfe_structures[0].structure.matrix()
+        if single_strand_flag: 
+            bps[i] = (len(oligo_list_1[i]) - np.trace(structure_mat))/2
+        else:
+            # remove all self bindings
+            structure_mat[:len(strnds[0]),:len(strnds[0])]=0
+            structure_mat[len(strnds[1]):,len(strnds[1]):]=0 
+            bps[i] = structure_mat.sum()/2
+        
+    return (bps,dGs)
+
+
+def all_pairwise_pairing(oligos,hyb_conditions,avoid_self = False,return_matrices = False):
     """
     pairwise distances between oligos using nupack's MFE
     returns both dG and number of binding sites (bps)
@@ -75,15 +170,25 @@ def all_pairwise_pairing(oligos,my_model,avoid_self = False):
         oligo_pairs = list(it.combinations(range(len(oligos)), 2))
     else: 
         oligo_pairs = [(i, j) for i, j in it.product(range(len(oligos)), repeat=2) if i <= j]
-
+    
     bps = np.zeros(len(oligo_pairs))
     dGs = np.zeros(len(oligo_pairs))
+    dG_mat = np.zeros((len(oligos),len(oligos)))
+    bps_mat = np.zeros((len(oligos),len(oligos)))
     for i,(o1,o2) in enumerate(oligo_pairs):
-        mfe_structures = nupack.mfe(strands=[oligos[o1],oligos[o2]], model=my_model)
+        mfe_structures = nupack.mfe(strands=[oligos[o1],oligos[o2]], model=hyb_conditions)
         structure_mat = mfe_structures[0].structure.matrix()
         bps[i] = (len(oligos[o1]) + len(oligos[o2]) - np.trace(structure_mat))/2
         dGs[i] = mfe_structures[0].energy
-    return (oligo_pairs,bps,dGs)
+        dG_mat[o1,o2]=dGs[i]
+        dG_mat[o2,o1]=dGs[i]
+        bps_mat[o1,o2]=bps[i]
+        bps_mat[o2,o1]=bps[i]
+
+    if return_matrices: 
+        return(bps_mat,dG_mat)
+    else:         
+        return (oligo_pairs,bps,dGs)
 
 
 def get_ATCG_freq(seq_list,atcg = ['A','T','C','G']):
@@ -195,92 +300,6 @@ def mutate_seqs(seqs,masks = None):
     return(new_seqs)
 
 
-# create_seq_set is old and was replaced by find_ortho_set - commented code will be deleted soon
-# def create_seq_set(seq_length = 20, ATminmax = {'min' : 0, 'max' :  float("inf")},
-#                    seq_to_avoid  = 'readouts', 
-#                    min_distance = 10, min_dG = -2,
-#                    assay_temp = 37, assay_salt = 0.3,
-#                    iter = 1000, batch_size = 100,
-#                    save_file = None, return_reasons = False):
-#     # housekeepting - 1. create nupack reaction model and
-#     my_model = nupack.Model(material='dna', 
-#                         celsius=assay_temp,
-#                         sodium=assay_salt,
-#                     )
-#     # housekeepint - 2 is asked, get readout sequences
-#     if seq_to_avoid is not None:
-#         dist_to_seq_to_avoid = [len(s)-seq_length+min_distance for s in seq_to_avoid]
-#         dist_to_seq_to_avoid = np.array(dist_to_seq_to_avoid)
-#         dist_to_seq_to_avoid = dist_to_seq_to_avoid[:,np.newaxis]
-
-#     # Find seed seq
-#     seed_seq = rand_seq(1,seq_length,AT = ATminmax)
-
-#     reject_reasons = {'exclude' : 0, 
-#                      'mfe' : 0,
-#                      'pool' : 0,
-#                      'self' : 0}   
-#     all_seq = seed_seq
-#     for i in range(iter):
-#         # random 
-#         poss_seq = rand_seq(batch_size,seq_length,AT = ATminmax)
-#         still_testing = batch_size
-
-#         # remove any that are too close to external seq list to avoid
-#         if seq_to_avoid is not None:
-#             dist_to_external = lev_mat2(seq_to_avoid,poss_seq)
-#             to_keep = np.all(dist_to_external>dist_to_seq_to_avoid,axis=0)
-
-#             # if there are any candidate keep them
-#             reject_reasons['exclude'] += still_testing-to_keep.sum()
-#             if not any(to_keep):
-#                 continue
-#             poss_seq=poss_seq[to_keep]
-#             still_testing = to_keep.sum()
-
-#         # remove seq with potential secondary structure
-#         to_keep = np.zeros(len(poss_seq),dtype=bool)
-#         for k,s in enumerate(poss_seq):
-#             mfe_structures = nupack.mfe(strands=[nupack.Strand(s,name='s')], model=my_model)
-#             if mfe_structures[0].energy>min_dG:
-#                 to_keep[k]=True
-#         reject_reasons['mfe'] += still_testing-to_keep.sum()
-#         if not any(to_keep):
-#             continue
-#         poss_seq=poss_seq[to_keep]
-#         still_testing = to_keep.sum()
-
-#         # check if any could be added to all_seq
-#         pool_to_smpl_dist = lev_mat2(all_seq,poss_seq)
-#         to_keep = pool_to_smpl_dist.min(axis=0)>=min_distance
-#         # if there are any candidate keep them
-#         reject_reasons['pool'] += still_testing-to_keep.sum()
-#         if not any(to_keep):
-#             continue
-#         poss_seq=poss_seq[to_keep]
-#         still_testing = to_keep.sum()
-
-#         # find sequences to add - use a heuristic that deletes 
-#         # seqs one at a time, removing the one with the most other similar sequeces. 
-#         self_dsts = lev_mat(poss_seq,self_dist = np.Inf)
-#         to_keep = np.ones(len(poss_seq),dtype=bool)
-#         while self_dsts.shape[0]>0 and self_dsts.min()<min_distance: 
-#             ix = np.argmax(np.sum(self_dsts < min_distance,axis=0))
-#             to_keep[ix] = False
-#             self_dsts = np.delete(np.delete(self_dsts,ix,0),ix,1)
-#         reject_reasons['self'] += still_testing-to_keep.sum()
-#         if not any(to_keep):
-#             continue
-#         poss_seq = poss_seq[to_keep]
-#         all_seq = np.hstack((all_seq,poss_seq))
-#         if save_file is not None: 
-#             np.savetxt(save_file, all_seq, delimiter=',',fmt="%s")
-#     print(f"Found {len(all_seq)} sequences")
-#     if return_reasons: 
-#         return all_seq,reject_reasons
-#     else:  
-#         return all_seq
-
 def screen_oligos_with_levenshtein(current_oligos, candidate_oligos,min_dist):
     """
     screens a list of candidates oligos against a list of current oligos to make sure that they have min_dist from all current_oligos. 
@@ -309,39 +328,14 @@ def screen_oligos_with_nupack(current_oligos, candidate_oligos,nupack_model,min_
     to_keep = np.ones(len(candidate_oligos),dtype = bool)
     for i,cand in enumerate(candidate_oligos):
         for j,curr in enumerate(current_oligos):
-            blah,bp,dG = all_pairwise_pairing([curr,cand],nupack_model,avoid_self=True)
-            if dG < min_dG and bp > max_bp:
+            bp,dG = binding_dist_oilgo_lists([curr],[cand],nupack_model)
+            # _,bp,dG = all_pairwise_pairing([curr,cand],nupack_model,avoid_self=True)
+            if dG[0] < min_dG or bp[0] > max_bp:
                 to_keep[i] = False
                 break
         if to_keep[i]:
             current_oligos.append(cand)
     return to_keep
-
-# def screen_oligos_with_levenshtein(current_oligos, candidate_oligos,min_dist):
-#     current_oligos = current_oligos.copy()
-#     to_keep = np.ones(len(candidate_oligos),dtype = bool)
-#     for i,cand in enumerate(candidate_oligos):
-#         for curr in current_oligos:
-#             cand_to_curr_dist = Levenshtein.distance(cand, curr)
-#             if cand_to_curr_dist < min_dist:
-#                 to_keep[i] = False
-#                 break
-#         if to_keep[i]:
-#             current_oligos.append(cand)
-#     return to_keep
-
-# def screen_oligos_with_nupack(current_oligos, candidate_oligos,nupack_model,min_dG = -3,max_bp = 5,orthogonal_input = False):
-#     current_oligos = current_oligos.copy()
-#     to_keep = np.ones(len(candidate_oligos),dtype = bool)
-#     for i,cand in enumerate(candidate_oligos):
-#         for j,curr in enumerate(current_oligos):
-#             blah,bp,dG = all_pairwise_pairing([curr,cand],nupack_model,avoid_self=True)
-#             if dG < min_dG or bp > max_bp:
-#                 to_keep[i] = False
-#                 break
-#         if to_keep[i] and not orthogonal_input:
-#             current_oligos.append(cand)
-#     return to_keep
 
 def screen_oligos_based_on_attributes(candidate_oligos,attribute_dict):
     """
@@ -391,11 +385,14 @@ def screen_oligos_based_on_attributes(candidate_oligos,attribute_dict):
     return to_keep
 
 
-def find_ortho_oligo_set(L,N,nupack_model,oligos = [],seq_to_avoid = None,min_dist = 12,min_dG = -10,min_dG_self = -2, max_bp = 8, max_self_bp = 4,GCcont = (0.4,0.6),exclude_patterns = ['GGG', 'CCC', 'AAAA', 'TTTT'],verbose = True):
+def find_ortho_oligo_set(L,N,nupack_model,oligos = None,seq_to_avoid = None,min_dist = 12,min_dG = -10,min_dG_self = -2, max_bp = 8, max_self_bp = 4,GCcont = (0.4,0.6),exclude_patterns = ['GGG', 'CCC', 'AAAA', 'TTTT'],verbose = True):
     """
     Goal: find a set of orthogonal oligos based on given rules. 
     screening is done using three set of criteria (attributes, lev, and nupack) so that it only checks things that are hard to compute if needed. 
     """
+    if oligos is None: 
+        oligos = list()
+
     start = time.time()
     if seq_to_avoid is None:
         oligos_start = 0
@@ -412,6 +409,9 @@ def find_ortho_oligo_set(L,N,nupack_model,oligos = [],seq_to_avoid = None,min_di
         to_keep = screen_oligos_based_on_attributes(candidates,{"GC content" : GCcont,"patterns to exclude" :exclude_patterns})
         candidates= candidates[to_keep]
         pass_attributes = np.sum(to_keep)
+
+        if pass_attributes==0: 
+            raise ValueError("did not find any oligo with reqruied attributes")
 
         # now we need to figure out if there is anything to screen against, 
         # if not (oligos is empty) find the first oligo that passes 2nd structure and continue
