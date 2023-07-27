@@ -309,9 +309,9 @@ def zscore(v, allow_nan=False, ignore_zero=False, zero_threshold=1e-10, **kwargs
         vcopy = v.copy()
         if ignore_zero:
             vcopy[vcopy<zero_threshold] = np.nan # turn a number to nan (usually 0)
-        return (vcopy-np.nanmean(vcopy, **kwargs))/(np.nanstd(vcopy, **kwargs))
+        return (vcopy-np.nanmedian(vcopy, **kwargs))/(np.nanstd(vcopy, **kwargs))
     else:
-        return (v-np.mean(v, **kwargs))/(np.std(v, **kwargs))
+        return (v-np.median(v, **kwargs))/(np.std(v, **kwargs))
 
 def stratified_sample(df, col, n: Union[int, dict], return_idx=False, group_keys=False, sort=False, random_state=0, **kwargs):
     """

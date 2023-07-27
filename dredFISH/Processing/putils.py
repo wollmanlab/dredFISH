@@ -9,6 +9,7 @@ from PIL import Image
 import torch
 import numpy as np
 from tqdm import tqdm
+from skimage.measure import regionprops
 
 def generate_img(data,FF=''):
     try:

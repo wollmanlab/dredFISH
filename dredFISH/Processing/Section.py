@@ -73,6 +73,8 @@ class Section_Class(object):
 
         if self.config.parameters['fishdata'] == 'fishdata':
             fishdata = self.config.parameters['fishdata']+str(datetime.today().strftime("_%Y%b%d"))
+        else:
+            fishdata = self.config.parameters['fishdata']
         self.path = os.path.join(self.metadata_path,fishdata)
         if not os.path.exists(self.path):
             self.update_user('Making fishdata Path',level=10)
@@ -246,12 +248,12 @@ class Section_Class(object):
             self.update_user('Loading Metadata')
             self.image_metadata = Metadata(self.metadata_path)
 
-        hybe = [i for i in self.image_metadata.acqnames if 'hybe' in i][0]
+        hybe = [i for i in self.image_metadata.acqnames if 'hybe' in i.lower()][0]
         posnames = np.unique(self.image_metadata.image_table[np.isin(self.image_metadata.image_table.acq,hybe)].Position)
         sections = np.unique([i.split('-Pos')[0] for i in posnames if '-Pos' in i])
 
         if sections.shape[0] == 0:
-            acqs = [i for i in self.image_metadata.acqnames if ('hybe' in i)|('strip' in i)]
+            acqs = [i for i in self.image_metadata.acqnames if ('hybe' in i.lower())|('strip' in i.lower())]
             self.posnames = np.array(self.image_metadata.image_table[np.isin(self.image_metadata.image_table.acq,acqs)].Position.unique())
         else:
             self.posnames = np.array([i for i in self.image_metadata.posnames if i.split('-Pos')[0]==self.section])
@@ -276,9 +278,9 @@ class Section_Class(object):
         :return: name of acquisition within Metadata.acqnames
         :rtype: str
         """
-        if 'hybe' in hybe:
-            hybe = hybe.split('hybe')[-1]
-        acqs = [i for i in self.acqs if protocol+hybe+'_' in i]
+        if 'hybe' in hybe.lower():
+            hybe = hybe.lower().split('hybe')[-1]
+        acqs = [i for i in self.acqs if protocol+hybe+'_' in i.lower()]
         if len(acqs)==0:
             raise ValueError(protocol+hybe+' not found in acqs')
         else:
@@ -788,19 +790,20 @@ def process_img(img,parameters,FF=1):
     if parameters['highpass_smooth']>0:
         img = gaussian_filter(img,parameters['highpass_smooth'])
     # Background Subtract
-    if parameters['highpass_function'] == 'gaussian':
-        bkg = gaussian_filter(img,parameters['highpass_sigma']) 
-    elif parameters['highpass_function'] == 'median':
-        bkg = median_filter(img,parameters['highpass_sigma']) 
-    elif parameters['highpass_function'] == 'minimum':
-        bkg = minimum_filter(img,size=parameters['highpass_sigma']) 
-    elif 'percentile' in parameters['highpass_function']:
-        bkg = percentile_filter(img,int(parameters['highpass_function'].split('_')[-1]),size=parameters['highpass_sigma'])
-    elif 'rolling_ball' in parameters['highpass_function']:
-        bkg = gaussian_filter(restoration.rolling_ball(gaussian_filter(img,parameters['highpass_sigma']/5),radius=parameters['highpass_sigma'],num_threads=30),parameters['highpass_sigma'])
-    else:
-        bkg = 0
-    img = img-bkg
+    for iter in range(parameters['background_estimate_iters']):
+        if parameters['highpass_function'] == 'gaussian':
+            bkg = gaussian_filter(img,parameters['highpass_sigma']) 
+        elif parameters['highpass_function'] == 'median':
+            bkg = median_filter(img,parameters['highpass_sigma']) 
+        elif parameters['highpass_function'] == 'minimum':
+            bkg = minimum_filter(img,size=parameters['highpass_sigma']) 
+        elif 'percentile' in parameters['highpass_function']:
+            bkg = percentile_filter(img,int(parameters['highpass_function'].split('_')[-1]),size=parameters['highpass_sigma'])
+        elif 'rolling_ball' in parameters['highpass_function']:
+            bkg = gaussian_filter(restoration.rolling_ball(gaussian_filter(img,parameters['highpass_sigma']/5),radius=parameters['highpass_sigma'],num_threads=30),parameters['highpass_sigma'])
+        else:
+            bkg = 0
+        img = img-bkg
     return img
 
 def preprocess_images(data,FF=1,nuc_FF=1):

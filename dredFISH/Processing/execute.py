@@ -23,6 +23,8 @@ if __name__ == '__main__':
     """
     metadata_path = args.metadata_path
     cword_config = args.cword_config
+    config = importlib.import_module(cword_config)
+    config.parameters['nucstain_acq']
     # if args.fishdata == 'fishdata':
     #     fishdata = args.fishdata+str(datetime.today().strftime("_%Y%b%d"))
     # else:
@@ -30,8 +32,8 @@ if __name__ == '__main__':
     print(args)
     if args.section=='all':
         image_metadata = Metadata(metadata_path)
-        hybe1s = [i for i in image_metadata.acqnames if 'hybe1_' in i]
-        posnames = np.unique(image_metadata.image_table[np.isin(image_metadata.image_table.acq,hybe1s)].Position)
+        hybe = [i for i in image_metadata.acqnames if config.parameters['nucstain_acq']+'_' in i.lower()]
+        posnames = np.unique(image_metadata.image_table[np.isin(image_metadata.image_table.acq,hybe)].Position)
         sections = np.unique([i.split('-Pos')[0] for i in posnames if '-Pos' in i])
     else:
         sections = [args.section]
