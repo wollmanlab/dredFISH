@@ -66,6 +66,26 @@ class Classifier(metaclass=abc.ABCMeta):
         """
         pass
 
+class Unsupervized(Classifier):
+    """
+    Unsupervized "pass-through", i.e. the ref data is the answer
+    only check if number of cells matches
+    """
+    def __init__(self):
+        super().__init__()
+
+    def train(self,ref_data,ref_label_id): 
+        # update the taxonomy
+        self.tax.add_types(ref_label_id,ref_data)
+        self._ref_label_id = ref_label_id
+        self._ref_data = ref_data
+
+    def classify(self, data):
+        if data.shape[0]==self._ref_data.shape[0]:
+            return self._ref_label_id
+        else: 
+            raise ValueError("Number of rows in data doesn't match training ref")
+    
 class KNNClassifier(Classifier): 
     """k-nearest-neighbor classifier
     
@@ -117,6 +137,95 @@ class KNNClassifier(Classifier):
             kids = self._ref_label_id[indices]
             ids = mode(kids,axis=1)
         return ids.flatten()
+    
+class OptimalLeidenUnsupervized(Unsupervized):
+    """Classifiy cells based on unsupervized Leiden with optimal resolution 
+    
+    This classifiers is trained using unsupervized learning. 
+    Uses Unsupervized (passthrough) classifiers
+    """ 
+    def __init__(self, TG):
+        """
+        Parameters
+        ----------
+        TG : TissueGraph
+            Required parameter - the TissueGraph object we're going to use for unsupervised clustering. 
+        """
+        if not isinstance(TG, TissueGraph.TissueGraph): 
+            raise ValueError("OptimalLeidenUnsupervized requires a TissueGraph object as input")
+            
+        #set up the KNN portion
+        super().__init__()
+        self._TG = TG   
+    
+    def train(self, opt_res=None, opt_params={'iters' : 10, 'n_consensus' : 50}):
+        """training for this class is performing optimal leiden clustering 
+        
+        Optimization is done over resolution parameter trying to maximize the TG conditional entropy. 
+        The analysis uses the two graphs (spatial and features) and finds a resolution parameters that will maximize 
+        the conditional entropy, H(Zone|Type). 
+        
+            
+        Parameters
+        ----------
+        opt_params : dict
+            Few parameters that control optimizaiton. 
+            'iter' is the number of repeats in each optimization round. 
+            'n_consensus' is the number of times to do the final clustering with optimal resolution.   
+            
+        """
+        def ObjFunLeidenRes(res, return_types=False):
+            """
+            Basic optimization routine for Leiden resolution parameter. 
+            Implemented using igraph leiden community detection
+            """
+            EntropyVec = np.zeros(opt_params['iters'])
+            for i in range(opt_params['iters']):
+                TypeVec = self._TG.FG.community_leiden(resolution_parameter=res,
+                                                   objective_function='modularity').membership
+                TypeVec = np.array(TypeVec).astype(np.int64)
+                EntropyVec[i] = self._TG.contract_graph(TypeVec).cond_entropy()
+            Entropy = EntropyVec.mean()
+            if return_types: 
+                return (-Entropy, TypeVec)
+            else:
+                return (-Entropy)
+
+        if opt_res is None: 
+            print(f"Calling initial optimization")
+            sol = minimize_scalar(ObjFunLeidenRes, bounds = (0.1,30), 
+                                                method='bounded',
+                                                options={'xatol': 1e-2, 'disp': 3})
+            self._opt_res = sol['x']
+            ent = sol['fun']
+            evls = sol['nfev']
+        else: 
+            self._opt_res = opt_res
+            ent = -1
+            evls = 0
+        
+        # consensus clustering
+        TypeVec = np.zeros((self._TG.N,opt_params['n_consensus']))
+        for i in range(opt_params['n_consensus']):
+            ent, TypeVec[:,i] = ObjFunLeidenRes(self._opt_res, return_types=True)
+            
+        if opt_params['n_consensus']>1:
+            cmb = np.array(list(itertools.combinations(np.arange(opt_params['n_consensus']), r=2)))
+            rand_scr = np.zeros(cmb.shape[0])
+            for i in range(cmb.shape[0]):
+                rand_scr[i] = adjusted_rand_score(TypeVec[:,cmb[i,0]],TypeVec[:,cmb[i,1]])
+            rand_scr = squareform(rand_scr)
+            total_rand_scr = rand_scr.sum(axis=0)
+            TypeVec = TypeVec[:,np.argmax(total_rand_scr)]
+                                                  
+        print(f"Number of types: {len(np.unique(TypeVec))} initial entropy: {ent} number of evals: {evls}")
+
+        # update the Taxonomy and create
+        # self.tax.add_types(self._TG.feature_mat,TypeVec)
+        # self.TypeVec = TypeVec
+        
+        # train the KNN classifier using the types we found
+        super().train(self._TG.feature_mat, TypeVec)
 
 class OptimalLeidenKNNClassifier(KNNClassifier):
     """Classifiy cells based on unsupervized Leiden with optimal resolution 
@@ -208,9 +317,6 @@ class OptimalLeidenKNNClassifier(KNNClassifier):
         # train the KNN classifier using the types we found
         super().train(self._TG.feature_mat, TypeVec)
          
-
-    # def classify(self):
-    #     return self.TypeVec
 
 class TopicClassifier(Classifier): 
     """Uses Latent Dirichlet Allocation to classify cells into regions types. 
