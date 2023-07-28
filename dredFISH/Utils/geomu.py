@@ -277,7 +277,8 @@ def plot_polygon_collection(verts_or_polys,
                             xlm = None,
                             ylm = None,
                             background_color = (1,1,1), # defaults to white background
-                            transpose = False):
+                            transpose = False,
+                            rotation = None):
     """
     utility function that gets vertices (list of XYs) or polygons (list of shapley polygons)
     and plots them using matplotlib PolygonCollection. If polygons have holes, will "fake it" and plot the holes on top of the 
@@ -293,6 +294,19 @@ def plot_polygon_collection(verts_or_polys,
 
     if transpose:
         verts = [np.fliplr(v) for v in verts]
+
+    if rotation is not None:
+        # find XY center of all verts and subtract the center from all vert points
+        xy = np.vstack(verts)
+        xy_cntr = xy.mean(axis=0)
+        verts_cntr = [v-xy_cntr for v in verts]
+        # convert rotation to matrix
+        rot_mat = rotation_matrix_degrees(rotation)
+        # multiply XYcentered by rotation matrix
+        verts_rot = [np.matmul(v,rot_mat) for v in verts_cntr]
+        # add back the centroids. 
+        verts = [v+xy_cntr for v in verts_rot]
+        
 
     # verify rgb inputs and deal with cases where we only want edges
     assert rgb_edges is not None or rgb_faces is not None,"To plot either pleaes provide RGB array (nx3) for either edges or faces "
@@ -334,13 +348,39 @@ def plot_polygon_collection(verts_or_polys,
     ax.set_aspect('equal', 'box')
     ax.axis('off')
 
-def plot_point_collection(pnts,sizes,rgb_faces = None,rgb_edges = None,ax = None,xlim=None,ylm = None):
+def rotation_matrix_degrees(angle_degrees):
+    # Convert angle from degrees to radians
+    angle_radians = np.radians(angle_degrees)
+    
+    # Calculate cos and sin of the angle
+    cos_theta = np.cos(angle_radians)
+    sin_theta = np.sin(angle_radians)
+    
+    # Create the 2D rotation matrix
+    rotation_matrix = np.array([[cos_theta, -sin_theta],
+                                [sin_theta, cos_theta]])
+    
+    return rotation_matrix
+
+def plot_point_collection(pnts,sizes,rgb_faces = None,rgb_edges = None,ax = None,xlm=None,ylm = None,transpose = None, rotation = None):
     # Create the PollyCollection from vertices and set face/edge colors
     assert rgb_edges is not None or rgb_faces is not None,"To plot either pleaes provide RGB array (nx3) for either edges or faces "
 
     # get XY from points
     xy = [(p.x,p.y) for p in pnts]
     xy = np.array(xy)
+
+    if transpose:
+        xy = xy[:,[1,0]]
+
+    if rotation is not None:
+        # find XY center of all verts and subtract the center from all vert points
+        xy_cntr = xy.mean(axis=0)
+        xy = xy = xy_cntr
+        # convert rotation to matrix
+        rot_mat = rotation_matrix_degrees(rotation)
+        # multiply XYcentered by rotation matrix
+        xy = np.matmul(xy,rot_mat)+xy_cntr
 
     if ax is None: 
         fig = plt.figure(figsize = (8,10))

@@ -96,7 +96,7 @@ class BasisView(View):
     def __init__(self,TMG,section = None, basis = np.arange(24), qntl = (0.025,0.975),colormaps="jet",subplot_layout = [1,1],**kwargs):
         super().__init__(TMG,name = "View basis",figsize=(15,10))
 
-        # decide the subplot layout, that keepw a 2x3 design
+        # decide the subplot layout, that keep a 2x3 design
         # this will only run if the subplot_layout is smaller then needed 
         while np.prod(subplot_layout)<len(basis):
             subplot_layout[1] += 1
@@ -163,8 +163,8 @@ class UMAPwithSpatialMap(View):
 
         # add the scatter plot
         Pumap = Scatter(self,self.ump1,self.ump2,c = clr,s=0.1,name = 'umaps',pos = gs[0],
-                        xlabel = 'UMAP-1',ylabel = 'UMAP-2',xtick = [],ytick=[])
-        Pmap = Map(V = self,section = section,rgb_faces = clr,pos = gs[1],name = 'map with UMAP colors')
+                        xlabel = 'UMAP-1',ylabel = 'UMAP-2',xtick = [],ytick=[],**kwargs)
+        Pmap = Map(V = self,section = section,rgb_faces = clr,pos = gs[1],name = 'map with UMAP colors',**kwargs)
 
     def show(self):
         super().show()
@@ -257,19 +257,17 @@ class Map(Panel):
         self.rgb_edges = rgb_edges
         self.rgb_faces = rgb_faces
         self.geom_type = geom_type
+        
 
         # get limits
         if self.V.TMG.unqS.count(self.section) == 0:
             raise ValueError(f"section {self.section} is not found in TMG.unqS {self.V.TMG.unqS}")
         else: 
             section_ix = self.V.TMG.unqS.index(self.section)
-        (xlim,ylim) = self.V.TMG.Geoms[section_ix]['mask'].get_xylim()
+
         self.xlim = kwargs.get('xlim',None)
         self.ylim = kwargs.get('ylim',None)
-        if self.xlim is None: 
-            self.xlim = xlim
-        if self.ylim is None: 
-            self.ylim = ylim
+        self.rotation = kwargs.get('rotation',None)
 
         # get the geom collection saved in appropriate TMG Geom
         self.geom_collection = self.V.TMG.Geoms[section_ix][geom_type].verts
@@ -286,13 +284,15 @@ class Map(Panel):
                                         rgb_faces = self.rgb_faces,
                                         rgb_edges = self.rgb_edges, 
                                         ax = self.ax,
-                                        xlm = self.xlim,ylm = self.ylim)
+                                        xlm = self.xlim,ylm = self.ylim,
+                                        rotation = self.rotation)
         else: 
             geomu.plot_polygon_collection(self.geom_collection,
                                           rgb_faces = self.rgb_faces,
                                           rgb_edges = self.rgb_edges, 
                                           ax = self.ax,
-                                          xlm = self.xlim,ylm = self.ylim)
+                                          xlm = self.xlim,ylm = self.ylim,
+                                          rotation = self.rotation)
             
 
 class TypeMap(Map):

@@ -6,6 +6,21 @@ import nupack
 from dredFISH.Utils import sequ
 from dredFISH.Utils.__init__plots import *
 
+from Bio.Seq import Seq
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+def get_rcseq(seq):
+    """reverse complement
+
+    Args:
+        seq (str): _description_
+
+    Returns:
+        str: _description_
+    """
+    return str(Seq(seq).reverse_complement())
 
 def get_num_combinations(n):
     """get number of expected complex
