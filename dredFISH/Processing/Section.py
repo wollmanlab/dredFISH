@@ -790,20 +790,20 @@ def process_img(img,parameters,FF=1):
     if parameters['highpass_smooth']>0:
         img = gaussian_filter(img,parameters['highpass_smooth'])
     # Background Subtract
-    for iter in range(parameters['background_estimate_iters']):
-        if parameters['highpass_function'] == 'gaussian':
-            bkg = gaussian_filter(img,parameters['highpass_sigma']) 
-        elif parameters['highpass_function'] == 'median':
-            bkg = median_filter(img,parameters['highpass_sigma']) 
-        elif parameters['highpass_function'] == 'minimum':
-            bkg = minimum_filter(img,size=parameters['highpass_sigma']) 
-        elif 'percentile' in parameters['highpass_function']:
-            bkg = percentile_filter(img,int(parameters['highpass_function'].split('_')[-1]),size=parameters['highpass_sigma'])
-        elif 'rolling_ball' in parameters['highpass_function']:
-            bkg = gaussian_filter(restoration.rolling_ball(gaussian_filter(img,parameters['highpass_sigma']/5),radius=parameters['highpass_sigma'],num_threads=30),parameters['highpass_sigma'])
-        else:
-            bkg = 0
-        img = img-bkg
+    # for iter in range(parameters['background_estimate_iters']):
+    if parameters['highpass_function'] == 'gaussian':
+        bkg = gaussian_filter(img,parameters['highpass_sigma']) 
+    elif parameters['highpass_function'] == 'median':
+        bkg = median_filter(img,parameters['highpass_sigma']) 
+    elif parameters['highpass_function'] == 'minimum':
+        bkg = minimum_filter(img,size=parameters['highpass_sigma']) 
+    elif 'percentile' in parameters['highpass_function']:
+        bkg = percentile_filter(img,int(parameters['highpass_function'].split('_')[-1]),size=parameters['highpass_sigma'])
+    elif 'rolling_ball' in parameters['highpass_function']:
+        bkg = gaussian_filter(restoration.rolling_ball(gaussian_filter(img,parameters['highpass_sigma']/5),radius=parameters['highpass_sigma'],num_threads=30),parameters['highpass_sigma'])
+    else:
+        bkg = 0
+    img = img-bkg
     return img
 
 def preprocess_images(data,FF=1,nuc_FF=1):
@@ -854,7 +854,9 @@ def preprocess_images(data,FF=1,nuc_FF=1):
                 i2 = interpolate.interp2d(x_correction,y_correction,bkg,fill_value=None)
                 bkg = i2(range(bkg.shape[1]), range(bkg.shape[0]))
             img = img-bkg
-
+        for iter in range(parameters['background_estimate_iters']):
+            img = img-gaussian_filter(restoration.rolling_ball(gaussian_filter(img,parameters['highpass_sigma']/5),radius=parameters['highpass_sigma'],num_threads=30),parameters['highpass_sigma'])
+            nuc = nuc-gaussian_filter(restoration.rolling_ball(gaussian_filter(nuc,parameters['highpass_sigma']/5),radius=parameters['highpass_sigma'],num_threads=30),parameters['highpass_sigma'])
         dtype = 'int32'
         nuc[nuc<np.iinfo(dtype).min] = np.iinfo(dtype).min
         img[img<np.iinfo(dtype).min] = np.iinfo(dtype).min
