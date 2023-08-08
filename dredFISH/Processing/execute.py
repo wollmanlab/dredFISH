@@ -39,7 +39,7 @@ if __name__ == '__main__':
         sections = [args.section]
     if sections.shape[0]==0:
         sections = ['Section1']
-
+    print(sections)
     if args.well!='':
         sections = [i for i in sections if args.well in i]
     np.random.shuffle(sections)
