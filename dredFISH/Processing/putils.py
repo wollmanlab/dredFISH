@@ -115,7 +115,7 @@ def generate_stitched(image_metadata,
                 continue
     return stitched.numpy()
 
-def colorize_segmented_image(img, color_type='rgb'):
+def colorize_segmented_image_slow(img, color_type='rgb'):
     """
     Returns a randomly colorized segmented image for display purposes.
     :param img: Should be a numpy array of dtype np.int and 2D shape segmented
@@ -140,3 +140,46 @@ def colorize_segmented_image(img, color_type='rgb'):
         rgb_img[tuple(regions[i].coords.T)] = colors[i]  # won't use the 1st color
 
     return rgb_img.astype(np.int)
+
+    # from dredFISH.Processing.putils import *
+def colorize_segmented_image(img, color_type='rgb'):
+    """
+    Returns a randomly colorized segmented image for display purposes.
+    :param img: Should be a numpy array of dtype np.int and 2D shape segmented
+    :param color_type: 'rg' for red green gradient, 'rb' = red blue, 'bg' = blue green
+    :return: Randomly colorized, segmented image (shape=(n,m,3))
+    """
+    def split(a, n):
+        k, m = divmod(len(a), n)
+        return (a[i*k+min(i, m):(i+1)*k+min(i+1, m)] for i in range(n))
+    img = torch.tensor(img)
+    # get empty rgb_img as a skeleton to add colors
+    rgb_img = torch.zeros((img.shape[0], img.shape[1], 3),dtype=torch.int8)
+    x,y = torch.where(img!=0)
+    l = img[x,y]
+    rgb = rgb_img[x,y,:]
+    # make your colors
+    cells = torch.unique(l).numpy()
+    np.random.shuffle(cells)
+    for cell in tqdm(cells,total=cells.shape[0]):
+        rgb[l==cell,:] = torch.tensor(np.random.randint(0, 255, (3)),dtype=torch.int8)
+    rgb_img[x,y,:] = rgb
+    return rgb_img.numpy().astype(np.int8)
+def bin_pixels_pytorch(image, n):
+    # Convert the NumPy array to a PyTorch tensor
+    image_tensor = torch.from_numpy(image)
+
+    # Get the dimensions of the original image
+    height, width, channels = image_tensor.shape
+
+    # Calculate the new height and width after binning
+    new_height = height // n
+    new_width = width // n
+
+    # Reshape the image to a new shape with n x n bins and 3 channels
+    binned_image = image_tensor[:new_height * n, :new_width * n].view(new_height, n, new_width, n, channels)
+
+    # Sum the pixels within each bin along the specified axes (axis 1 and axis 3)
+    binned_image = binned_image.sum(dim=(1, 3))
+
+    return binned_image.numpy()
