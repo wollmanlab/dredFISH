@@ -37,6 +37,7 @@ import igraph
 import pynndescent 
 
 from scipy.sparse.csgraph import dijkstra
+from scipy.ndimage import distance_transform_edt
 import scipy.sparse 
 
 import anndata
@@ -143,10 +144,10 @@ class TissueMultiGraph:
             self.Geoms = list()
             
             self.Taxonomies = list() # a list of Taxonomies
-            self.layer_taxonomy_mapping = dict() # list() # a list of tuples that keep tracks of which TissueGraph (index into Layer) 
-                                                 # uses which taxonomy (index into Taxonomies
-                                                 # FIXME -- has to be a dictinary 
-
+            self.layer_taxonomy_mapping = dict() # dict() # a dictopnary that keep tracks of which TissueGraph (index into Layer) 
+                                                 # uses which taxonomy (index into Taxonomies)
+                                                 
+            
         elif quick_load_cell_obs:
             # load cell level attributes only -- faster
             with open(os.path.join(self.basepath,"TMG.json")) as fh:
@@ -184,15 +185,9 @@ class TissueMultiGraph:
             LayerNameList = self._config["layer_types"]
             self.Layers = [None]*len(LayerNameList)
             for i in range(len(LayerNameList)): 
-                if i in self.layer_taxonomy_mapping.keys():
-                    tax_ix = self.layer_taxonomy_mapping[i]
-                    tax = self.Taxonomies[tax_ix]
-                else:
-                    tax = None
                 self.Layers[i] = TissueGraph(basepath = self.basepath,
                                              dataset = self.dataset, 
                                              layer_type = LayerNameList[i], 
-                                             tax = tax, 
                                              redo = False)
                 
             self.layers_graph = self._config["layers_graph"]
@@ -279,23 +274,33 @@ class TissueMultiGraph:
         if len(self.Layers) < layer_id or layer_id is None or layer_id < 0: 
             raise ValueError(f"requested layer id: {layer_id} doesn't exist")
 
-        if self.Layers[layer_id].Type is not None:
-            print("!! .Type already exists in that layer; return ...")
-            return
+        # if Tax is a new Taxonomy, add it to self
+        if isinstance(tax, Taxonomy): # add to the pool and use an index to represent it
+            self.Taxonomies.append(tax)
+            tax_id = len(self.Taxonomies)-1
+
+        if isinstance(tax,str):
+            tax_names = [t.name for t in self.Taxonomies]
+            tax_id = [i for i, word in enumerate(tax_names) if word == tax]
+            if len(tax_id)==0:
+                raise ValueError(f"taxonomy {tax} not found in {tax_names}")
+            if len(tax_id)>1:
+                raise ValueError(f"taxonomy {tax} apears more then once in {tax_names}, please check!")
+            tax_id = tax_id[0]
+            tax = self.Taxonomies[tax_id]
+
+        if any(isinstance(item, str) for item in type_vec):
+            type_vec_inds = -np.ones(len(type_vec))
+            for i,typ in enumerate(tax.Type): 
+                type_vec_inds[type_vec==typ]=i
+            type_vec = type_vec_inds
 
         # update .Type  
         self.Layers[layer_id].Type = type_vec
 
-        # add Tax
-        # add a reference of which taxonomy index belongs to this TG
-        if isinstance(tax, Taxonomy): # add to the pool and use an index to represent it
-            self.Taxonomies.append(tax)
-            tax = len(self.Taxonomies)-1
-        self.Layers[layer_id].tax = tax
-
         # update mapping between layers and taxonomies to TMG (self)
         # this decides on which type to move on next...
-        self.layer_taxonomy_mapping[layer_id] = tax #.append((layer_id,tax))
+        self.layer_taxonomy_mapping[layer_id] = tax_id 
         return 
     
     def create_cell_layer(self, metric='cosine', norm='default', 
@@ -383,7 +388,6 @@ class TissueMultiGraph:
 
     def create_isozone_layer(self, cell_layer = 0):
         """Creates isozones layer using cell types. 
-        = IsoZoneLayer.tax 
         Contract cell types to create isozone graph. 
         
         """
@@ -394,7 +398,7 @@ class TissueMultiGraph:
         IsoZoneLayer = self.Layers[cell_layer].contract_graph()
         self.Layers.append(IsoZoneLayer)
         layer_id = len(self.Layers)-1                             
-        self.layer_taxonomy_mapping[layer_id] = IsoZoneLayer.tax # .append((layer_id,IsoZoneLayer.tax))
+        self.layer_taxonomy_mapping[layer_id] = self.layer_taxonomy_mapping[cell_layer]
         self.layers_graph.append((cell_layer,layer_id))
     
     def create_region_layer(self, topics, region_tax, cell_layer=0):
@@ -564,7 +568,7 @@ class TissueMultiGraph:
         # return a list of (unique) sections 
         return(list(np.unique(Sections)))
 
-    def add_geoms(self,geom_types = ["points","mask","voronoi","cells"]):
+    def add_geoms(self,geom_types = ["points","mask","voronoi","cells"],mask_source = 'raster', unqS = None):
         """
         Creates the geometries needed (mask, lines, points, and polygons) to be used in views to create maps.
         Geometries are vectorized representations of cells using lists of Shapely objects. 
@@ -584,18 +588,40 @@ class TissueMultiGraph:
         # XY and Section infpormation is independent on Geoms
         allXY = self.Layers[0].XY
         Sections = self.Layers[0].Section
+        if unqS is None: 
+            unqS = self.unqS
 
         # init final voronoi and mask polys to None and created them first time they are used. this prevents 
         # creating something if we don't need it, and prevents us from creating it twice
-        masked_vor_polys = None
-        mask_polys = None
-        cell_labels_raster = None
 
         # Init Geom
         self.Geoms = list()
-        # Create geoms per section: 
-        for i,s in enumerate(self.unqS):
 
+        def create_mask(self,mask_source,section,XY):
+            if mask_source=='raster':
+                cell_labels_raster = self.load_stiched_labeled_image(section = section,label_type = 'total')
+                mask_polys = geomu.create_mask_from_raster(cell_labels_raster)
+            elif mask_source=='XY':
+                XYint = (XY*1000).astype(int)
+                sz = np.fliplr(XYint).max(axis=0)+100
+                cell_labels_raster = np.zeros(sz,dtype=bool)
+                cell_labels_raster[XYint[:,1],XYint[:,0]]=True
+                cell_labels_raster = distance_transform_edt(1-cell_labels_raster)<2
+                mask_polys = geomu.create_mask_from_raster(cell_labels_raster)
+                rescl = [0.001, 0, 0, 0.001, 0, 0]
+                mask_polys = [shapely.affinity.affine_transform(m,rescl) for m in mask_polys]
+            else: 
+                raise ValueError(f"unsupported mask_source {mask_source}")
+            return mask_polys
+
+        # Create geoms per section: 
+        for i,s in enumerate(unqS):
+            # init all polygons for each section
+            masked_vor_polys = None
+            mask_polys = None
+            cell_labels_raster = None
+
+            print(f"started working on section {s}")
             # Initalize an empty Geom dict for this section
             section_geoms = {}
             
@@ -605,19 +631,14 @@ class TissueMultiGraph:
 
             # mask geom
             if "mask" in geom_types:
-                if mask_polys is None:
-                    if cell_labels_raster is None: 
-                        cell_labels_raster = self.load_stiched_labeled_image(section = s,label_type = 'total') 
-                    mask_polys = geomu.create_mask(cell_labels_raster)
+                mask_polys = create_mask(self,mask_source,s,XY)
                 section_geoms['mask'] = Geom(geom_type='mask',polys = mask_polys,section = s,
                                              basepath = self.basepath,dataset = self.dataset)
 
             # Voronoi geometry 
             if "voronoi" in geom_types:
                 if mask_polys is None:
-                    if cell_labels_raster is None: 
-                        cell_labels_raster = self.load_stiched_labeled_image(section = s,label_type = 'total') 
-                    mask_polys = geomu.create_mask(cell_labels_raster)
+                    mask_polys = create_mask(self,mask_source,s,XY)
                 vor_polys = geomu.voronoi_polygons(XY)
                 masked_vor_polys = geomu.mask_voronoi(vor_polys,mask_polys)
                 section_geoms['voronoi'] = Geom(geom_type='voronoi',polys = masked_vor_polys,section = s,
@@ -625,8 +646,7 @@ class TissueMultiGraph:
             
             # Vectorize cell segmentations matrix
             if "cells" in geom_types:
-                if cell_labels_raster is None: 
-                    cell_labels_raster = self.load_stiched_labeled_image(section = s,label_type = 'total') 
+                cell_labels_raster = self.load_stiched_labeled_image(section = s,label_type = 'total') 
                 cell_polys = geomu.vectorize_labeled_matrix_to_polygons(cell_labels_raster)
                 section_geoms['cells'] = Geom(geom_type='cells',polys = cell_polys,section = s,
                                               basepath = self.basepath,dataset = self.dataset)
@@ -646,9 +666,7 @@ class TissueMultiGraph:
             if "isozones" in geom_types:
                 if masked_vor_polys is None:
                     if mask_polys is None:
-                        if cell_labels_raster is None: 
-                            cell_labels_raster = self.load_stiched_labeled_image(section = s,label_type = 'total') 
-                        mask_polys = geomu.create_mask(cell_labels_raster)
+                        mask_polys = create_mask(self,mask_source,s,XY)
                     vor_polys = geomu.voronoi_polygons(XY)
                     masked_vor_polys = geomu.mask_voronoi(vor_polys,mask_polys)
                 
@@ -660,9 +678,7 @@ class TissueMultiGraph:
             if "regions" in geom_types: 
                 if masked_vor_polys is None:
                     if mask_polys is None:
-                        if cell_labels_raster is None: 
-                            cell_labels_raster = self.load_stiched_labeled_image(section = s,label_type = 'total') 
-                        mask_polys = geomu.create_mask(cell_labels_raster)
+                        mask_polys = create_mask(self,mask_source,s,XY)
                     vor_polys = geomu.voronoi_polygons(XY)
                     masked_vor_polys = geomu.mask_voronoi(vor_polys,mask_polys)
                 layer_ix = self.find_layer_by_name(self.geom_to_layer_type_mapping['regions'])
@@ -734,7 +750,7 @@ class TissueGraph:
     """
     def __init__(self, basepath=None, layer_type=None, dataset=None,
                        feature_mat=None, feature_mat_raw=None,
-                       tax=None, redo=False, obs=None,
+                       redo=False, obs=None,
                        quick_load_cell_obs=False
         ):
         """Create a TissueGraph object
@@ -772,9 +788,7 @@ class TissueGraph:
                                                              dataset=self.dataset):
             raise ValueError(f"either anndata file exists in basepath, or feature_mat must be provided")
 
-        # Taxonomy object - if it exists, provides a pointer to the object, None by default: 
-        self.tax = tax
-            
+           
         # this dict stores the defaults field names in the anndata objects that maps to TissueGraph properties
         # this allows storing different versions (i.e. different cell type assignment) in the anndata object 
         # while still maintaining a "clean" interfact, i.e. i can still call for TG.Type and get a type vector without 
@@ -833,8 +847,7 @@ class TissueGraph:
 
             # if feautre_mat is a tuple, replace with NaNs
             if isinstance(feature_mat,tuple): 
-                feature_mat = np.empty(feature_mat)
-                feature_mat[:]=np.nan
+                feature_mat = scipy.sparse.csr_matrix(feature_mat)
 
             # The main data container is an anndata, initalize with feature_mat  
             self.adata = anndata.AnnData(feature_mat, obs=obs,dtype=feature_mat.dtype) # the tissuegraph AnnData object
@@ -1251,7 +1264,6 @@ class TissueGraph:
         ZoneGraph.node_size = ZoneSize
         ZoneGraph.Type = TypeVec[ZoneSingleIx]
         ZoneGraph.Upstream = IxMapping
-        ZoneGraph.tax = self.tax
         
         return(ZoneGraph)
                              
@@ -1451,7 +1463,7 @@ class Taxonomy:
     """
     
     def __init__(self, name=None, 
-        Types=None, feature_mat=None
+        Types=None, feature_mat=None,rgb_codes=None
         ): 
         """Create a Taxonomy object
 
@@ -1466,7 +1478,7 @@ class Taxonomy:
             raise ValueError("Taxonomy must get a name")
         self.name = name
             
-        self._df = pd.DataFrame()
+        self._df = pd.DataFrame({"RGB" : rgb_codes})
 
         if Types is not None and feature_mat is not None: 
             self.add_types(Types,feature_mat)
@@ -1545,6 +1557,7 @@ class Taxonomy:
                               type='Taxonomy',
                               model_type=self.name,
                               dataset=dataset)
+        self._df.set_index('type', inplace=True)
         
     def add_types(self,new_types,feature_mat):
         """add new types and their feature average to the Taxonomy
@@ -1559,6 +1572,21 @@ class Taxonomy:
             self._df = pd.concat((self._df,type_feat_df.iloc[missing_index,:]),axis=0)
         
         return None
+    
+    @property
+    def N(self):
+        return len(self.Type)
+
+    @property
+    def RGB(self):
+        """
+        Returns RGB values for all types (random value if none assigned)
+        """
+        rgb = self._df['RGB']
+
+    @RGB.setter
+    def RGB(self,rgb_codes):
+        self._df['RGB'] = rgb_codes
 
 class Geom:
     """

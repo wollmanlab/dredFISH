@@ -133,9 +133,17 @@ def mask_voronoi(vor_polys,mask_polys):
     for i in range(len(vrts)):
         vor_ids.append(np.ones(vrts[i].shape[0])*i)
     vor_ids = np.hstack(vor_ids)
-    bnd = points_in_polygons(mask_polys,all_vrts)
-    bnd = np.any(bnd,axis=1)
-    bnd_vor_ids = np.unique(vor_ids[np.logical_not(bnd)])
+
+    # TODO
+    # can potentially speed things up by finding if polygons to be intersected are on boundary (bnd)
+    # however, this doesn't deal with holes well. Doing all of them is a few min per section so 
+    # replacing it with checking all of them (all vor_ids)
+
+    # bnd = points_in_polygons(mask_polys,all_vrts,check_holes = remove_holes)
+    # bnd = np.any(bnd,axis=1)
+    # bnd_vor_ids = np.unique(vor_ids[np.logical_not(bnd)])
+
+    bnd_vor_ids = vor_ids
 
     mask_polys = shapely.geometry.MultiPolygon(mask_polys)
     # after intersections, there are cases where shapely doesn't return a single polygons
@@ -162,7 +170,7 @@ def mask_voronoi(vor_polys,mask_polys):
     return vor_polys
 
 
-def create_mask(lbl,scl = 0.1,rds = 150,flip = False):
+def create_mask_from_raster(lbl,scl = 0.1,rds = 150,flip = False):
     """
     Create a mask that includes ALL cells, returns a list of polygons
 
@@ -306,6 +314,8 @@ def plot_polygon_collection(verts_or_polys,
         verts_rot = [np.matmul(v,rot_mat) for v in verts_cntr]
         # add back the centroids. 
         verts = [v+xy_cntr for v in verts_rot]
+
+
         
 
     # verify rgb inputs and deal with cases where we only want edges
@@ -327,6 +337,12 @@ def plot_polygon_collection(verts_or_polys,
     for i in range(len(hole_verts)):
         for j in range(len(hole_verts[i])):
             all_inr.append(hole_verts[i][j])
+
+    if rotation is not None: 
+        # same for hole-verts
+        all_inr = [v-xy_cntr for v in all_inr]
+        all_inr = [np.matmul(v,rot_mat) for v in all_inr]
+        all_inr = [v+xy_cntr for v in all_inr]
 
     # Create a second PolyCollection for the holes
     p2 = PolyCollection(all_inr)
@@ -469,7 +485,7 @@ def points_in_polygons(polys,XY,check_holes = False):
         result[:,i] = path.contains_points(XY)
 
         if check_holes:
-            # now exclude innter points
+            # now exclude interior points
             for j,iv in enumerate(in_verts):
                 path = Path(iv)
                 result[:,i] = np.logical_and(result[:,i],np.logical_not(path.contains_points(XY)))

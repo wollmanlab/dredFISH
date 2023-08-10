@@ -70,11 +70,11 @@ def type_color_using_supervized_umap(data,target):
     reducer = umap.UMAP(n_components = 3, metric = "cosine")
     embedding = reducer.fit_transform(data, y = target)
     L = embedding[:,0]
-    L = (L-L.min())/(L.max()-L.min())*100
+    L = (L-L.min())/(L.max()-L.min())
     a = embedding[:,1]
-    a = ((a-a.min())/(a.max()-a.min())-0.5)*255
+    a = ((a-a.min())/(a.max()-a.min()))
     b = embedding[:,2]
-    b = ((b-b.min())/(b.max()-b.min())-0.5)*255
+    b = ((b-b.min())/(b.max()-b.min()))
     Lab = np.hstack((L[:,np.newaxis],a[:,np.newaxis],b[:,np.newaxis]))
     rgb_by_type = convert_lab01_2rgb(Lab)
     return rgb_by_type

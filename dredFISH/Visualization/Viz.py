@@ -130,6 +130,8 @@ class SingleMapView(View):
             Pmap = Colorpleth(val_to_map,V=self,section = section,**kwargs)
         elif map_type == 'random':
             Pmap = RandomColorMap(geom_type,V=self,section=section,**kwargs)
+        else: 
+            raise ValueError(f"value {map_type} is not a recognized map_type")
         
 
 class UMAPwithSpatialMap(View):
@@ -138,7 +140,7 @@ class UMAPwithSpatialMap(View):
     1. add support multi-section
     2. allow coloring by cell types taken from TMG. 
     """
-    def __init__(self,TMG,section = None, qntl = (0,1),**kwargs):
+    def __init__(self,TMG,section = None, qntl = (0,1),clp_embed = (0,1),**kwargs):
         super().__init__(TMG,name = "UMAP with spatial map",figsize=(16,8))
 
         # add two subplots
@@ -151,13 +153,15 @@ class UMAPwithSpatialMap(View):
         
         reducer = umap.UMAP()
         embedding = reducer.fit_transform(basis)
-        self.ump1 = embedding[:,0]
-        self.ump2 = embedding[:,1]
+        self.ump1 = np.clip(embedding[:,0],np.quantile(embedding[:,0],clp_embed[0]),np.quantile(embedding[:,0],clp_embed[1]))
+        self.ump2 = np.clip(embedding[:,1],np.quantile(embedding[:,1],clp_embed[0]),np.quantile(embedding[:,1],clp_embed[1]))
 
         corner_colors = kwargs.get('corner_colors',["#d10f7c", "#53e6de", "#f4fc4e", "#4e99fc"]) #magenta, cyan, yellow, blue
         self.cmap = xycmap.custom_xycmap(corner_colors = corner_colors, n = (100, 100))
 
-        colors = xycmap.bivariate_color(sx=embedding[:,0], sy=embedding[:,1], cmap=self.cmap)
+
+
+        colors = xycmap.bivariate_color(sx=self.ump1, sy=self.ump2, cmap=self.cmap)
         clr = np.vstack(colors)
         clr[clr>1]=1
 
@@ -211,6 +215,8 @@ class DapiValueDistributions(View):
     def set_view(self):
         self.Data['values_to_map'] = np.log10(self.V.TMG.Layers[1].node_size)
         super().set_view() """
+
+
 
 class Panel(metaclass=abc.ABCMeta):
     def __init__(self, V = None, name = None, pos=(0,0,1,1)):
@@ -314,12 +320,15 @@ class TypeMap(Map):
         self.Data['type'] = self.V.TMG.Layers[layer_ix].Type
         types = self.Data['type']
         target = self.Data['tax']
+        _, target_index = np.unique(target, return_index=True)
         data =  self.Data['data']
 
         # get colors and assign for each unit (cell, isozone, regions)
-        if color_assign_method == 'supervised_umap': 
-            self.rgb_by_type = coloru.type_color_using_supervized_umap(data,target)
-        if color_assign_method == 'linkage':
+        if color_assign_method == 'taxonomy': 
+            self.rgb_by_type = self.V.TMG.Taxonomies[tax_ix].RGB()
+        elif color_assign_method == 'supervised_umap': 
+            self.rgb_by_type = coloru.type_color_using_supervized_umap(data,target_index)
+        elif color_assign_method == 'linkage':
             metric = kwargs.get("metric","cosine")
             self.cmap_names = kwargs.get('colormaps', "hot")
             self.cmap = coloru.merge_colormaps(self.cmap_names,range=(0.05,1))

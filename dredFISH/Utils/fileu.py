@@ -7,6 +7,9 @@ import logging
 import shapely
 from datetime import datetime
 import torch
+import importlib
+import sys
+import glob
 
 def check_existance(path='',hybe='',channel='',type='',model_type='',dataset='',section='',logger='FileU'):
     """
@@ -238,3 +241,17 @@ def load_polygon_list(fname):
             p = shapely.wkt.loads(wktstr)
             polys.append(p)
     return polys
+
+
+def load_config_module(inputpath):
+    section_paths = [f.path for f in os.scandir(inputpath) if f.is_dir()]
+    first_section_path = os.path.join(inputpath,section_paths[0])
+    cword_config = glob.glob(os.path.join(first_section_path,'*.py'))[0]
+
+    module_dir = os.path.dirname(cword_config)
+    sys.path.append(module_dir)
+
+    # Now import the module using its name (without .py)
+    module_name = os.path.basename(cword_config).replace('.py', '')
+    config = importlib.import_module(module_name)
+    return config
