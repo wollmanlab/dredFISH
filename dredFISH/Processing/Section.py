@@ -21,7 +21,10 @@ import pywt
 import logging
 from dredFISH.Utils import fileu
 import shutil
+from skimage.segmentation  import watershed
+from skimage import morphology
 import dredFISH.Processing as Processing
+from skimage.feature import peak_local_max
 
 from skimage import (
     data, restoration, util
@@ -513,7 +516,8 @@ class Section_Class(object):
 
         :param model_type: model for cellpose ('nuclei' 'total' 'cytoplasm'), defaults to 'nuclei'
         :type model_type: str, optional
-        """        
+        """      
+
         if (not self.config.parameters['segment_overwrite'])&self.check_existance(type='mask',model_type=model_type):
             self.mask = self.load(type='mask',model_type=model_type)
         else:
@@ -572,6 +576,12 @@ class Section_Class(object):
                             model=None
                             self.mask = None
                 if not isinstance(model,type(None)):
+                    # Define Global Thresholds
+                    if 'total' in model_type:
+                        thresh = np.median(total[total!=0].numpy())+np.std(total[total!=0].numpy())
+                    else:
+                        thresh = np.median(nucstain[nucstain!=0].numpy())+np.std(nucstain[nucstain!=0].numpy())
+
                     window = 2000
                     x_step = round(nucstain.shape[0]/int(nucstain.shape[0]/window))
                     y_step = round(nucstain.shape[1]/int(nucstain.shape[1]/window))
@@ -583,7 +593,7 @@ class Section_Class(object):
                             Input.append([x,y])
                     for (x,y) in self.generate_iterable(Input,'Segmenting Cells: '+model_type):
                         nuc = nucstain[(x*x_step):((x+1)*x_step),(y*y_step):((y+1)*y_step)].numpy()
-                        if 'cyto' in model_type:
+                        if 'total' in model_type:
                             tot = total[(x*x_step):((x+1)*x_step),(y*y_step):((y+1)*y_step)].numpy()
                             stk = np.dstack([nuc,tot,np.zeros_like(nuc)])
                             diameter = int(self.config.parameters['segment_diameter']*1.5)
@@ -606,6 +616,58 @@ class Section_Class(object):
                                                             cellprob_threshold=0,
                                                             min_size=min_size)
                         mask = torch.tensor(raw_mask_image.astype(int),dtype=torch.int32)
+                        # Use Watershed to find missing cells 
+                        if 'total' in model_type:
+                            image = stk[:,:,1]
+                        else:
+                            image = stk
+                        # Define Cell Borders
+                        img = gaussian_filter(image.copy(),2)
+                        cell_mask = img>thresh
+                        cell_mask = morphology.remove_small_holes(cell_mask, 20)
+                        cell_mask = morphology.remove_small_objects(cell_mask, int(self.config.parameters['segment_diameter']**1.5))
+                        cell_mask = morphology.binary_dilation(cell_mask,footprint=create_circle_array(5, 5))
+                        # Call Cell Centers
+                        img = gaussian_filter(image.copy(),5)
+                        img[~cell_mask]=0
+                        if (np.sum(cell_mask)>1)&(mask.max().numpy()>5):
+                            min_peak_height = np.percentile(img[cell_mask],5)
+                            min_peak_distance = int(self.config.parameters['segment_diameter']/2)
+                            peaks = peak_local_max(img, min_distance=min_peak_distance, threshold_abs=min_peak_height)
+                            # Make Seeds for Watershed
+                            seed = 0*np.ones_like(img)
+                            seed[peaks[:,0],peaks[:,1]] = 1+np.array(range(peaks.shape[0]))
+                            seed_max = morphology.binary_dilation(seed!=0,footprint=create_circle_array(int(1.5*self.config.parameters['segment_diameter']), int(1.5*self.config.parameters['segment_diameter'])))
+                            for tx in range(-5,5):
+                                for ty in range(-5,5):
+                                    seed[peaks[:,0]+tx,peaks[:,1]+ty] = 1+np.array(range(peaks.shape[0]))
+                            # Watershed
+                            watershed_img = watershed(image=np.ones_like(img), markers=seed,mask=cell_mask&seed_max)
+                            # Merge Cellpose and Watershed
+                            tx,ty = np.where(watershed_img!=0)
+                            pixel_labels = watershed_img[tx,ty].copy()
+                            cellpose_pixel_labels = mask.numpy()[tx,ty].copy()
+                            current_label = cellpose_pixel_labels.max()
+                            for i in np.unique(pixel_labels):
+                                m = pixel_labels==i
+                                if np.max(cellpose_pixel_labels[m])==0:
+                                    current_label+=1
+                                    cellpose_pixel_labels[m] = current_label
+                                    # raise(ValueError('Finished'))
+                            updated_mask = mask.numpy().copy()
+                            updated_mask[tx,ty] = cellpose_pixel_labels
+                            # Remove Small Cells
+                            tx,ty = np.where(updated_mask!=0)
+                            pixel_labels = updated_mask[tx,ty].copy()
+                            for i in np.unique(pixel_labels):
+                                m = pixel_labels==i
+                                if np.sum(m)<self.config.parameters['segment_diameter']**1.5:
+                                    pixel_labels[m] = 0
+                            updated_mask[tx,ty] = pixel_labels
+
+                            mask = torch.tensor(updated_mask.astype(int),dtype=torch.int32)
+
+                        # Add tile to stitched
                         mask[mask>0] = mask[mask>0]+self.mask.max() # ensure unique labels
                         self.mask[(x*x_step):((x+1)*x_step),(y*y_step):((y+1)*y_step)] = mask
                         del raw_mask_image,flows,styles,diams
@@ -664,7 +726,7 @@ class Section_Class(object):
             self.cell_metadata['dapi'] = self.vectors[:,-1].numpy()
             self.vectors = self.vectors[:,0:-1]
             self.data = anndata.AnnData(X=self.vectors.numpy(),
-                                var=pd.DataFrame(index=np.array([h for r,h,c in self.config.bitmap])),
+                                var=pd.DataFrame(index=np.array([r for r,h,c in self.config.bitmap])),
                                 obs=self.cell_metadata)
             self.data.layers['raw_vectors'] = self.vectors.numpy()
             self.data.obs['polyt'] = self.data.X[:,-1]
@@ -790,20 +852,20 @@ def process_img(img,parameters,FF=1):
     if parameters['highpass_smooth']>0:
         img = gaussian_filter(img,parameters['highpass_smooth'])
     # Background Subtract
-    for iter in range(parameters['background_estimate_iters']):
-        if parameters['highpass_function'] == 'gaussian':
-            bkg = gaussian_filter(img,parameters['highpass_sigma']) 
-        elif parameters['highpass_function'] == 'median':
-            bkg = median_filter(img,parameters['highpass_sigma']) 
-        elif parameters['highpass_function'] == 'minimum':
-            bkg = minimum_filter(img,size=parameters['highpass_sigma']) 
-        elif 'percentile' in parameters['highpass_function']:
-            bkg = percentile_filter(img,int(parameters['highpass_function'].split('_')[-1]),size=parameters['highpass_sigma'])
-        elif 'rolling_ball' in parameters['highpass_function']:
-            bkg = gaussian_filter(restoration.rolling_ball(gaussian_filter(img,parameters['highpass_sigma']/5),radius=parameters['highpass_sigma'],num_threads=30),parameters['highpass_sigma'])
-        else:
-            bkg = 0
-        img = img-bkg
+    # for iter in range(parameters['background_estimate_iters']):
+    if parameters['highpass_function'] == 'gaussian':
+        bkg = gaussian_filter(img,parameters['highpass_sigma']) 
+    elif parameters['highpass_function'] == 'median':
+        bkg = median_filter(img,parameters['highpass_sigma']) 
+    elif parameters['highpass_function'] == 'minimum':
+        bkg = minimum_filter(img,size=parameters['highpass_sigma']) 
+    elif 'percentile' in parameters['highpass_function']:
+        bkg = percentile_filter(img,int(parameters['highpass_function'].split('_')[-1]),size=parameters['highpass_sigma'])
+    elif 'rolling_ball' in parameters['highpass_function']:
+        bkg = gaussian_filter(restoration.rolling_ball(gaussian_filter(img,parameters['highpass_sigma']/5),radius=parameters['highpass_sigma'],num_threads=30),parameters['highpass_sigma'])
+    else:
+        bkg = 0
+    img = img-bkg
     return img
 
 def preprocess_images(data,FF=1,nuc_FF=1):
@@ -854,7 +916,9 @@ def preprocess_images(data,FF=1,nuc_FF=1):
                 i2 = interpolate.interp2d(x_correction,y_correction,bkg,fill_value=None)
                 bkg = i2(range(bkg.shape[1]), range(bkg.shape[0]))
             img = img-bkg
-
+        for iter in range(parameters['background_estimate_iters']):
+            img = img-gaussian_filter(restoration.rolling_ball(gaussian_filter(img,parameters['highpass_sigma']/5),radius=parameters['highpass_sigma'],num_threads=30),parameters['highpass_sigma'])
+            nuc = nuc-gaussian_filter(restoration.rolling_ball(gaussian_filter(nuc,parameters['highpass_sigma']/5),radius=parameters['highpass_sigma'],num_threads=30),parameters['highpass_sigma'])
         dtype = 'int32'
         nuc[nuc<np.iinfo(dtype).min] = np.iinfo(dtype).min
         img[img<np.iinfo(dtype).min] = np.iinfo(dtype).min
@@ -953,3 +1017,59 @@ def visualize_merge(img1,img2,color1=np.array([1,0,1]),color2=np.array([0,1,1]),
     plt.imshow(color_stk)
     plt.show()
     
+def create_circle_array(size, diameter):
+    center = size // 2
+    radius = diameter // 2
+    array = np.zeros((size, size), dtype=int)
+
+    for i in range(size):
+        for j in range(size):
+            distance = np.sqrt((i - center) ** 2 + (j - center) ** 2)
+            if distance <= radius:
+                array[i, j] = 1
+
+    return array
+
+def colorize_segmented_image(img, color_type='rgb'):
+    """
+    Returns a randomly colorized segmented image for display purposes.
+    :param img: Should be a numpy array of dtype np.int and 2D shape segmented
+    :param color_type: 'rg' for red green gradient, 'rb' = red blue, 'bg' = blue green
+    :return: Randomly colorized, segmented image (shape=(n,m,3))
+    """
+    # def split(a, n):
+    #     k, m = divmod(len(a), n)
+    #     return (a[i*k+min(i, m):(i+1)*k+min(i+1, m)] for i in range(n))
+    img = torch.tensor(img)
+    # get empty rgb_img as a skeleton to add colors
+    rgb_img = torch.zeros((img.shape[0], img.shape[1], 3),dtype=torch.int16)
+    x,y = torch.where(img!=0)
+    l = img[x,y]
+    rgb = rgb_img[x,y,:]
+    # make your colors
+    cells = torch.unique(l).numpy()
+    np.random.shuffle(cells)
+    for cell in tqdm(cells,total=cells.shape[0]):
+        rgb[l==cell,:] = torch.tensor(np.random.randint(0, 255, (3)),dtype=torch.int16).abs()
+    # rgb[rgb<2] = 0
+    rgb_img[x,y,:] = rgb
+    return rgb_img.numpy().astype(np.int16)
+
+def bin_pixels_pytorch(image, n):
+    # Convert the NumPy array to a PyTorch tensor
+    image_tensor = torch.from_numpy(image)
+
+    # Get the dimensions of the original image
+    height, width, channels = image_tensor.shape
+
+    # Calculate the new height and width after binning
+    new_height = height // n
+    new_width = width // n
+
+    # Reshape the image to a new shape with n x n bins and 3 channels
+    binned_image = image_tensor[:new_height * n, :new_width * n].view(new_height, n, new_width, n, channels)
+
+    # Sum the pixels within each bin along the specified axes (axis 1 and axis 3)
+    binned_image = binned_image.sum(dim=(1, 3))
+
+    return binned_image.numpy()

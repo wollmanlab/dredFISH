@@ -40,7 +40,7 @@ parameters['stitch_fliplr'] = True# NEW True
 parameters['register_stitch_reference'] = True
 
 parameters['segment_gpu'] = False
-parameters['fishdata']='fishdata_2023Jul21'
+parameters['fishdata']='fishdata_2023Aug07'
 parameters['QC_pixel_size'] = 2 # um
 parameters['diameter'] = 8 #15 # um
 parameters['segment_diameter'] = parameters['diameter']/parameters['pixel_size']
@@ -61,7 +61,7 @@ parameters['highpass_function'] = 'rolling_ball'
 parameters['highpass_smooth_function'] = 'rolling_ball'
 parameters['strip'] = True
 parameters['highpass_smooth'] = 1
-parameters['model_types'] = ['total','nuclei','cytoplasm']
+parameters['model_types'] = ['total']
 parameters['dapi_thresh'] = 100
 parameters['processing_log_level'] = logging.DEBUG
 parameters['background_estimate_iters'] = 5
