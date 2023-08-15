@@ -4,6 +4,8 @@ from colormath.color_diff import delta_e_cie2000, delta_e_cie1976
 from scipy.cluster import hierarchy 
 import numpy as np
 
+import random
+
 import umap
 import xycmap
 
@@ -64,6 +66,21 @@ def convert_lab01_2rgb(clr_best):
 
     clr_rgb = np.clip(clr_rgb,0,1)
     return clr_rgb
+
+def rand_hex_codes(n):
+    color_list = []
+
+    for _ in range(n):
+        # Generate random RGB values between 0 and 255
+        red = random.randint(0, 255)
+        green = random.randint(0, 255)
+        blue = random.randint(0, 255)
+        
+        # Convert RGB values to hex format and add to the list
+        hex_color = "#{:02X}{:02X}{:02X}".format(red, green, blue)
+        color_list.append(hex_color)
+
+    return color_list
 
 
 def type_color_using_supervized_umap(data,target):

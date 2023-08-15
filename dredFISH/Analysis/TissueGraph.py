@@ -49,6 +49,7 @@ import shapely.wkt
 from dredFISH.Utils import basicu 
 from dredFISH.Utils import tmgu
 from dredFISH.Utils import geomu
+from dredFISH.Utils import coloru
 
 from dredFISH.Processing.Section import *
 
@@ -432,10 +433,12 @@ class TissueMultiGraph:
         
         # create the region layer merging information from contracted graph and environments
         RegionLayer = TissueGraph(feature_mat=Env, basepath=self.basepath, 
-                                 dataset = self.dataset, layer_type="region", redo=True)
+                                  dataset = self.dataset, layer_type="region", redo=True)
         RegionLayer.SG = CG.SG.copy()
         RegionLayer.node_size = CG.node_size.copy()
         RegionLayer.Upstream = CG.Upstream.copy()
+        RegionLayer.XY = CG.XY.copy()
+        RegionLayer.Section = CG.Section.copy()
 
         self.Layers.append(RegionLayer)
         current_layer_id = len(self.Layers)-1
@@ -568,7 +571,7 @@ class TissueMultiGraph:
         # return a list of (unique) sections 
         return(list(np.unique(Sections)))
 
-    def add_geoms(self,geom_types = ["points","mask","voronoi","cells"],mask_source = 'raster', unqS = None):
+    def add_geoms(self,geom_types = ["points","mask","voronoi","cells"],mask_source = 'raster', unqS = None,redo = True):
         """
         Creates the geometries needed (mask, lines, points, and polygons) to be used in views to create maps.
         Geometries are vectorized representations of cells using lists of Shapely objects. 
@@ -584,6 +587,19 @@ class TissueMultiGraph:
         There are some reports that shaeply 2.0 is better, but conda fails to install it. This workaround could be avoided
         in the future either by upgrading shaply or some other workaround. 
         """
+
+        if redo == False and fileu.check_existance(path=self.basepath,type='Geom',model_type=geom_types[0],dataset=self.dataset,section=self.unqS[0]):
+            self.Geoms = list()
+            for s in self.unqS:
+                section_geoms = dict()
+                for gt in geom_types:
+                    polys = fileu.load(self.basepath,type='Geom',model_type=gt,
+                                       section=s,dataset=self.dataset)
+                    section_geoms[gt] = Geom(geom_type=gt,polys=polys,
+                                             basepath=self.basepath,
+                                             section=s,dataset=self.dataset)
+                self.Geoms.append(section_geoms)
+            return
         
         # XY and Section infpormation is independent on Geoms
         allXY = self.Layers[0].XY
@@ -1242,13 +1258,7 @@ class TissueGraph:
             
         # create new SG for zones 
         ZSG = self.SG.copy()
-        
-        comb = {"X" : "mean",
-               "Y" : "mean",
-               "Type" : "ignore",
-               "name" : "ignore"}
-        
-        ZSG.contract_vertices(IxMapping,combine_attrs=comb)
+        ZSG.contract_vertices(IxMapping)
         ZSG.simplify()
 
         # create a new Tissue graph by copying existing one, contracting, and updating XY
@@ -1258,7 +1268,18 @@ class TissueGraph:
                                 layer_type="isozone",
                                 redo=True,
                                 )
+        
+        # recreate contracted graph as a TissueGraph 
+        unq_ix = np.unique(IxMapping)
+        new_XY = np.zeros((len(unq_ix),2))
+        new_section = []
+        for i,qix in enumerate(unq_ix):
+            ix = np.flatnonzero(IxMapping==qix)
+            new_XY[i,:] = self.XY[ix,:].mean(axis=0)
+            new_section.append(self.Section[ix[0]])
 
+        ZoneGraph.XY = new_XY
+        ZoneGraph.Section = new_section
         ZoneGraph.SG = ZSG
         ZoneGraph.names = ZoneName
         ZoneGraph.node_size = ZoneSize
@@ -1477,11 +1498,14 @@ class Taxonomy:
         if name is None: 
             raise ValueError("Taxonomy must get a name")
         self.name = name
-            
-        self._df = pd.DataFrame({"RGB" : rgb_codes})
 
         if Types is not None and feature_mat is not None: 
             self.add_types(Types,feature_mat)
+
+        # add RGB values if provided
+        self._df = pd.DataFrame()
+        if rgb_codes is not None:     
+            self._df['RGB'] = rgb_codes
 
         return None
     
@@ -1582,7 +1606,11 @@ class Taxonomy:
         """
         Returns RGB values for all types (random value if none assigned)
         """
-        rgb = self._df['RGB']
+        if 'RGB' in self._df.columns:
+            rgb = self._df['RGB']
+        else: 
+            rgb = coloru.rand_hex_codes(self._df.shape[0])
+        return rgb
 
     @RGB.setter
     def RGB(self,rgb_codes):

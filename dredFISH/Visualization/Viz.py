@@ -120,6 +120,9 @@ class SingleMapView(View):
     """
     def __init__(self, TMG, section = None,level_type = "cell",map_type = "type", val_to_map = None, figsize=(11, 11),**kwargs):
         super().__init__(TMG, "Map", figsize)
+
+        if len(TMG.unqS)==1 and section is None: 
+            section = TMG.unqS[0]
         
         geom_type = TMG.layer_to_geom_type_mapping[level_type]
         if map_type == 'type':
@@ -317,7 +320,7 @@ class TypeMap(Map):
         # get data and rename for simplicity
         self.Data['data'] = self.V.TMG.Taxonomies[tax_ix].feature_mat
         self.Data['tax'] = self.V.TMG.Taxonomies[tax_ix].Type
-        self.Data['type'] = self.V.TMG.Layers[layer_ix].Type
+        self.Data['type'] = self.V.TMG.Layers[layer_ix].Type[self.V.TMG.Layers[layer_ix].Section==section]
         types = self.Data['type']
         target = self.Data['tax']
         _, target_index = np.unique(target, return_index=True)
