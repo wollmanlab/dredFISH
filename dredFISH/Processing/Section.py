@@ -379,7 +379,7 @@ class Section_Class(object):
                     translation_y_list = [0,0,0]
                     translation_x_list = [0,0,0]
                 results = {}
-                with multiprocessing.Pool(60) as p:
+                with multiprocessing.Pool(5) as p:
                     for posname,nuc,signal,translation_x,translation_y in self.generate_iterable(p.imap(pfunc,Input),'Processing '+acq+'_'+channel,length=len(Input)):
                         results[posname] = {}
                         results[posname]['nuc'] = nuc
@@ -459,6 +459,53 @@ class Section_Class(object):
 
                         stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),0] = nuc
                         stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),1] = signal
+                if self.config.parameters['stain_correction']:
+                    image = torch.clone(stitched[:,:,1]).float()
+                    downsample_factor = self.config.parameters['stain_correction_downsample']
+                    offsets = range(downsample_factor)  # Different offsets for subsampling
+
+                    # Calculate the dimensions after padding
+                    padded_height = (image.shape[0] + downsample_factor - 1) // downsample_factor * downsample_factor
+                    padded_width = (image.shape[1] + downsample_factor - 1) // downsample_factor * downsample_factor
+
+                    # Create a new image with zeros and copy the original image into it
+                    padded_image = torch.zeros((padded_height, padded_width)).float()
+                    padded_image[:image.shape[0], :image.shape[1]] = torch.clone(image).float()
+
+                    # Initialize a tensor to store the subsampled images
+                    subsampled_images = []
+
+                    for offset_x in offsets:
+                        for offset_y in offsets:
+                            # Select pixels with the given offset and subsample factor
+                            subsampled_region = padded_image[offset_x::downsample_factor, offset_y::downsample_factor]
+
+                            # Convert the region to a tensor and append it to the list
+                            subsampled_images.append(subsampled_region)
+
+                    # Stack the subsampled images along a new axis
+                    subsampled_stack = torch.stack(subsampled_images, dim=0)
+
+                    # Calculate the mean along the new axis
+                    downsampled_image = torch.mean(subsampled_stack, dim=0)
+
+                    # blurred_image = gaussian_filter(downsampled_image.numpy(), sigma=500/downsample_factor)
+                    blurred_image = gaussian_filter(median_filter(downsampled_image.numpy(), 
+                                                                  size=int(self.config.parameters['stain_correction_kernel']/downsample_factor)),
+                                                                  sigma=self.config.parameters['stain_correction_kernel']/(10*downsample_factor)) 
+                    def upsample_tensor(tensor, target_size):
+                        import torch.nn.functional as F
+                        return F.interpolate(tensor.unsqueeze(0).unsqueeze(0), size=target_size, mode='bilinear', align_corners=False).squeeze().numpy()
+
+                    upsampled_blurred_image = upsample_tensor(torch.tensor(blurred_image), image.shape)
+
+                    out_image_tensor = torch.tensor(upsampled_blurred_image)
+                    correction_image = image * (out_image_tensor.float().mean()/out_image_tensor.float())
+                    correction_image[np.isnan(correction_image)] = 0
+                    correction_image[image==0] = 0
+
+                    stitched[:,:,1] = correction_image
+
                 self.save(stitched[:,:,0],hybe=hybe,channel=self.config.parameters['nucstain_channel'],type='stitched')
                 self.save(stitched[:,:,1],hybe=hybe,channel=channel,type='stitched')
                 nuclei = stitched[self.config.parameters['border']:-self.config.parameters['border'],
@@ -490,12 +537,14 @@ class Section_Class(object):
                 FF = generate_FF(self.image_metadata,acq,channel,bkg_acq='',posnames=self.posnames,parameters=self.config.parameters,verbose=self.verbose)
                 self.FF = FF
                 self.save(FF,channel=channel,type='FF')
+                self.save(FF,hybe='FF',channel=channel,type='image')
             if self.check_existance(channel=self.config.parameters['nucstain_channel'],type='FF'):
                 self.nuc_FF = self.load(channel=self.config.parameters['nucstain_channel'],type='FF')
             else:
                 nuc_FF = generate_FF(self.image_metadata,acq,self.config.parameters['nucstain_channel'],bkg_acq='',posnames=self.posnames,parameters=self.config.parameters,verbose=self.verbose)
                 self.nuc_FF = nuc_FF
                 self.save(nuc_FF,channel=self.config.parameters['nucstain_channel'],type='FF')
+                self.save(FF,hybe='FF',channel=self.config.parameters['nucstain_channel'],type='image')
         """ Generate Refernce """
         self.any_incomplete_hybes = False
         self.reference_stitched,self.ref_nuclei,self.ref_nuclei_down,signal,signal_down = self.stitcher(self.config.parameters['nucstain_acq'],self.config.parameters['total_channel'])
@@ -616,6 +665,7 @@ class Section_Class(object):
                                                             cellprob_threshold=0,
                                                             min_size=min_size)
                         mask = torch.tensor(raw_mask_image.astype(int),dtype=torch.int32)
+                        updated_mask = mask.numpy().copy()
                         # Use Watershed to find missing cells 
                         if 'total' in model_type:
                             image = stk[:,:,1]
@@ -645,25 +695,26 @@ class Section_Class(object):
                             watershed_img = watershed(image=np.ones_like(img), markers=seed,mask=cell_mask&seed_max)
                             # Merge Cellpose and Watershed
                             tx,ty = np.where(watershed_img!=0)
-                            pixel_labels = watershed_img[tx,ty].copy()
-                            cellpose_pixel_labels = mask.numpy()[tx,ty].copy()
-                            current_label = cellpose_pixel_labels.max()
-                            for i in np.unique(pixel_labels):
-                                m = pixel_labels==i
-                                if np.max(cellpose_pixel_labels[m])==0:
-                                    current_label+=1
-                                    cellpose_pixel_labels[m] = current_label
-                                    # raise(ValueError('Finished'))
-                            updated_mask = mask.numpy().copy()
-                            updated_mask[tx,ty] = cellpose_pixel_labels
+                            if tx.shape[0]>0:
+                                pixel_labels = watershed_img[tx,ty].copy()
+                                cellpose_pixel_labels = mask.numpy()[tx,ty].copy()
+                                current_label = cellpose_pixel_labels.max()
+                                for i in np.unique(pixel_labels):
+                                    m = pixel_labels==i
+                                    if np.max(cellpose_pixel_labels[m])==0:
+                                        current_label+=1
+                                        cellpose_pixel_labels[m] = current_label
+                                        # raise(ValueError('Finished'))
+                                updated_mask[tx,ty] = cellpose_pixel_labels
                             # Remove Small Cells
                             tx,ty = np.where(updated_mask!=0)
-                            pixel_labels = updated_mask[tx,ty].copy()
-                            for i in np.unique(pixel_labels):
-                                m = pixel_labels==i
-                                if np.sum(m)<self.config.parameters['segment_diameter']**1.5:
-                                    pixel_labels[m] = 0
-                            updated_mask[tx,ty] = pixel_labels
+                            if tx.shape[0]>0:
+                                pixel_labels = updated_mask[tx,ty].copy()
+                                for i in np.unique(pixel_labels):
+                                    m = pixel_labels==i
+                                    if np.sum(m)<self.config.parameters['segment_diameter']**1.5:
+                                        pixel_labels[m] = 0
+                                updated_mask[tx,ty] = pixel_labels
 
                             mask = torch.tensor(updated_mask.astype(int),dtype=torch.int32)
 
@@ -848,11 +899,12 @@ def process_img(img,parameters,FF=1):
     """    
     # FlatField 
     img = img*FF
+    # Remove Dead Pixels
+    img = median_filter(img,2) 
     # Smooth
     if parameters['highpass_smooth']>0:
         img = gaussian_filter(img,parameters['highpass_smooth'])
     # Background Subtract
-    # for iter in range(parameters['background_estimate_iters']):
     if parameters['highpass_function'] == 'gaussian':
         bkg = gaussian_filter(img,parameters['highpass_sigma']) 
     elif parameters['highpass_function'] == 'median':
