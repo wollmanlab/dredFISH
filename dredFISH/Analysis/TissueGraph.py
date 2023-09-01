@@ -323,7 +323,7 @@ class TissueMultiGraph:
         
          
         """
-        allowed_options = ['default', 'logrowmedian']
+        allowed_options = ['default', 'logrowmedian','none']
         if norm not in allowed_options:
             raise ValueError(f"Choose from {allowed_options}")
         
@@ -357,6 +357,8 @@ class TissueMultiGraph:
             FISHbasis_norm = basicu.normalize_fishdata(FISHbasis, norm_cell=norm_cell, norm_basis=norm_basis)
         elif norm == 'logrowmedian':
             FISHbasis_norm = basicu.normalize_fishdata_logrowmedian(FISHbasis, norm_basis=norm_basis)
+        else:
+            FISHbasis_norm = FISHbasis
         
         # creating first layer - cell tissue graph
         TG = TissueGraph(feature_mat=FISHbasis_norm,
