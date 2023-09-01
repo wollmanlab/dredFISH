@@ -39,10 +39,10 @@ if __name__ == '__main__':
         sections = [args.section]
     if sections.shape[0]==0:
         sections = ['Section1']
-    print(sections)
     if args.well!='':
         sections = [i for i in sections if args.well in i]
     np.random.shuffle(sections)
+    print(sections)
     for section in sections:
         # print('Processing Section ',section)
         self = Section_Class(metadata_path,section,cword_config,verbose=True)
@@ -56,4 +56,9 @@ if __name__ == '__main__':
         if os.path.exists(dst):
             os.remove(dst)
         shutil.copyfile(src, dst)
+        # src = os.path.join(Processing.__file__.split('Processing')[0],'TutorialNotebooks/Processing_preview.ipynb')
+        # dst = os.path.join(self.path,'Processing_preview.ipynb')
+        # if os.path.exists(dst):
+        #     os.remove(dst)
+        # shutil.copyfile(src, dst)
         self.run()
