@@ -305,13 +305,36 @@ def zscore(v, allow_nan=False, ignore_zero=False, zero_threshold=1e-10, **kwargs
     axis=0 # zscore across rows for each column (if v is 2-dimensional)
     axis=1 # zscore across cols for each row  (if v is 2-dimensional)
     """
+    if 'axis' in kwargs.items():
+        if kwargs['axis'] ==1:
+            v = v.T
     if allow_nan:
         vcopy = v.copy()
         if ignore_zero:
             vcopy[vcopy<zero_threshold] = np.nan # turn a number to nan (usually 0)
-        return (vcopy-np.nanmedian(vcopy, **kwargs))/(np.nanstd(vcopy, **kwargs))
+            for i in range(vcopy.shape[1]):
+                c = vcopy[:,i]
+                vmin,vmid,vmax = np.percentile(c[np.isnan(c)==False],[25,50,75])
+                if vmax!=vmin:
+                    vcopy[:,i] = (c-vmid)/(vmax-vmin)
+                else:
+                    # likely not enough observations or all are 1 value
+                    vcopy[:,i] = 0
     else:
-        return (v-np.median(v, **kwargs))/(np.std(v, **kwargs))
+        vcopy = v.copy()
+        for i in range(vcopy.shape[1]):
+            c = vcopy[:,i]
+            vmin,vmid,vmax = np.percentile(c[np.isnan(c)==False],[25,50,75])
+            if vmax!=vmin:
+                vcopy[:,i] = (c-vmid)/(vmax-vmin)
+            else:
+                # likely not enough observations or all are 1 value
+                vcopy[:,i] = 0
+    if 'axis' in kwargs.items():
+        if kwargs['axis'] ==1:
+            vcopy = vcopy.T
+    return vcopy
+    
 
 def stratified_sample(df, col, n: Union[int, dict], return_idx=False, group_keys=False, sort=False, random_state=0, **kwargs):
     """
@@ -406,11 +429,39 @@ def normalize_fishdata_logrowmedian(X, norm_basis=True, allow_nan=False):
 
     # feature as the log counts removed by median per cell
     X = np.log10(X+1)
+    
     X = X - np.median(X, axis=1).reshape(-1,1)
 
     # further normalize by bit
     if norm_basis:
         X = zscore(X, axis=0, allow_nan=allow_nan) # 0 - across rows (cells) for each col (bit) 
+
+    return X
+
+def normalize_fishdata_log(X, norm_cell=True, norm_basis=True, allow_nan=False):
+    """
+    X -- cell by basis raw count matrix
+    
+    0 clipping; cell normalization; bit normalization
+    """
+    # clip at 0
+    X = np.clip(X, 0, None)
+
+    # feature as the log counts removed by median per cell
+    X = np.log10(X+1)
+
+    # total counts per cell
+    bitssum = X.sum(axis=1)
+    logging.info(f"{bitssum.shape[0]} cells, minimum counts = {bitssum.min()}")
+
+    # normalize by cell 
+    if norm_cell:
+        X = X/np.clip(bitssum.reshape(-1,1), 1e-10, None)
+
+    # further normalize by bit
+    if norm_basis:
+        X = zscore(X, axis=0, allow_nan=allow_nan) # 0 - across rows (cells) for each col (bit) 
+
 
     return X
 
