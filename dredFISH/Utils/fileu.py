@@ -68,25 +68,25 @@ def generate_filename(path,hybe,channel,type,model_type,dataset,section,logger='
         hybe = hybe.split('hybe')[-1]
     if not 'Hybe' in hybe:
         hybe = 'Hybe'+hybe
-    if type == 'anndata':
+    if type.split('_')[0] == 'anndata':
         fname = dataset+'_'+section+'_'+model_type+'_'+type+'.h5ad'
-    elif type =='matrix':
+    elif type.split('_')[0] =='matrix':
         fname = dataset+'_'+section+'_'+model_type+'_'+type+'.csv'
-    elif type == 'metadata':
+    elif type.split('_')[0] == 'metadata':
         fname = dataset+'_'+section+'_'+model_type+'_'+type+'.csv'
-    elif type == 'mask':
+    elif type.split('_')[0] == 'mask':
         fname = dataset+'_'+section+'_'+model_type+'_'+'mask_stitched'+'.pt'
-    elif type == 'image':
+    elif type.split('_')[0] == 'image':
         fname = dataset+'_'+section+'_'+hybe+'_'+channel+'_'+'stitched'+'.tif'
-    elif type == 'stitched':
+    elif type.split('_')[0] == 'stitched':
         fname = dataset+'_'+section+'_'+hybe+'_'+channel+'_'+type+'.pt'
-    elif type == 'FF':
+    elif type.split('_')[0] == 'FF':
         fname = dataset+'_'+section+'_'+channel+'_'+type+'.pt'
-    elif type == 'Layer':
+    elif type.split('_')[0] == 'Layer':
         fname = dataset+'_'+model_type+'_'+type+'.h5ad'
-    elif type == 'Taxonomy': 
+    elif type.split('_')[0] == 'Taxonomy': 
         fname = dataset+'_'+model_type+'_'+type+'.csv'
-    elif type == 'Geom':
+    elif type.split('_')[0] == 'Geom':
         fname = dataset+'_'+section+'_'+model_type+'_'+type+'.wkt'
     else:
         update_user('Unsupported File Type '+type,level=40,logger=logger)
@@ -115,6 +115,7 @@ def save(data,path='',hybe='',channel='',type='',model_type='',dataset='',sectio
     """
     fname = generate_filename(path,hybe,channel,type,model_type,dataset,section,logger=logger)
     update_user('Saving '+type,level=10,logger=logger)
+    type = type.split('_')[0]
     if type == 'anndata':
         data.write(fname)
     elif type =='matrix':
@@ -163,6 +164,7 @@ def load(path='',hybe='',channel='',type='anndata',model_type='',dataset='',sect
     :rtype : object
     """
     fname = generate_filename(path,hybe,channel,type,model_type,dataset,section,logger=logger)
+    type = type.split('_')[0]
     if os.path.exists(fname):
         update_user('Loading '+type,level=10,logger=logger)
         if type == 'anndata':
