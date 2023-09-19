@@ -323,7 +323,7 @@ class TissueMultiGraph:
         
          
         """
-        allowed_options = ['default', 'logrowmedian','none']
+        allowed_options = ['default', 'logrowmedian','log','none']
         if norm not in allowed_options:
             raise ValueError(f"Choose from {allowed_options}")
         
@@ -340,23 +340,30 @@ class TissueMultiGraph:
         section_names = os.listdir(self.inputpath)
         dfall_meta = []
         matrix_all = []
+        x_max = 0
+        y_max = 0
         for s in section_names:
             section_path = os.path.join(self.inputpath,s)
             meta = fileu.load(section_path,type='metadata',model_type=measurement_type)
             matrix = fileu.load(section_path,type='matrix',model_type=measurement_type)
             matrix = np.array(matrix[hybes])
+            meta['stage_x'] = meta['stage_x'] + x_max
+            x_max = meta['stage_x'].max()
             dfall_meta.append(meta)
             matrix_all.append(matrix)
+
         dfall_meta = pd.concat(dfall_meta)
         FISHbasis = np.vstack(matrix_all)
         XY = np.array(dfall_meta[["stage_x","stage_y"]])
-        S =  np.array(dfall_meta[["section_index"]])
+        S =  np.array(dfall_meta[["section_index"]])[:,0]
 
         if norm == 'default':
             # FISH basis is the raw count matrices from imaging; normalize data
             FISHbasis_norm = basicu.normalize_fishdata(FISHbasis, norm_cell=norm_cell, norm_basis=norm_basis)
         elif norm == 'logrowmedian':
             FISHbasis_norm = basicu.normalize_fishdata_logrowmedian(FISHbasis, norm_basis=norm_basis)
+        elif norm == 'log':
+            FISHbasis_norm = basicu.normalize_fishdata_log(FISHbasis, norm_cell=norm_cell, norm_basis=norm_basis)
         else:
             FISHbasis_norm = FISHbasis
         
@@ -375,6 +382,7 @@ class TissueMultiGraph:
         # add XY and section information 
         TG.XY = XY
         TG.Section = S
+
 
         # build two key graphs
         if build_spatial_graph:
