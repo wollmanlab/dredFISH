@@ -52,6 +52,8 @@ bitmap = [('RS0095_cy5', 'hybe1', 'FarRed'),
             ('RS458122_cy5', 'hybe21', 'FarRed'),
             ('RS0083_SS_Cy5', 'hybe5', 'FarRed'),
             ('RS0255_SS_Cy5', 'hybe20', 'FarRed'),
+            ('Nonspecific_Readout','hybe27','FarRed'),
+            ('Nonspecific_Encoding','hybe26','FarRed'),
             ('PolyT', 'hybe25', 'FarRed')]
 
 
@@ -66,7 +68,7 @@ parameters['stitch_fliplr'] = True# NEW True
 parameters['register_stitch_reference'] = True
 
 parameters['segment_gpu'] = False
-parameters['fishdata']='fishdata_2023Aug30'
+parameters['fishdata']='fishdata_2023Sep06'
 parameters['QC_pixel_size'] = 2 # um
 parameters['diameter'] = 8 #15 # um
 parameters['segment_diameter'] = parameters['diameter']/parameters['pixel_size']
@@ -76,7 +78,7 @@ parameters['total_channel'] = 'FarRed'
 parameters['total_acq'] = 'hybe25' #'hybe25'
 parameters['overwrite'] = False #False
 parameters['segment_overwrite'] = False #False
-parameters['vector_overwrite'] = False #False
+parameters['vector_overwrite'] = True #False
 parameters['outpath'] = '/greendata/GeneralStorage/Data/dredFISH/' #"Path to save data"
 parameters['nuclei_size_threshold'] = parameters['segment_diameter']*2
 parameters['ratio'] = parameters['pixel_size']/parameters['QC_pixel_size']
