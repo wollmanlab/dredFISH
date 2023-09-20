@@ -820,7 +820,7 @@ class Section_Class(object):
             self.data.obs['nonspecific_encoding_raw'] = self.data.layers['raw_vectors'][:,self.data.var.index=='Nonspecific_Encoding']
             self.data.obs['nonspecific_readout'] = self.data.layers['processed_vectors'][:,self.data.var.index=='Nonspecific_Readout']
             self.data.obs['nonspecific_readout_raw'] = self.data.layers['raw_vectors'][:,self.data.var.index=='Nonspecific_Readout']
-            self.data = self.data[:,0:self.data.var.index.isin(['PolyT','Nonspecific_Encoding','Nonspecific_Readout'])==False]
+            self.data = self.data[:,self.data.var.index.isin(['PolyT','Nonspecific_Encoding','Nonspecific_Readout'])==False]
 
             self.save(self.data.obs,type='metadata',model_type=model_type)
             self.save(pd.DataFrame(self.data.X,index=self.data.obs.index,columns=self.data.var.index),type='matrix',model_type=model_type)
