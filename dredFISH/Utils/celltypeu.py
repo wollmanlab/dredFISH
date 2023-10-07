@@ -335,6 +335,8 @@ def iterative_classify(
                  ):
     """allow kwargs per level
     """
+    Y_refdata = Y_refdata.astype(str)
+    
     y_data = np.empty((len(X_data),len(levels)), dtype=object)
     if len(run_kwargs_perlevel) == 0:
         run_kwargs_perlevel = [dict()]*len(levels)

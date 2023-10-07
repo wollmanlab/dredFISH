@@ -76,26 +76,26 @@ def generate_filename(path,hybe,channel,typ,model_type,dataset,section,logger='F
         hybe = hybe.split('hybe')[-1]
     if not 'Hybe' in hybe:
         hybe = 'Hybe'+hybe
-    if typ == 'anndata':
-        fname = dataset+'_'+section+'_'+model_type+'_'+typ+'.h5ad'
-    elif typ =='matrix':
-        fname = dataset+'_'+section+'_'+model_type+'_'+typ+'.csv'
-    elif typ == 'metadata':
-        fname = dataset+'_'+section+'_'+model_type+'_'+typ+'.csv'
-    elif typ == 'mask':
+    if type == 'anndata':
+        fname = dataset+'_'+section+'_'+model_type+'_'+type+'.h5ad'
+    elif type =='matrix':
+        fname = dataset+'_'+section+'_'+model_type+'_'+type+'.csv'
+    elif type == 'metadata':
+        fname = dataset+'_'+section+'_'+model_type+'_'+type+'.csv'
+    elif type == 'mask':
         fname = dataset+'_'+section+'_'+model_type+'_'+'mask_stitched'+'.pt'
-    elif typ == 'image':
+    elif type == 'image':
         fname = dataset+'_'+section+'_'+hybe+'_'+channel+'_'+'stitched'+'.tif'
-    elif typ == 'stitched':
-        fname = dataset+'_'+section+'_'+hybe+'_'+channel+'_'+typ+'.pt'
-    elif typ == 'FF':
-        fname = dataset+'_'+section+'_'+channel+'_'+typ+'.pt'
-    elif typ == 'Layer':
-        fname = dataset+'_'+model_type+'_'+typ+'.h5ad'
-    elif typ == 'Taxonomy': 
-        fname = dataset+'_'+model_type+'_'+typ+'.csv'
-    elif typ == 'Geom':
-        fname = dataset+'_'+section+'_'+model_type+'_'+typ+'.wkt'
+    elif type == 'stitched':
+        fname = dataset+'_'+section+'_'+hybe+'_'+channel+'_'+type+'.pt'
+    elif type == 'FF':
+        fname = dataset+'_'+section+'_'+channel+'_'+type+'.pt'
+    elif type == 'Layer':
+        fname = dataset+'_'+model_type+'_'+type+'.h5ad'
+    elif type == 'Taxonomy': 
+        fname = dataset+'_'+model_type+'_'+type+'.csv'
+    elif type == 'Geom':
+        fname = dataset+'_'+section+'_'+model_type+'_'+type+'.wkt'
     else:
         update_user('Unsupported File Type '+typ,level=40,logger=logger)
         fname = dataset+'_'+section+'_'+hybe+'_'+channel+'_'+typ
@@ -121,9 +121,9 @@ def save(data,path='',hybe='',channel='',typ='',model_type='',dataset='',section
     :param logger: Logger to send logs can be a name of logger, defaults to 'FileU'
     :type logger: str, logging.Logger, optional
     """
-    fname = generate_filename(path,hybe,channel,typ,model_type,dataset,section,logger=logger)
-    update_user('Saving '+typ,level=10,logger=logger)
-    if typ == 'anndata':
+    fname = generate_filename(path,hybe,channel,type,model_type,dataset,section,logger=logger)
+    update_user('Saving '+type,level=10,logger=logger)
+    if type == 'anndata':
         data.write(fname)
     elif typ =='matrix':
         data.to_csv(fname)
@@ -172,7 +172,7 @@ def load(path='',hybe='',channel='',typ='anndata',model_type='',dataset='',secti
     :return : Desired Data Object or None if not found
     :rtype : object
     """
-    fname = generate_filename(path,hybe,channel,typ,model_type,dataset,section,logger=logger)
+    fname = generate_filename(path,hybe,channel,type,model_type,dataset,section,logger=logger)
     if os.path.exists(fname):
         update_user('Loading '+typ,level=10,logger=logger)
         if typ == 'anndata':
