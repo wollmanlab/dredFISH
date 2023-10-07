@@ -8,23 +8,28 @@ from skimage.morphology import remove_small_objects
 from skimage.filters import threshold_otsu 
 import skimage
 
-from scipy.ndimage import binary_fill_holes, uniform_filter
+from scipy.ndimage import binary_fill_holes, uniform_filter,distance_transform_edt
 from scipy.spatial import Voronoi
 from scipy.signal import convolve2d
 import skimage.morphology
 from skimage.transform import rescale
+
 import scipy.ndimage.measurements
 
-from scipy.spatial import Delaunay, Voronoi
+from scipy.spatial import Delaunay
+from scipy.linalg import svd
+from sklearn.neighbors import NearestNeighbors
 
 import math
 
 import igraph
 
 import shapely
-from shapely.geometry import Polygon, Point
+from shapely.geometry import Polygon, Point, MultiPoint
 from shapely.ops import unary_union
 from shapely.ops import voronoi_diagram
+from shapely.strtree import STRtree
+
 import shapely.geometry
 import shapely.validation
 import shapely.ops
@@ -44,13 +49,43 @@ from matplotlib.path import Path
 
 import pdb
 
-# Commented this for now, replaced with create_voronoi
-# keeping it ghere commented till more testing will be done on create_voronoi
+def create_voronoi(XY):
+    points = MultiPoint(XY)
+    regions = voronoi_diagram(points)
+    vor_polygons = list(regions.geoms)
+    return vor_polygons
+
+
 def voronoi_polygons(XY):
     """
-    Generate shapely.geometry.Polygon objects corresponding to the
-    regions of a scipy.spatial.Voronoi object, in the order of the
-    input points. The polygons for the infinite regions are large
+    Creates voronoi as list of Shapely polygons
+
+    geomu includes two implementations, scipy and native shapely. 
+    scipy is faster, so tries that first, however, sometime there are issues 
+    so fall back is on the shapely implemntation
+
+    Both methods deal slightly different with boundary polygons, however, after masking they should be the same. 
+    """
+    try: 
+        vor_polys = create_voronoi_scipy(XY)
+    except: 
+        vor_polys = create_voronoi_shapely(XY)
+
+    return vor_polys
+
+def create_voronoi_shapely(XY):
+    # create voronoi using shapely. 
+    # shapely returns points in wrong order so need to reorder them using the SRtree which slows this down (most time is reordering....)
+    mp = MultiPoint(XY)
+    diagram = STRtree(list(voronoi_diagram(mp)))
+    vor_poly = [diagram.nearest(point) for point in mp.geoms]
+    return vor_poly
+
+
+def create_voronoi_scipy(XY):
+    """
+    create shapely voronoi polygons usong scipy.spatial.Voronoi object
+    The polygons for the infinite regions are large
     enough that all points within a distance 'diameter' of a Voronoi
     vertex are contained in one of the infinite polygons.
     
@@ -122,34 +157,16 @@ def voronoi_polygons(XY):
     return vor_polygons
 
 
-def mask_voronoi(vor_polys,mask_polys):
+def mask_voronoi(vor_polys,mask_polys,area_thresh_percentile = 95):
     """
     masks voronoi polygons based on masks. Both inputs are lists
     """
-    # First, find which subset of polygons are on the boundary and need to be trimmed
-    vrts = get_polygons_vertices(vor_polys)[0]
-    all_vrts = np.vstack(vrts)
-    vor_ids = list()
-    for i in range(len(vrts)):
-        vor_ids.append(np.ones(vrts[i].shape[0])*i)
-    vor_ids = np.hstack(vor_ids)
-
-    # TODO
-    # can potentially speed things up by finding if polygons to be intersected are on boundary (bnd)
-    # however, this doesn't deal with holes well. Doing all of them is a few min per section so 
-    # replacing it with checking all of them (all vor_ids)
-
-    # bnd = points_in_polygons(mask_polys,all_vrts,check_holes = remove_holes)
-    # bnd = np.any(bnd,axis=1)
-    # bnd_vor_ids = np.unique(vor_ids[np.logical_not(bnd)])
-
-    bnd_vor_ids = vor_ids
-
+    vor_poly_area = np.array([p.area for p in vor_polys])
+    vor_ids = np.flatnonzero(vor_poly_area > np.percentile(vor_poly_area,area_thresh_percentile))
     mask_polys = shapely.geometry.MultiPolygon(mask_polys)
     # after intersections, there are cases where shapely doesn't return a single polygons
     # the code below deals with it by checking for edge cases: MultiPolygon, GeometryCollection    
-    for pix in bnd_vor_ids:
-        pix = int(pix)
+    for pix in vor_ids:
         v = vor_polys[pix]
         vp = v.intersection(mask_polys)
         if isinstance(vp,shapely.geometry.MultiPolygon):
@@ -169,6 +186,34 @@ def mask_voronoi(vor_polys,mask_polys):
 
     return vor_polys
 
+def local_density(coords, k):
+    nbrs = NearestNeighbors(n_neighbors=k+1, algorithm='auto').fit(coords)
+    distances, _ = nbrs.kneighbors(coords)
+    
+    # Distances to k-th nearest neighbor
+    k_distances = distances[:, -1]
+    
+    return k_distances
+
+
+def find_rotation_angle(coords, return_points=False):
+    centered_coords = coords - np.mean(coords, axis=0)
+    _, _, vh = svd(centered_coords, full_matrices=False)
+    first_pc = vh[0, :]
+    angle_rad = np.arctan2(first_pc[1], first_pc[0])
+    angle_deg = np.degrees(angle_rad)
+    
+    if return_points:
+        # Define the rotation matrix
+        cos_theta, sin_theta = np.cos(-angle_rad), np.sin(-angle_rad)
+        rotation_matrix = np.array([[cos_theta, -sin_theta], [sin_theta, cos_theta]])
+        
+        # Apply the rotation
+        rotated_coords = np.dot(centered_coords, rotation_matrix.T)
+        
+        return angle_deg, rotated_coords
+    
+    return angle_deg
 
 def create_mask_from_raster(lbl,scl = 0.1,rds = 150,flip = False):
     """
@@ -304,8 +349,11 @@ def plot_polygon_collection(verts_or_polys,
         verts = [np.fliplr(v) for v in verts]
 
     if rotation is not None:
-        # find XY center of all verts and subtract the center from all vert points
         xy = np.vstack(verts)
+        if rotation == 'auto': 
+            rotation = find_rotation_angle(xy)
+        # find XY center of all verts and subtract the center from all vert points
+
         xy_cntr = xy.mean(axis=0)
         verts_cntr = [v-xy_cntr for v in verts]
         # convert rotation to matrix
@@ -390,6 +438,8 @@ def plot_point_collection(pnts,sizes,rgb_faces = None,rgb_edges = None,ax = None
         xy = xy[:,[1,0]]
 
     if rotation is not None:
+        if rotation == 'auto':
+            rotation = find_rotation_angle(xy)
         # find XY center of all verts and subtract the center from all vert points
         xy_cntr = xy.mean(axis=0)
         xy = xy = xy_cntr
@@ -602,3 +652,41 @@ def merge_polygons_by_ids(polys,ids,max_buff = 1000):
     
     return all_merged_polys
 
+def create_mask_from_XY(XY,units = 'auto',dist_thresh = 2):
+    # creates mask from XY coordinates using distance transform
+    # key is to create a raster with ones at each XY (rounded to int)
+    # and then use dist transform. 
+    # units are used to determine scale for rastering. 'auto' works pretty well for whole section with raster of ~5000x5000
+    if units=='mm':
+        rescal = 1000
+    elif units=='um':
+        rescal = 1 
+    elif units=='auto':
+        rng = (XY.max(axis=0) - XY.min(axis=0)).max()
+        rescal = 5000/rng
+    else:
+        raise ValueError('wrong units in create mask')
+        
+    XYint = (XY*rescal).astype(int)
+    sz = np.fliplr(XYint).max(axis=0)+10
+    mask_raster = np.zeros(sz,dtype=bool)
+    mask_raster[XYint[:,1],XYint[:,0]]=True
+    mask_raster = distance_transform_edt(1-mask_raster)<dist_thresh
+    
+    mask_polys = create_mask_from_raster(mask_raster)
+    if rescal != 1:
+        rescl_mat = [1/rescal, 0, 0, 1/rescal, 0, 0]
+        mask_polys = [shapely.affinity.affine_transform(m,rescl_mat) for m in mask_polys]
+
+    return mask_polys
+
+# Create geoms per section:
+def calc_mask_voronoi_polygons_from_XY(XY):
+    section_geom_polys = dict()
+    mask_polys = create_mask_from_XY(XY)
+    section_geom_polys['mask'] = mask_polys
+    vor_polys = voronoi_polygons(XY)
+    masked_vor_polys = mask_voronoi(vor_polys,mask_polys)
+    section_geom_polys['voronoi'] = masked_vor_polys
+    
+    return section_geom_polys

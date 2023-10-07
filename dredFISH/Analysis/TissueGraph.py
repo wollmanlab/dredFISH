@@ -1,64 +1,47 @@
 """TissueMultiGraph Analysis module.
 
 The module contains the three main classes required graph based tissue analysis: 
-TissueMultiGraph: the key organizing class used to create and manage graphs across layers (hence multi)
-TissueGraph: Each layers (cells, zones, regions) is defined using spatial and feature graphs that are both part ot a single tissuegraph
-Taxonomy: a container class that stores information about the taxonomical units (cell types, region types).  
+TissueMultiGraph: the key organizing class used to create and manage graphs across layers
+TissueGraph: object that represent a single biospatial unit tyoe
+            Each layers (cells, zones, regions) is defined using 
+            spatial and feature graphs that are both part ot a single tissuegraph
+Taxonomy: a container class that stores information about the taxonomical units 
+          (cell types, region types).  
 
 Note
 ----
 In current implementation each TMG object is stored as multiple files in a single directory. 
-That is the same directory that stores all the input files used by TMG to create it's different objects. 
-Only a single TMG object can exist in each directory. To create two TMG objects from the same data, just copy the raw data. 
+It is the same directory that stores input files used by TMG to create it's different objects. 
+Only a single TMG object can exist in each directory. 
+To create two TMG objects from the same data, just copy the raw data. 
 
-Example
--------
-TMG is created in a folder with csv file(s) that have cells transcriptional state (\*_matrix.csv) and other metadata information such as x,y, section information in (\*_metadata.csv) files. 
-The creation of TMG follows the methods to create different layers (create_cell_layer, create_zone_layer, create_region_layer) and creating Geoms using create_geoms. 
 """
 
-# dependencies
-from cmath import nan
-import functools
-from textwrap import indent
-# import ipyparallel as ipp
-from collections import Counter
-import numpy as np
-rng = np.random.default_rng()
 import pandas as pd
-import itertools
+import numpy as np
+
 import logging
-import os.path 
-import glob
+import os.path
 import json
-import pickle
 
 import igraph
-import pynndescent 
+import pynndescent
 
 from scipy.sparse.csgraph import dijkstra
-from scipy.ndimage import distance_transform_edt
-import scipy.sparse 
+import scipy.sparse
+
+from multiprocessing import Pool
 
 import anndata
-# to create geomtries
-from shapely.geometry import Polygon, MultiPolygon, LineString, MultiLineString, MultiPoint
-from scipy.spatial import Delaunay, Voronoi
-import shapely.wkt
 
-from dredFISH.Utils import basicu 
+from dredFISH.Utils import basicu
 from dredFISH.Utils import tmgu
 from dredFISH.Utils import geomu
 from dredFISH.Utils import coloru
-
 from dredFISH.Processing.Section import *
 
-import re
+rng = np.random.default_rng()
 
-# for debuding mostly
-import warnings
-import time
-# from IPython import embed
 
 class TissueMultiGraph: 
     """Main class used to manage the creation of multi-layer graph representation of tissues. 
@@ -99,8 +82,9 @@ class TissueMultiGraph:
     def __init__(self, 
         inputpath = None, 
         redo = False,
-        quick_load_cell_obs = False,
-        path_suffix = '_Analysis'
+        skip_geoms = False,
+        path_suffix = '_Analysis',
+        mem_only = False, 
         ):
         """Create a TMG object
         
@@ -118,15 +102,15 @@ class TissueMultiGraph:
                 If the object was already created in the past, the default behavior is to just load the object. 
                 This can be overruled when redo is set to True. If this is the first time a TMG object is created 
             
-            quick_load_cell_obs : bool (default False)
-                only load cell observation data calculated by Processing module, ignoring all other Layers / Geometries
         Raises
         ------
             input must exists (os.path.exists) or an error will be raised
             
         """
+        if mem_only: 
+            redo = True
         
-        if inputpath is None or not os.path.exists(inputpath):
+        if not mem_only and (inputpath is None or not os.path.exists(inputpath)):
             raise ValueError(f"Path {inputpath} doesn't exist")
 
         # infer the basepath for this TMG object and create it if doesn't exist
@@ -134,41 +118,22 @@ class TissueMultiGraph:
         self.inputpath = inputpath
         (prefix,self.dataset) = os.path.split(os.path.normpath(inputpath))
         self.basepath = os.path.join(prefix,self.dataset+self.path_suffix)
-        if not os.path.exists(self.basepath):
+        if not os.path.exists(self.basepath) and not mem_only:
             os.mkdir(self.basepath, mode = 0o775)
 
         # check to see if a TMG.json file exists in that folder; if not, create an empty TMG. 
         if redo or not os.path.exists(os.path.join(self.basepath,"TMG.json")):
             self.Layers = list() # a list of TissueGraphs
             self.layers_graph = list() # a list of tuples that keep track of the relationship between different layers 
-            
+            self.skip_geoms = skip_geoms
             self.Geoms = list()
             
             self.Taxonomies = list() # a list of Taxonomies
             self.layer_taxonomy_mapping = dict() # dict() # a dictopnary that keep tracks of which TissueGraph (index into Layer) 
                                                  # uses which taxonomy (index into Taxonomies)
-                                                 
-            
-        elif quick_load_cell_obs:
-            # load cell level attributes only -- faster
-            with open(os.path.join(self.basepath,"TMG.json")) as fh:
-                self._config = json.load(fh)
-            LayerNameList = self._config["layer_types"]
-            self.Layers = [None]*len(LayerNameList)
-            self.Layers[0] = TissueGraph(basepath=self.basepath,
-                                         dataset = self.dataset, 
-                                         layer_type=LayerNameList[0], 
-                                         tax=None,  
-                                         redo=False,
-                                         quick_load_cell_obs=True,
-                                         )
-            self.layers_graph= list()
-            self.layer_taxonomy_mapping=dict()
-            self.Taxonomies = list()
-
         else: 
             # load from drive
-            with open(os.path.join(self.basepath,"TMG.json")) as fh:
+            with open(os.path.join(self.basepath,"TMG.json"),encoding="utf-8") as fh:
                 self._config = json.load(fh)
             
             # start with Taxonomies: 
@@ -192,17 +157,26 @@ class TissueMultiGraph:
                                              redo = False)
                 
             self.layers_graph = self._config["layers_graph"]
+            self.Geoms = [None] * len(self.unqS)
             geom_types = self._config["geom_types"]
-            self.Geoms = list()
-            for s in self.unqS:
-                section_geoms = dict()
+            self.skip_geoms = skip_geoms
+            if not skip_geoms:
+                for i,s in enumerate(self.unqS):
+                    section_geoms = dict()
+                    for gt in geom_types:
+                        polys = fileu.load(self.basepath,typ='Geom',model_type=gt,
+                                            section=s,dataset=self.dataset)
+                        section_geoms[gt] = Geom(geom_type=gt,polys=polys,
+                                                    basepath=self.basepath,
+                                                    section=s,dataset=self.dataset)
+                    self.Geoms[i] = section_geoms
+            else:
+                section_geoms = dict() 
                 for gt in geom_types:
-                    polys = fileu.load(self.basepath,type='Geom',model_type=gt,
-                                       section=s,dataset=self.dataset)
-                    section_geoms[gt] = Geom(geom_type=gt,polys=polys,
-                                             basepath=self.basepath,
-                                             section=s,dataset=self.dataset)
-                self.Geoms.append(section_geoms)
+                    section_geoms[gt] = None
+                self.Geoms[0] = section_geoms
+                
+
         # conf dict to map geoms to layer types
         self.geom_to_layer_type_mapping = {'total' : 'cell', 
                                             'nuclei' : 'cell', 
@@ -211,6 +185,7 @@ class TissueMultiGraph:
                                             'points' : 'cell',
                                             'isozones' : 'isozone', 
                                             'regions' : 'region'}
+        
         self.layer_to_geom_type_mapping = {'cell' : 'voronoi',
                                             'isozone' : 'isozones',
                                             'region' : 'regions'}
@@ -237,7 +212,7 @@ class TissueMultiGraph:
                        "layer_types" : [tg.layer_type for tg in self.Layers],
                        "geom_types" : geom_types}
         
-        with open(os.path.join(self.basepath, "TMG.json"), 'w') as json_file:
+        with open(os.path.join(self.basepath, "TMG.json"), 'w',encoding="utf-8") as json_file:
             json.dump(self._config, json_file)
 
            
@@ -250,13 +225,36 @@ class TissueMultiGraph:
         for i in range(len(self.Taxonomies)): 
             self.Taxonomies[i].save(self.basepath, self.dataset)
 
-        for i,s in enumerate(self.unqS):
-            for j,gt in enumerate(geom_types):
-                self.Geoms[i][gt].save()
-                
-                    
-        logging.info(f"saved")
+        if not self.skip_geoms: 
+            for i in range(len(self.unqS)):
+                for gt in geom_types:
+                    if isinstance(self.Geoms[i][gt],Geom):
+                        self.Geoms[i][gt].save()
+              
+        logging.info("saved")
         
+    def load_geoms(self,sections = None): 
+        if sections is None: 
+            sections = self.unqS
+        elif not isinstance(sections,list):
+            sections = [sections]
+        if hasattr(self, '_config'):
+            geom_types = self._config["geom_types"]
+        else: 
+            raise ValueError('cannot load geoms that were never saved, please check!')
+        for s in sections: 
+            ix = self.unqS.index(s)
+            section_geoms = dict()
+            for gt in geom_types:
+                polys = fileu.load(self.basepath,typ='Geom',model_type=gt,
+                                    section=s,dataset=self.dataset)
+                section_geoms[gt] = Geom(geom_type=gt,polys=polys,
+                                            basepath=self.basepath,
+                                            section=s,dataset=self.dataset)
+            self.Geoms[ix] = section_geoms
+
+
+    
     def add_type_information(self, layer_id, type_vec, tax): 
         """Adds type information to TMG
         
@@ -268,7 +266,7 @@ class TissueMultiGraph:
             what layers are we adding type info to? should be a `cell` layer 
         type_vec : numpy 1D array / list
             the integer codes of type 
-        tax : int / Taxonomy
+        tax : int / str(Taxnomy.name) / Taxonomy
             either an integer that will be intepreted as an index to existing taxonomies or a Taxonomy object
         
         """
@@ -291,11 +289,8 @@ class TissueMultiGraph:
             tax = self.Taxonomies[tax_id]
 
         if any(isinstance(item, str) for item in type_vec):
-            type_vec_inds = -np.ones(len(type_vec))
-            for i,typ in enumerate(tax.Type): 
-                type_vec_inds[type_vec==typ]=i
-            type_vec = type_vec_inds
-
+            type_vec = tax.get_type_ix(type_vec)
+            
         # update .Type  
         self.Layers[layer_id].Type = type_vec
 
@@ -342,8 +337,8 @@ class TissueMultiGraph:
         matrix_all = []
         for s in section_names:
             section_path = os.path.join(self.inputpath,s)
-            meta = fileu.load(section_path,type='metadata',model_type=measurement_type)
-            matrix = fileu.load(section_path,type='matrix',model_type=measurement_type)
+            meta = fileu.load(section_path,typ='metadata',model_type=measurement_type)
+            matrix = fileu.load(section_path,typ='matrix',model_type=measurement_type)
             matrix = np.array(matrix[hybes])
             dfall_meta.append(meta)
             matrix_all.append(matrix)
@@ -389,20 +384,28 @@ class TissueMultiGraph:
         logging.info('done with create_cell_layer')
         return
 
-    def create_isozone_layer(self, cell_layer = 0):
+    def create_isozone_layer(self, cell_layer = 0, replace = False):
         """Creates isozones layer using cell types. 
         Contract cell types to create isozone graph. 
-        
+        cell_layer determine the base layer to contract
+        replace = True (default false) allow overwriting existing layer
         """
-        for TG in self.Layers:
+        isozone_layer_id = None
+        for i,TG in enumerate(self.Layers):
             if TG.layer_type == "isozone":
-                print("!!`isozone` layer already exists; return...")
-                return 
+                isozone_layer_id = i
+                if not replace: 
+                    raise ValueError("!!`isozone` layer already exists; change replace=True to overwrite")
+         
         IsoZoneLayer = self.Layers[cell_layer].contract_graph()
-        self.Layers.append(IsoZoneLayer)
-        layer_id = len(self.Layers)-1                             
-        self.layer_taxonomy_mapping[layer_id] = self.layer_taxonomy_mapping[cell_layer]
-        self.layers_graph.append((cell_layer,layer_id))
+        if isozone_layer_id is None: 
+            self.Layers.append(IsoZoneLayer)
+            isozone_layer_id = len(self.Layers)-1  
+        else: 
+            self.Layers[isozone_layer_id] = IsoZoneLayer
+
+        self.layer_taxonomy_mapping[isozone_layer_id] = self.layer_taxonomy_mapping[cell_layer]
+        self.layers_graph.append((cell_layer,isozone_layer_id))
     
     def create_region_layer(self, topics, region_tax, cell_layer=0):
         """Add region layor given cells' region types (topics)
@@ -472,7 +475,7 @@ class TissueMultiGraph:
         fixed = region_types > -1
 
         # renumber region types in case removing some made numbering discontinuous
-        unq,ix = np.unique(region_types[fixed],return_inverse=True)
+        _,ix = np.unique(region_types[fixed],return_inverse=True)
         cont_region_types = region_types.copy()
         cont_region_types[fixed] = ix
 
@@ -490,7 +493,6 @@ class TissueMultiGraph:
         new_type = region_type_filled[ix_zero_to_two]
 
         # recreate the layer
-        upstream_layer_ix = self.find_upstream_layer(lvl_to_fill)
         NewLayer = self.Layers[lvl_to_fill-1].contract_graph(new_type)
         self.Layers[lvl_to_fill] = NewLayer
         if update_feature_mat_flag:
@@ -573,7 +575,7 @@ class TissueMultiGraph:
         # return a list of (unique) sections 
         return(list(np.unique(Sections)))
 
-    def add_geoms(self,geom_types = ["points","mask","voronoi","cells"],mask_source = 'raster', unqS = None,redo = True):
+    def add_geoms(self,geom_types = ["points","mask","voronoi","cells"], unqS = None,redo = True):
         """
         Creates the geometries needed (mask, lines, points, and polygons) to be used in views to create maps.
         Geometries are vectorized representations of cells using lists of Shapely objects. 
@@ -590,12 +592,12 @@ class TissueMultiGraph:
         in the future either by upgrading shaply or some other workaround. 
         """
 
-        if redo == False and fileu.check_existance(path=self.basepath,type='Geom',model_type=geom_types[0],dataset=self.dataset,section=self.unqS[0]):
+        if redo == False and fileu.check_existance(path=self.basepath,typ='Geom',model_type=geom_types[0],dataset=self.dataset,section=self.unqS[0]):
             self.Geoms = list()
             for s in self.unqS:
                 section_geoms = dict()
                 for gt in geom_types:
-                    polys = fileu.load(self.basepath,type='Geom',model_type=gt,
+                    polys = fileu.load(self.basepath,typ='Geom',model_type=gt,
                                        section=s,dataset=self.dataset)
                     section_geoms[gt] = Geom(geom_type=gt,polys=polys,
                                              basepath=self.basepath,
@@ -603,66 +605,38 @@ class TissueMultiGraph:
                 self.Geoms.append(section_geoms)
             return
         
-        # XY and Section infpormation is independent on Geoms
-        allXY = self.Layers[0].XY
-        Sections = self.Layers[0].Section
+        # create XY per section 
+        XY_per_section = list()
         if unqS is None: 
             unqS = self.unqS
+        for s in unqS:
+            XY_per_section.append(self.get_XY(section=s))
 
-        # init final voronoi and mask polys to None and created them first time they are used. this prevents 
-        # creating something if we don't need it, and prevents us from creating it twice
+        # if mask and/or voronoi are part of the geom_type, run those calculations in parallel
+        geoms_requiering_voronoi = ['mask','voronoi','isozones','regions']
+        if any(gtype in geoms_requiering_voronoi for gtype in geom_types): 
+            with Pool() as pool: 
+                section_geom_polys = pool.map(geomu.calc_mask_voronoi_polygons_from_XY,XY_per_section)
 
         # Init Geom
         self.Geoms = list()
 
-        def create_mask(self,mask_source,section,XY):
-            if mask_source=='raster':
-                cell_labels_raster = self.load_stiched_labeled_image(section = section,label_type = 'total')
-                mask_polys = geomu.create_mask_from_raster(cell_labels_raster)
-            elif mask_source=='XY':
-                XYint = (XY*1000).astype(int)
-                sz = np.fliplr(XYint).max(axis=0)+100
-                cell_labels_raster = np.zeros(sz,dtype=bool)
-                cell_labels_raster[XYint[:,1],XYint[:,0]]=True
-                cell_labels_raster = distance_transform_edt(1-cell_labels_raster)<2
-                mask_polys = geomu.create_mask_from_raster(cell_labels_raster)
-                rescl = [0.001, 0, 0, 0.001, 0, 0]
-                mask_polys = [shapely.affinity.affine_transform(m,rescl) for m in mask_polys]
-            else: 
-                raise ValueError(f"unsupported mask_source {mask_source}")
-            return mask_polys
-
-        # Create geoms per section: 
         for i,s in enumerate(unqS):
-            # init all polygons for each section
-            masked_vor_polys = None
-            mask_polys = None
-            cell_labels_raster = None
+           # init all polygons for each section
+            masked_vor_polys = section_geom_polys[i]['voronoi']
+            mask_polys = section_geom_polys[i]['mask']
 
-            print(f"started working on section {s}")
             # Initalize an empty Geom dict for this section
             section_geoms = {}
-            
-            # XY points are basis for many geoms:
-            ix = np.flatnonzero(Sections==s) 
-            XY = allXY[ix,:]
 
-            # mask geom
             if "mask" in geom_types:
-                mask_polys = create_mask(self,mask_source,s,XY)
                 section_geoms['mask'] = Geom(geom_type='mask',polys = mask_polys,section = s,
-                                             basepath = self.basepath,dataset = self.dataset)
-
-            # Voronoi geometry 
+                                            basepath = self.basepath,dataset = self.dataset)
             if "voronoi" in geom_types:
-                if mask_polys is None:
-                    mask_polys = create_mask(self,mask_source,s,XY)
-                vor_polys = geomu.voronoi_polygons(XY)
-                masked_vor_polys = geomu.mask_voronoi(vor_polys,mask_polys)
                 section_geoms['voronoi'] = Geom(geom_type='voronoi',polys = masked_vor_polys,section = s,
                                                 basepath = self.basepath,dataset = self.dataset)
             
-            # Vectorize cell segmentations matrix
+            # Vectorize cell / nuclei / cytoplasm segmentations matrix
             if "cells" in geom_types:
                 cell_labels_raster = self.load_stiched_labeled_image(section = s,label_type = 'total') 
                 cell_polys = geomu.vectorize_labeled_matrix_to_polygons(cell_labels_raster)
@@ -681,37 +655,29 @@ class TissueMultiGraph:
                 section_geoms['cytoplasm'] = Geom(geom_type='cytoplasm',polys = cytoplasm_polys,section = s,
                                                   basepath = self.basepath,dataset = self.dataset)
 
+            # add "higher level" polygon merging based on layer mapping
             if "isozones" in geom_types:
-                if masked_vor_polys is None:
-                    if mask_polys is None:
-                        mask_polys = create_mask(self,mask_source,s,XY)
-                    vor_polys = geomu.voronoi_polygons(XY)
-                    masked_vor_polys = geomu.mask_voronoi(vor_polys,mask_polys)
-                
                 layer_ix = self.find_layer_by_name(self.geom_to_layer_type_mapping['isozones'])
                 zones_polys = geomu.merge_polygons_by_ids(masked_vor_polys,self.Layers[layer_ix].Upstream)
                 section_geoms['isozones'] = Geom(geom_type='isozones',polys = zones_polys,section = s,
                                                   basepath = self.basepath,dataset = self.dataset)
                 
             if "regions" in geom_types: 
-                if masked_vor_polys is None:
-                    if mask_polys is None:
-                        mask_polys = create_mask(self,mask_source,s,XY)
-                    vor_polys = geomu.voronoi_polygons(XY)
-                    masked_vor_polys = geomu.mask_voronoi(vor_polys,mask_polys)
                 layer_ix = self.find_layer_by_name(self.geom_to_layer_type_mapping['regions'])
                 region_polys = geomu.merge_polygons_by_ids(masked_vor_polys,self.Layers[layer_ix].Upstream)
                 section_geoms['regions'] =Geom(geom_type='regions',polys = region_polys,section = s,
                                                basepath = self.basepath,dataset = self.dataset)
 
             self.Geoms.append(section_geoms)
+        
+
 
     def load_stiched_labeled_image(self,section = '',label_type = 'total',flip = True):
         if section is None:
             section = self.unqS[0]
         
         # load from drive using fileu
-        lbl = fileu.load(os.path.join(self.inputpath,section),type = 'mask',model_type = label_type)
+        lbl = fileu.load(os.path.join(self.inputpath,section),typ = 'mask',model_type = label_type)
         lbl = lbl.numpy()
         # zero out any labels in the mask do not mattch the TG names
         # does that by finding layers, getting names, subsetting to section
@@ -732,7 +698,7 @@ class TissueMultiGraph:
         lbl_filtered = geomu.swap_mask(lbl, lookup_o2n)
 
         if flip:
-           lbl_filtered = np.transpose(lbl_filtered) 
+            lbl_filtered = np.transpose(lbl_filtered) 
 
         return(lbl_filtered)
 
@@ -800,13 +766,6 @@ class TissueGraph:
         self.basepath = basepath
         self.dataset = dataset
  
-        if feature_mat is None and not fileu.check_existance(path=self.basepath,
-                                                             type='Layer',
-                                                             model_type=self.layer_type,
-                                                             dataset=self.dataset):
-            raise ValueError(f"either anndata file exists in basepath, or feature_mat must be provided")
-
-           
         # this dict stores the defaults field names in the anndata objects that maps to TissueGraph properties
         # this allows storing different versions (i.e. different cell type assignment) in the anndata object 
         # while still maintaining a "clean" interfact, i.e. i can still call for TG.Type and get a type vector without 
@@ -824,6 +783,7 @@ class TissueGraph:
         # Key graphs - spatial and feature based
         self.SG = None # spatial graph (created by build_spatial_graph, or load in __init__)
         self.FG = None # Feature graph (created by build_feature_graph, or load in __init__)
+        self._spatial_edge_list = None # for performance (of .contract_graph), going to save the edge list extermally from self.SG 
 
         # if anndata file exists and redo is False, just read the file. 
 
@@ -834,45 +794,45 @@ class TissueGraph:
         
         if quick_load_cell_obs:
             self.adata = fileu.load(path=self.basepath,
-                                    type='Layer',
+                                    typ='Layer',
                                     model_type=self.layer_type,
                                     dataset=self.dataset)
             self.adata.obsp.clear()
 
         elif not redo and fileu.check_existance(path=self.basepath,
-                                    type='Layer',
+                                    typ='Layer',
                                     model_type=self.layer_type,
                                     dataset=self.dataset):
             self.adata = fileu.load(path=self.basepath,
-                                    type='Layer',
+                                    typ='Layer',
                                     model_type=self.layer_type,
                                     dataset=self.dataset)
             # SG is saved as a list of spatial graphs (one per section)
             if "SG" in self.adata.obsp.keys():
                 # create SG and FG from Anndata
                 sg = self.adata.obsp["SG"] # csr matrix
-                self.SG =  tmgu.adjacency_to_igraph(sg, directed=False)
+                self.SG =  tmgu.adjacency_to_igraph(sg, directed=False, simplify = False)
                 
             # FG - there is one feature graph for the whole TG object
             if "FG" in self.adata.obsp.keys():
                 fg = self.adata.obsp["FG"] # csr matrix
-                self.FG = tmgu.adjacency_to_igraph(fg, directed=False)
+                self.FG = tmgu.adjacency_to_igraph(fg, directed=False, simplify = False)
             
         else: # create an object from given feature_mat data
-            # validate input
-            if feature_mat is None: 
-                raise ValueError("Missing feature_mat in TisseGraph constructor")
 
-            # if feautre_mat is a tuple, replace with NaNs
+            # if feautre_mat is a tuple, replace with an empty sparse matrix
             if isinstance(feature_mat,tuple): 
                 feature_mat = scipy.sparse.csr_matrix(feature_mat)
 
             # The main data container is an anndata, initalize with feature_mat  
-            self.adata = anndata.AnnData(feature_mat, obs=obs,dtype=feature_mat.dtype) # the tissuegraph AnnData object
+            if feature_mat is None: 
+                self.adata = anndata.AnnData(feature_mat, obs=obs)
+            else: 
+                self.adata = anndata.AnnData(feature_mat, obs=obs,dtype=feature_mat.dtype) # the tissuegraph AnnData object
 
             if feature_mat_raw is not None:
                 self.adata.layers['raw'] = feature_mat_raw
-            
+
             
         return None
     
@@ -892,7 +852,7 @@ class TissueGraph:
         can only work if layer_type==cells
         """
         if self.layer_type != "cell": 
-            raise("can only filter at the cell level")
+            raise ValueError("can only filter at the cell level")
 
         self.adata = self.adata[logical_vec]
 
@@ -913,7 +873,7 @@ class TissueGraph:
         """save TG to file"""
         if not self.is_empty():
             fileu.save(self.adata,path=self.basepath,
-                                  type='Layer',
+                                  typ='Layer',
                                   model_type=self.layer_type,
                                   dataset=self.dataset)
     
@@ -948,6 +908,19 @@ class TissueGraph:
         self.adata.uns["Upstream"]=V
     
     @property
+    def spatial_edge_list(self):
+        if self._spatial_edge_list is None: 
+            if self.SG is None: 
+                raise ValueError('cannot return edge list before spatial graph was created')
+            self._spatial_edge_list = np.array(self.SG.get_edgelist(),dtype=int)
+
+        return self._spatial_edge_list.copy()
+
+    @property
+    def feature_mat_shape(self):
+        return self.adata.shape
+
+    @property
     def feature_mat(self):
         """matrix : the feature values for this TG observations
         
@@ -957,7 +930,7 @@ class TissueGraph:
         if self.is_empty():
             return None
         # otherwide, feature_mat is stored as the main data in adata
-        return(self.adata.X)
+        return(self.adata.X.copy())
     
     @feature_mat.setter
     def feature_mat(self,X):
@@ -965,7 +938,7 @@ class TissueGraph:
     
     def get_feature_mat(self,section = None):
         if section is None: 
-            return(self.feature_mat)
+            return(self.feature_mat.copy())
         else: 
             return(self.feature_mat[self.Section == section,:])
 
@@ -1031,7 +1004,7 @@ class TissueGraph:
 
     @property
     def size_of_sections(self):
-        unq,count = np.unique(self.Section,return_counts = True)
+        _,count = np.unique(self.Section,return_counts = True)
         return(count)
 
     @Section.setter
@@ -1180,7 +1153,6 @@ class TissueGraph:
         logging.info(f"Building spatial graphs for {self.Nsections} sections")
         
         self.SG = list()
-        csr_list = list()
         for s in range(self.Nsections): 
             # get XY for a given section
             XY_per_section = self.XY[self.Section==unqS[s],:]
@@ -1194,7 +1166,7 @@ class TissueGraph:
         self.adata.obs[self.adata_mapping["node_size"]] = np.ones(self.XY.shape[0])
         logging.info("done building spatial graph")
     
-    def contract_graph(self, TypeVec=None):
+    def contract_graph(self, TypeVec=None, return_useful_layer = True):
         """find zones/region, i.e. spatially continous areas in the graph the same (cell/microenvironment) type
         
         reduce graph size by merging spatial neighbors of same type. 
@@ -1222,17 +1194,24 @@ class TissueGraph:
         if TypeVec is None: 
             TypeVec = self.Type
 
+        # convert to int if needed
+        if isinstance(TypeVec[0],str): 
+            _,TypeVec = np.unique(TypeVec,return_inverse = True)
+
         # Merge the spatial graphs from multiple sections into one large 
         
         # get edge list - note that Spatial graphs work with indexes not cell names      
-        EL = np.asarray(self.SG.get_edgelist()).astype("int")
+        EL = self.spatial_edge_list
         
         # only keep edges where neighbors are of same types
         EL = EL[np.take(TypeVec,EL[:,0]) == np.take(TypeVec,EL[:,1]),:]
         
         # remake a graph with potentially many components
         IsoZonesGraph = igraph.Graph(n=self.N, edges=EL, directed = False)
-        IsoZonesGraph = IsoZonesGraph.as_undirected().simplify()
+
+        # commented next line for perfornace as it shouldn't be needed
+        # the input graph is simnple and we're only removing edges
+        #IsoZonesGraph = IsoZonesGraph.as_undirected().simplify()
 
         # because we used both type and proximity, the original graph (based only on proximity)
         # that was a single component graph will be broken down to multiple components 
@@ -1241,18 +1220,17 @@ class TissueGraph:
         
         IxMapping = np.asarray(cmp.membership)
         
-        ZoneName, ZoneSingleIx = np.unique(IxMapping, return_index=True)
-        
-        # zone size sums the current graph zone size per each aggregate (i.e. zone or microenv)
-        df = pd.DataFrame(data = self.node_size)
-        df['type'] = IxMapping
-        ZoneSize = df.groupby(['type']).sum()
-        ZoneSize = np.array(ZoneSize).flatten()
+        ZoneName, ZoneSingleIx, ZoneSize = np.unique(IxMapping, return_index=True, return_counts = True)
         
         # calculate zones feature_mat
-        # if all values are Nan, just replace with tuple of the required size
-        if np.all(np.isnan(self.feature_mat)): 
-            zone_feat_mat = (len(ZoneSize),self.feature_mat.shape[1])
+        # if it's an empty sparse matrix of if np.ndarray with all values are Nan, 
+        # just replace with tuple of the required size
+        if not return_useful_layer:
+            zone_feat_mat = (len(ZoneSize),0)
+        elif scipy.sparse.issparse(self.feature_mat) and self.feature_mat.nnz==0:
+            zone_feat_mat = (len(ZoneSize),self.feature_mat_shape[1])
+        elif isinstance(self.feature_mat,np.ndarray) and np.all(np.isnan(self.feature_mat)):
+            zone_feat_mat = (len(ZoneSize),self.feature_mat_shape[1])
         else: 
             df = pd.DataFrame(data = self.feature_mat)
             df['type']=IxMapping
@@ -1271,17 +1249,24 @@ class TissueGraph:
                                 redo=True,
                                 )
         
-        # recreate contracted graph as a TissueGraph 
-        unq_ix = np.unique(IxMapping)
-        new_XY = np.zeros((len(unq_ix),2))
-        new_section = []
-        for i,qix in enumerate(unq_ix):
-            ix = np.flatnonzero(IxMapping==qix)
-            new_XY[i,:] = self.XY[ix,:].mean(axis=0)
-            new_section.append(self.Section[ix[0]])
+        # recreate contracted graph as a TissueGraph
+        if return_useful_layer:
+            # use weighted bincount to calc XY fast
+            newX = np.bincount(IxMapping,weights = self.XY[:,0]) / ZoneSize
+            newY = np.bincount(IxMapping,weights = self.XY[:,1]) / ZoneSize
+            new_XY = np.hstack((newX,newY))
+        
+            # assigne seciton name using unique indexes
+            unq_ix = np.unique(IxMapping)
+            new_XY = np.zeros((len(unq_ix),2))
+            _,unq_ix = np.unique(IxMapping, return_index = True)
+            new_section = self.Section[unq_ix]
 
-        ZoneGraph.XY = new_XY
-        ZoneGraph.Section = new_section
+
+            ZoneGraph.XY = new_XY
+            ZoneGraph.Section = new_section
+            
+
         ZoneGraph.SG = ZSG
         ZoneGraph.names = ZoneName
         ZoneGraph.node_size = ZoneSize
@@ -1290,19 +1275,24 @@ class TissueGraph:
         
         return(ZoneGraph)
                              
-    def type_freq(self): 
+    def type_freq(self, max_val = None): 
         """return the catogorical probability for each type in TG
         
         Probabilities are weighted by the node_size
         """
         if self.Type is None: 
             raise ValueError("Type not yet assigned, can't count frequencies")
-        unqTypes = np.unique(self.Type)
-        Ptypes = tmgu.count_values(self.Type,unqTypes,self.node_size)
         
-        return Ptypes,unqTypes
+        if max_val is None: 
+            max_val = np.max(self.Type)
+        
+        cnts = np.bincount(self.Type, weights=self.node_size, minlength=max_val+1) 
+        Ptypes = cnts / np.sum(cnts) 
+
+        
+        return Ptypes
     
-    def cond_entropy(self):
+    def cond_entropy(self,return_all = False):
         """calculate conditional entropy of the tissue graph
            
            cond entropy is the difference between graph entropy based on zones and type entropy
@@ -1315,11 +1305,15 @@ class TissueGraph:
         if self.Type is None: 
             raise ValueError("Can't calculate cond-entropy without Types, please check")
             
-        Ptypes = self.type_freq()[0] 
+        Ptypes = self.type_freq()
+        Ptypes = Ptypes[Ptypes>0]
         Entropy_Types=-np.sum(Ptypes*np.log2(Ptypes))
         
         cond_entropy = Entropy_Zone-Entropy_Types
-        return(cond_entropy)
+        if return_all: 
+            return (Entropy_Zone,Entropy_Types,cond_entropy)
+        else: 
+            return(cond_entropy)
     
     def extract_environments(self,ordr = None,typevec = None):
         """returns the categorical distribution of neighbors. 
@@ -1436,12 +1430,13 @@ class TissueGraph:
         Ent = np.zeros(Rvec.shape)
         Ntypes = np.zeros(Rvec.shape)
         for i in range(len(Rvec)):
+            print(f"iter: {i}")
             TypeVec = self.FG.community_leiden(resolution_parameter=Rvec[i],objective_function='modularity').membership
             TypeVec = np.array(TypeVec).astype(np.int64)
-            Ent[i] = self.contract_graph(TypeVec).cond_entropy()
+            Ent[i] = self.contract_graph(TypeVec,return_useful_layer = False).cond_entropy()
             Ntypes[i] = len(np.unique(TypeVec))
             
-        self.cond_entropy_df = pd.DataFrame(data = {'Entropy' : Ent, 'Ntypes' : Ntypes, 'Resolution' : Rvec})     
+        self.cond_entropy_df = pd.DataFrame(data = {'Entropy' : Ent, 'Ntypes' : Ntypes, 'Resolution' : Rvec})  
     
     def gradient_magnitude(self,V):
         """Spatial gradient based on spatial graph
@@ -1500,14 +1495,14 @@ class Taxonomy:
         if name is None: 
             raise ValueError("Taxonomy must get a name")
         self.name = name
+        self._df = pd.DataFrame()
 
         if Types is not None and feature_mat is not None: 
             self.add_types(Types,feature_mat)
 
         # add RGB values if provided
-        self._df = pd.DataFrame()
-        if rgb_codes is not None:     
-            self._df['RGB'] = rgb_codes
+        if rgb_codes is not None:
+            self._df['RGB'] = list(rgb_codes)
 
         return None
     
@@ -1572,7 +1567,7 @@ class Taxonomy:
         """
         if not self.is_empty():
             fileu.save(self._df,path=basepath,
-                                  type='Taxonomy',
+                                  typ='Taxonomy',
                                   model_type=self.name,
                                   dataset=dataset)
                 
@@ -1580,7 +1575,7 @@ class Taxonomy:
         """save from basepath using Taxonomy name
         """
         self._df = fileu.load(path=basepath,
-                              type='Taxonomy',
+                              typ='Taxonomy',
                               model_type=self.name,
                               dataset=dataset)
         self._df.set_index('type', inplace=True)
@@ -1609,7 +1604,11 @@ class Taxonomy:
         Returns RGB values for all types (random value if none assigned)
         """
         if 'RGB' in self._df.columns:
-            rgb = self._df['RGB']
+            rgb = list(self._df['RGB'])
+            if isinstance(rgb[0],str): 
+                # if RGB is string, convert to tuples of 0-255
+                rgb = coloru.hex_to_rgb(rgb)
+                rgb = np.array(rgb)
         else: 
             rgb = coloru.rand_hex_codes(self._df.shape[0])
         return rgb
@@ -1617,6 +1616,11 @@ class Taxonomy:
     @RGB.setter
     def RGB(self,rgb_codes):
         self._df['RGB'] = rgb_codes
+
+    def get_type_ix(self,typ_str):
+        Type_ix_dict = {item: i for i, item in enumerate(self.Type)}
+        index_positions = [Type_ix_dict.get(item) for item in typ_str]
+        return index_positions
 
 class Geom:
     """
@@ -1658,18 +1662,17 @@ class Geom:
         self.basepath = basepath
         self.dataset = dataset
         self.section = section
-        pass
+        
 
     @property
     def verts(self):
         return self._verts
 
     def save(self):
-        fileu.save(self.polys,path = self.basepath,type = 'Geom',
+        fileu.save(self.polys,path = self.basepath,typ = 'Geom',
                    model_type = self.type,dataset = self.dataset,
                    section = self.section)
-        pass 
-
+       
     def get_xylim(self):
         """Returns the min/max xy of the geometry
         """

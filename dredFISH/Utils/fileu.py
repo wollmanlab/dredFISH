@@ -1,17 +1,25 @@
-import numpy as np
-import cv2 
-import pandas as pd
+"""
+fileu module handles all IO that are part of TMG. 
+Two key areas are all Processing related stuff and the save/load of TMG
+"""
 import os
-import anndata
 import logging
-import shapely
 from datetime import datetime
-import torch
 import importlib
 import sys
 import glob
 
-def check_existance(path='',hybe='',channel='',type='',model_type='',dataset='',section='',logger='FileU'):
+import numpy as np
+import cv2
+import pandas as pd
+import torch
+
+import anndata
+import shapely
+import shapely.wkt
+
+
+def check_existance(path='',hybe='',channel='',typ='',model_type='',dataset='',section='',logger='FileU'):
     """
     check_existance Check if File Existsin accordance with established file structure
 
@@ -30,10 +38,10 @@ def check_existance(path='',hybe='',channel='',type='',model_type='',dataset='',
     :return : True of file exists, False otherwise
     :rtype : bool
     """
-    filename = generate_filename(path,hybe,channel,type,model_type,dataset,section,logger=logger)
+    filename = generate_filename(path,hybe,channel,typ,model_type,dataset,section,logger=logger)
     return os.path.exists(filename)
 
-def generate_filename(path,hybe,channel,type,model_type,dataset,section,logger='FileU'):
+def generate_filename(path,hybe,channel,typ,model_type,dataset,section,logger='FileU'):
     """
     fname Generate File Name 
 
@@ -59,7 +67,7 @@ def generate_filename(path,hybe,channel,type,model_type,dataset,section,logger='
         (prefix,section) = os.path.split(path)
         (prefix,dataset) = os.path.split(prefix)
     
-    out_path = os.path.join(path,type)
+    out_path = os.path.join(path,typ)
     if not os.path.exists(out_path):
         update_user('Making Type Path',logger=logger)
         os.mkdir(out_path)
@@ -68,33 +76,33 @@ def generate_filename(path,hybe,channel,type,model_type,dataset,section,logger='
         hybe = hybe.split('hybe')[-1]
     if not 'Hybe' in hybe:
         hybe = 'Hybe'+hybe
-    if type == 'anndata':
-        fname = dataset+'_'+section+'_'+model_type+'_'+type+'.h5ad'
-    elif type =='matrix':
-        fname = dataset+'_'+section+'_'+model_type+'_'+type+'.csv'
-    elif type == 'metadata':
-        fname = dataset+'_'+section+'_'+model_type+'_'+type+'.csv'
-    elif type == 'mask':
+    if typ == 'anndata':
+        fname = dataset+'_'+section+'_'+model_type+'_'+typ+'.h5ad'
+    elif typ =='matrix':
+        fname = dataset+'_'+section+'_'+model_type+'_'+typ+'.csv'
+    elif typ == 'metadata':
+        fname = dataset+'_'+section+'_'+model_type+'_'+typ+'.csv'
+    elif typ == 'mask':
         fname = dataset+'_'+section+'_'+model_type+'_'+'mask_stitched'+'.pt'
-    elif type == 'image':
+    elif typ == 'image':
         fname = dataset+'_'+section+'_'+hybe+'_'+channel+'_'+'stitched'+'.tif'
-    elif type == 'stitched':
-        fname = dataset+'_'+section+'_'+hybe+'_'+channel+'_'+type+'.pt'
-    elif type == 'FF':
-        fname = dataset+'_'+section+'_'+channel+'_'+type+'.pt'
-    elif type == 'Layer':
-        fname = dataset+'_'+model_type+'_'+type+'.h5ad'
-    elif type == 'Taxonomy': 
-        fname = dataset+'_'+model_type+'_'+type+'.csv'
-    elif type == 'Geom':
-        fname = dataset+'_'+section+'_'+model_type+'_'+type+'.wkt'
+    elif typ == 'stitched':
+        fname = dataset+'_'+section+'_'+hybe+'_'+channel+'_'+typ+'.pt'
+    elif typ == 'FF':
+        fname = dataset+'_'+section+'_'+channel+'_'+typ+'.pt'
+    elif typ == 'Layer':
+        fname = dataset+'_'+model_type+'_'+typ+'.h5ad'
+    elif typ == 'Taxonomy': 
+        fname = dataset+'_'+model_type+'_'+typ+'.csv'
+    elif typ == 'Geom':
+        fname = dataset+'_'+section+'_'+model_type+'_'+typ+'.wkt'
     else:
-        update_user('Unsupported File Type '+type,level=40,logger=logger)
-        fname = dataset+'_'+section+'_'+hybe+'_'+channel+'_'+type
+        update_user('Unsupported File Type '+typ,level=40,logger=logger)
+        fname = dataset+'_'+section+'_'+hybe+'_'+channel+'_'+typ
     fname = os.path.join(out_path,fname)
     return fname
 
-def save(data,path='',hybe='',channel='',type='',model_type='',dataset='',section='',logger='FileU'):
+def save(data,path='',hybe='',channel='',typ='',model_type='',dataset='',section='',logger='FileU'):
     """
     save save File in accordance with established file structure
 
@@ -113,37 +121,39 @@ def save(data,path='',hybe='',channel='',type='',model_type='',dataset='',sectio
     :param logger: Logger to send logs can be a name of logger, defaults to 'FileU'
     :type logger: str, logging.Logger, optional
     """
-    fname = generate_filename(path,hybe,channel,type,model_type,dataset,section,logger=logger)
-    update_user('Saving '+type,level=10,logger=logger)
-    if type == 'anndata':
+    fname = generate_filename(path,hybe,channel,typ,model_type,dataset,section,logger=logger)
+    update_user('Saving '+typ,level=10,logger=logger)
+    if typ == 'anndata':
         data.write(fname)
-    elif type =='matrix':
+    elif typ =='matrix':
         data.to_csv(fname)
-    elif type == 'metadata':
+    elif typ == 'metadata':
         data.to_csv(fname)
-    elif type == 'mask':
+    elif typ == 'mask':
         torch.save(data,fname)
-    elif type == 'image':
+    elif typ == 'image':
         if not isinstance(data,np.ndarray):
             data = data.numpy()
         data = data.copy()
         data[data<np.iinfo('uint16').min] = np.iinfo('uint16').min
         data[data>np.iinfo('uint16').max] = np.iinfo('uint16').max
+        # pylint: disable=no-member
         cv2.imwrite(fname, data.astype('uint16'))
-    elif type == 'stitched':
+        # pylint: enable=no-member
+    elif typ == 'stitched':
         torch.save(data,fname)
-    elif type == 'FF':
+    elif typ == 'FF':
         torch.save(data,fname)
-    elif type == 'Layer':
+    elif typ == 'Layer':
         data.write(fname)
-    elif type == 'Taxonomy':
+    elif typ == 'Taxonomy':
         data.to_csv(fname)
-    elif type == 'Geom':
+    elif typ == 'Geom':
         save_polygon_list(data,fname)
     else:
-        update_user('Unsupported File Type '+type,level=30,logger=logger)
+        update_user('Unsupported File Type '+typ,level=30,logger=logger)
 
-def load(path='',hybe='',channel='',type='anndata',model_type='',dataset='',section='',logger='FileU'):
+def load(path='',hybe='',channel='',typ='anndata',model_type='',dataset='',section='',logger='FileU'):
     """
     load load File in accordance with established file structure
 
@@ -162,32 +172,32 @@ def load(path='',hybe='',channel='',type='anndata',model_type='',dataset='',sect
     :return : Desired Data Object or None if not found
     :rtype : object
     """
-    fname = generate_filename(path,hybe,channel,type,model_type,dataset,section,logger=logger)
+    fname = generate_filename(path,hybe,channel,typ,model_type,dataset,section,logger=logger)
     if os.path.exists(fname):
-        update_user('Loading '+type,level=10,logger=logger)
-        if type == 'anndata':
+        update_user('Loading '+typ,level=10,logger=logger)
+        if typ == 'anndata':
             data = anndata.read_h5ad(fname)
-        elif type =='matrix':
+        elif typ =='matrix':
             data = pd.read_csv(fname)
-        elif type == 'metadata':
+        elif typ == 'metadata':
             data = pd.read_csv(fname)
-        elif type == 'mask':
+        elif typ == 'mask':
             data = torch.load(fname)
-        elif type == 'image':
+        elif typ == 'image':
             data = cv2.imread(fname,cv2.IMREAD_UNCHANGED)
             data = data.astype('uint16')
-        elif type == 'stitched':
+        elif typ == 'stitched':
             data = torch.load(fname)
-        elif type == 'FF':
+        elif typ == 'FF':
             data = torch.load(fname)
-        elif type == 'Layer':
+        elif typ == 'Layer':
             data = anndata.read_h5ad(fname)
-        elif type == 'Taxonomy':
+        elif typ == 'Taxonomy':
             data = pd.read_csv(fname)
-        elif type == 'Geom':
-            data = load_polygon_list(fname)        
+        elif typ == 'Geom':
+            data = load_polygon_list(fname)
         else:
-            update_user('Unsupported File Type '+type,level=30,logger=logger) 
+            update_user('Unsupported File Type '+typ,level=30,logger=logger)
             data = None
         return data
     else:
@@ -214,28 +224,33 @@ def update_user(message,level=20,logger=None):
     else:
         log = logging.getLogger('Unknown Logger')
     if level<=10:
+        # pylint: disable=logging-not-lazy
         log.debug(str(datetime.now().strftime("%H:%M:%S"))+' '+str(message))
     elif level==20:
+        # pylint: disable=logging-not-lazy
         log.info(str(datetime.now().strftime("%H:%M:%S"))+' '+str(message))
     elif level==30:
+        # pylint: disable=logging-not-lazy
         log.warning(str(datetime.now().strftime("%H:%M:%S"))+' '+str(message))
     elif level==40:
+        # pylint: disable=logging-not-lazy
         log.error(str(datetime.now().strftime("%H:%M:%S"))+' '+str(message))
     elif level>=50:
+        # pylint: disable=logging-not-lazy
         log.critical(str(datetime.now().strftime("%H:%M:%S"))+' '+str(message))
 
 def save_polygon_list(polys,fname):
     """
     Simple polygon saving utility 
     """
-    with open(fname, "w") as f:
+    with open(fname, "w", encoding='utf8') as f:
         for p in polys:
             wkt = shapely.wkt.dumps(p)
             f.write(wkt + "\n")
 
 def load_polygon_list(fname):
     polys = list()
-    with open(fname) as file:
+    with open(fname,encoding='utf8') as file:
         for line in file:
             wktstr = line.rstrip()
             p = shapely.wkt.loads(wktstr)

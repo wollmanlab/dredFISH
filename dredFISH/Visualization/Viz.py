@@ -94,7 +94,8 @@ class View:
 
 class BasisView(View):
     def __init__(self,TMG,section = None, basis = np.arange(24), qntl = (0.025,0.975),colormaps="jet",subplot_layout = [1,1],**kwargs):
-        super().__init__(TMG,name = "View basis",figsize=(15,10))
+        figsize = kwargs.get('figsize',(15,10))
+        super().__init__(TMG,name = "View basis",figsize=figsize)
 
         # decide the subplot layout, that keep a 2x3 design
         # this will only run if the subplot_layout is smaller then needed 
@@ -128,7 +129,7 @@ class SingleMapView(View):
         if map_type == 'type':
             Pmap = TypeMap(geom_type,V=self,section = section,**kwargs)
         elif map_type == 'colorpleth': 
-            if val_to_map == None: 
+            if val_to_map is None: 
                 raise ValueError("Must provide val_to_map if map_type is colorpleth")
             Pmap = Colorpleth(val_to_map,V=self,section = section,**kwargs)
         elif map_type == 'random':
@@ -221,6 +222,27 @@ class DapiValueDistributions(View):
 
 
 
+class LocalCellDensity(View):
+    """
+    Creates a map of local cell density of a given section (or None for all)
+    local density is estimated using k-nearest neighbors (default k=10)
+    """
+    def __init__(self,TMG,figsize = (16,8),section = None, qntl = (0,1),k = 10,**kwargs):
+        super().__init__(TMG, "local cell density", figsize)
+
+        # calculate cell densities
+        ind = self.TMG.Layers[0].SG.neighborhood(order = k)
+
+        # add two subplots
+        gs = self.fig.add_gridspec(1,2,wspace = 0.01)
+
+        XY = TMG.Layers[0].get_XY(section = section)
+
+        local_dens = geomu.local_density(XY,k=k)
+        
+        Pmap = Colorpleth(local_dens,V=self,section = section,qntl = qntl,**kwargs)
+
+
 class Panel(metaclass=abc.ABCMeta):
     def __init__(self, V = None, name = None, pos=(0,0,1,1)):
         if not isinstance(V,View):
@@ -266,7 +288,6 @@ class Map(Panel):
         self.rgb_edges = rgb_edges
         self.rgb_faces = rgb_faces
         self.geom_type = geom_type
-        
 
         # get limits
         if self.V.TMG.unqS.count(self.section) == 0:
@@ -276,7 +297,7 @@ class Map(Panel):
 
         self.xlim = kwargs.get('xlim',None)
         self.ylim = kwargs.get('ylim',None)
-        self.rotation = kwargs.get('rotation',None)
+        self.rotation = kwargs.get('rotation','auto')
 
         # get the geom collection saved in appropriate TMG Geom
         self.geom_collection = self.V.TMG.Geoms[section_ix][geom_type].verts
@@ -287,7 +308,8 @@ class Map(Panel):
         """
         plot a map (list of shapely points in colors) 
         """
-        if self.geom_type == "points": 
+        if self.geom_type == "points":
+            self.sizes = None # TODO - make sure to fix self.sizes to something real...
             geomu.plot_point_collection(self.geom_collection,
                                         self.sizes,
                                         rgb_faces = self.rgb_faces,
@@ -316,7 +338,7 @@ class TypeMap(Map):
         layer = self.V.TMG.geom_to_layer_type_mapping[geom_type]
         layer_ix = self.V.TMG.find_layer_by_name(layer)
         tax_ix = self.V.TMG.layer_taxonomy_mapping[layer_ix]
-        
+
         # get data and rename for simplicity
         self.Data['data'] = self.V.TMG.Taxonomies[tax_ix].feature_mat
         self.Data['tax'] = self.V.TMG.Taxonomies[tax_ix].Type
@@ -328,7 +350,7 @@ class TypeMap(Map):
 
         # get colors and assign for each unit (cell, isozone, regions)
         if color_assign_method == 'taxonomy': 
-            self.rgb_by_type = self.V.TMG.Taxonomies[tax_ix].RGB()
+            self.rgb_by_type = self.V.TMG.Taxonomies[tax_ix].RGB
         elif color_assign_method == 'supervised_umap': 
             self.rgb_by_type = coloru.type_color_using_supervized_umap(data,target_index)
         elif color_assign_method == 'linkage':
@@ -364,7 +386,7 @@ class Colorpleth(Map):
     def __init__(self, values_to_map, V = None,section = None, name = None, 
                                       pos = (0,0,1,1), geom_type = None,qntl = (0,1),
                                       clp = (-np.inf,np.inf), **kwargs):
-                # if geom_type is None chose it based on size of input vector
+        # if geom_type is None chose it based on size of input vector
         if geom_type is None:         
             lvlarr = np.flatnonzero(np.equal(V.TMG.N,len(values_to_map)))
             if len(lvlarr)!=1:

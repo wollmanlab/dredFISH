@@ -7,33 +7,31 @@ import numpy as np
 import random
 
 import umap
-import xycmap
 
 import matplotlib.cm as cm
-from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+from matplotlib.colors import LinearSegmentedColormap
 
-from scipy.spatial.distance import jensenshannon, pdist, squareform
-from dredFISH.Utils.distu import *
+from scipy.spatial.distance import pdist
 
-def color_diff(clr1,clr2, mode = "RGB",de = "1976"): 
+def color_diff(clr1,clr2, mode = "RGB",de = "1976"):
     """
     clr1/2 are 3 elements only
     """
-    if mode=="RGB": 
-        clr1_rgb = sRGBColor(clr1[0],clr1[1],clr1[2]);
-        clr2_rgb = sRGBColor(clr2[0],clr2[1],clr2[2]);
+    if mode=="RGB":
+        clr1_rgb = sRGBColor(clr1[0],clr1[1],clr1[2])
+        clr2_rgb = sRGBColor(clr2[0],clr2[1],clr2[2])
 
         # Convert from RGB to Lab Color Space
-        clr1_lab = convert_color(clr1_rgb, LabColor);
+        clr1_lab = convert_color(clr1_rgb, LabColor)
 
         # Convert from RGB to Lab Color Space
-        clr2_lab = convert_color(clr2_rgb, LabColor);
+        clr2_lab = convert_color(clr2_rgb, LabColor)
     
     # Find the color difference
     if de == "2000":
-        delta_e = delta_e_cie2000(clr1_lab, clr2_lab);
+        delta_e = delta_e_cie2000(clr1_lab, clr2_lab)
     elif de == "1976": 
-        delta_e = delta_e_cie1976(clr1_lab, clr2_lab);
+        delta_e = delta_e_cie1976(clr1_lab, clr2_lab)
     else: 
         raise ValueError("de must be 1976 or 2000 (strings)")
     
@@ -82,6 +80,14 @@ def rand_hex_codes(n):
 
     return color_list
 
+def hex_to_rgb(hex_codes):
+    def single_hex_to_rgb(hex_code):
+        rgb_255 = tuple(int(hex_code[i:i+2], 16) for i in (1, 3, 5))
+        rgb = (float(rgb_255[0])/255,float(rgb_255[1])/255,float(rgb_255[2])/255)
+        return rgb
+    
+    return [single_hex_to_rgb(hex_code) for hex_code in hex_codes]
+
 
 def type_color_using_supervized_umap(data,target):
     reducer = umap.UMAP(n_components = 3, metric = "cosine")
@@ -105,10 +111,10 @@ def type_color_using_linkage(data,cmap,metric = "cosine"):
     rgb_by_type = rgb_by_type[ordr,:]
     return rgb_by_type
 
-def merge_colormaps(colormap_names,range = (0,1),res = 128):
+def merge_colormaps(colormap_names,clr_range = (0,1),res = 128):
     """
     Merge multiple matplotlib colormaps into one. 
-    range: either a tuple (same for all colormaps, or an Nx2 array with ranges to use. 
+    clr_range: either a tuple (same for all colormaps, or an Nx2 array with ranges to use. 
            full range is 0-1, so to clip any side just use partial range (0.1,1)
     """
 
@@ -117,16 +123,16 @@ def merge_colormaps(colormap_names,range = (0,1),res = 128):
         colormap_names=[colormap_names]
 
     # process / verify the range input
-    if not isinstance(range, np.ndarray): 
-        range = np.tile(range,(len(colormap_names),1))
-    assert range.shape[0]==len(colormap_names), "ranges dimension doesn't match colormap names"
+    if not isinstance(clr_range, np.ndarray): 
+        clr_range = np.tile(clr_range,(len(colormap_names),1))
+    assert clr_range.shape[0]==len(colormap_names), "ranges dimension doesn't match colormap names"
 
     # sample the colormaps that you want to use. Use 128 from each so we get 256
     # colors in total
     colors = []
     for i,cmap_name in enumerate(colormap_names): 
         cmap = cm.get_cmap(cmap_name, res)
-        colors.append(cmap(np.linspace(range[i,0],range[i,1],res)))
+        colors.append(cmap(np.linspace(clr_range[i,0],clr_range[i,1],res)))
     colors = np.vstack(colors)
     mymap = LinearSegmentedColormap.from_list('my_colormap', colors)
     return mymap

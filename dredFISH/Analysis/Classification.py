@@ -80,12 +80,12 @@ class Unsupervized(Classifier):
         self._ref_label_id = ref_label_id
         self._ref_data = ref_data
 
-    def classify(self, data):
-        if data.shape[0]==self._ref_data.shape[0]:
+    def classify(self, data = None):
+        if data is None or data.shape[0]==self._ref_data.shape[0]:
             return self._ref_label_id
         else: 
             raise ValueError("Number of rows in data doesn't match training ref")
-    
+        
 class KNNClassifier(Classifier): 
     """k-nearest-neighbor classifier
     
@@ -184,7 +184,7 @@ class OptimalLeidenUnsupervized(Unsupervized):
                 TypeVec = self._TG.FG.community_leiden(resolution_parameter=res,
                                                    objective_function='modularity').membership
                 TypeVec = np.array(TypeVec).astype(np.int64)
-                EntropyVec[i] = self._TG.contract_graph(TypeVec).cond_entropy()
+                EntropyVec[i] = self._TG.contract_graph(TypeVec,return_useful_layer = False).cond_entropy()
             Entropy = EntropyVec.mean()
             if return_types: 
                 return (-Entropy, TypeVec)
@@ -274,7 +274,7 @@ class OptimalLeidenKNNClassifier(KNNClassifier):
                 TypeVec = self._TG.FG.community_leiden(resolution_parameter=res,
                                                    objective_function='modularity').membership
                 TypeVec = np.array(TypeVec).astype(np.int64)
-                EntropyVec[i] = self._TG.contract_graph(TypeVec).cond_entropy()
+                EntropyVec[i] = self._TG.contract_graph(TypeVec,return_useful_layer = False).cond_entropy()
             Entropy = EntropyVec.mean()
             if return_types: 
                 return (-Entropy, TypeVec)
@@ -376,7 +376,14 @@ class TopicClassifier(Classifier):
             cnt=cnt/cnt.sum()
             Type_entropy[i] = entropy(cnt,base=2) 
 
-        self._lda = results[np.argmax(Type_entropy)][0]
+        # some of the topics might be empty (weren't used in the fit)
+        # so need to find the correct number and refit
+        curr_lda = results[np.argmax(Type_entropy)][0]
+        topics_prob = curr_lda.transform(self.Env)
+        topics = np.argmax(topics_prob, axis=1)
+        # train one last LDA after we found the correct number of topics
+        n_topics = topics.max()
+        self._lda = self.lda_fit(n_topics)[0]
         topics_prob = self._lda.transform(self.Env)
         topics = np.argmax(topics_prob, axis=1)
         self.tax.add_types(topics,self.Env)
