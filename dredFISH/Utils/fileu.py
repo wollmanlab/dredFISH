@@ -76,6 +76,7 @@ def generate_filename(path,hybe,channel,file_type,model_type,dataset,section,log
         hybe = hybe.split('hybe')[-1]
     if not 'Hybe' in hybe:
         hybe = 'Hybe'+hybe
+    file_type = file_type.split('_')[0]
     if file_type == 'anndata':
         fname = dataset+'_'+section+'_'+model_type+'_'+file_type+'.h5ad'
     elif file_type =='matrix':
