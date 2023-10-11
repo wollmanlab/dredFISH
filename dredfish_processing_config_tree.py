@@ -94,7 +94,7 @@ parameters['stitch_fliplr'] = True# NEW True
 parameters['register_stitch_reference'] = True
 
 parameters['segment_gpu'] = False
-parameters['fishdata']='fishdata_2023Sep06'
+parameters['fishdata']='fishdata_2023Oct11'
 parameters['QC_pixel_size'] = 2 # um
 parameters['diameter'] = 8 #15 # um
 parameters['segment_diameter'] = parameters['diameter']/parameters['pixel_size']
