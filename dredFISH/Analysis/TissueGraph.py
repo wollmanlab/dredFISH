@@ -685,7 +685,7 @@ class TissueMultiGraph:
             section = self.unqS[0]
         
         # load from drive using fileu
-        lbl = fileu.load(os.path.join(self.inputpath,section),typ = 'mask',model_type = label_type)
+        lbl = fileu.load(os.path.join(self.inputpath,section),file_type='mask',model_type = label_type)
         lbl = lbl.numpy()
         # zero out any labels in the mask do not mattch the TG names
         # does that by finding layers, getting names, subsetting to section
@@ -1677,7 +1677,7 @@ class Geom:
         return self._verts
 
     def save(self):
-        fileu.save(self.polys,path = self.basepath,typ = 'Geom',
+        fileu.save(self.polys,path = self.basepath,file_type='Geom',
                    model_type = self.type,dataset = self.dataset,
                    section = self.section)
        
