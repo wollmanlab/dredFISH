@@ -164,7 +164,7 @@ class TissueMultiGraph:
                 for i,s in enumerate(self.unqS):
                     section_geoms = dict()
                     for gt in geom_types:
-                        polys = fileu.load(self.basepath,typ='Geom',model_type=gt,
+                        polys = fileu.load(self.basepath,file_type='Geom',model_type=gt,
                                             section=s,dataset=self.dataset)
                         section_geoms[gt] = Geom(geom_type=gt,polys=polys,
                                                     basepath=self.basepath,
@@ -246,7 +246,7 @@ class TissueMultiGraph:
             ix = self.unqS.index(s)
             section_geoms = dict()
             for gt in geom_types:
-                polys = fileu.load(self.basepath,typ='Geom',model_type=gt,
+                polys = fileu.load(self.basepath,file_type='Geom',model_type=gt,
                                     section=s,dataset=self.dataset)
                 section_geoms[gt] = Geom(geom_type=gt,polys=polys,
                                             basepath=self.basepath,
@@ -339,8 +339,8 @@ class TissueMultiGraph:
         y_max = 0
         for s in section_names:
             section_path = os.path.join(self.inputpath,s)
-            meta = fileu.load(section_path,typ='metadata',model_type=measurement_type)
-            matrix = fileu.load(section_path,typ='matrix',model_type=measurement_type)
+            meta = fileu.load(section_path,file_type='metadata',model_type=measurement_type)
+            matrix = fileu.load(section_path,file_type='matrix',model_type=measurement_type)
             matrix = np.array(matrix[hybes])
             meta['stage_x'] = meta['stage_x'] + x_max
             x_max = meta['stage_x'].max()
@@ -600,12 +600,12 @@ class TissueMultiGraph:
         in the future either by upgrading shaply or some other workaround. 
         """
 
-        if redo == False and fileu.check_existance(path=self.basepath,typ='Geom',model_type=geom_types[0],dataset=self.dataset,section=self.unqS[0]):
+        if redo == False and fileu.check_existance(path=self.basepath,file_type='Geom',model_type=geom_types[0],dataset=self.dataset,section=self.unqS[0]):
             self.Geoms = list()
             for s in self.unqS:
                 section_geoms = dict()
                 for gt in geom_types:
-                    polys = fileu.load(self.basepath,typ='Geom',model_type=gt,
+                    polys = fileu.load(self.basepath,file_type='Geom',model_type=gt,
                                        section=s,dataset=self.dataset)
                     section_geoms[gt] = Geom(geom_type=gt,polys=polys,
                                              basepath=self.basepath,
@@ -685,7 +685,7 @@ class TissueMultiGraph:
             section = self.unqS[0]
         
         # load from drive using fileu
-        lbl = fileu.load(os.path.join(self.inputpath,section),typ = 'mask',model_type = label_type)
+        lbl = fileu.load(os.path.join(self.inputpath,section),file_type='mask',model_type = label_type)
         lbl = lbl.numpy()
         # zero out any labels in the mask do not mattch the TG names
         # does that by finding layers, getting names, subsetting to section
@@ -802,17 +802,17 @@ class TissueGraph:
         
         if quick_load_cell_obs:
             self.adata = fileu.load(path=self.basepath,
-                                    typ='Layer',
+                                    file_type='Layer',
                                     model_type=self.layer_type,
                                     dataset=self.dataset)
             self.adata.obsp.clear()
 
         elif not redo and fileu.check_existance(path=self.basepath,
-                                    typ='Layer',
+                                    file_type='Layer',
                                     model_type=self.layer_type,
                                     dataset=self.dataset):
             self.adata = fileu.load(path=self.basepath,
-                                    typ='Layer',
+                                    file_type='Layer',
                                     model_type=self.layer_type,
                                     dataset=self.dataset)
             # SG is saved as a list of spatial graphs (one per section)
@@ -881,7 +881,7 @@ class TissueGraph:
         """save TG to file"""
         if not self.is_empty():
             fileu.save(self.adata,path=self.basepath,
-                                  typ='Layer',
+                                  file_type='Layer',
                                   model_type=self.layer_type,
                                   dataset=self.dataset)
     
@@ -1575,7 +1575,7 @@ class Taxonomy:
         """
         if not self.is_empty():
             fileu.save(self._df,path=basepath,
-                                  typ='Taxonomy',
+                                  file_type='Taxonomy',
                                   model_type=self.name,
                                   dataset=dataset)
                 
@@ -1583,7 +1583,7 @@ class Taxonomy:
         """save from basepath using Taxonomy name
         """
         self._df = fileu.load(path=basepath,
-                              typ='Taxonomy',
+                              file_type='Taxonomy',
                               model_type=self.name,
                               dataset=dataset)
         self._df.set_index('type', inplace=True)
@@ -1677,7 +1677,7 @@ class Geom:
         return self._verts
 
     def save(self):
-        fileu.save(self.polys,path = self.basepath,typ = 'Geom',
+        fileu.save(self.polys,path = self.basepath,file_type='Geom',
                    model_type = self.type,dataset = self.dataset,
                    section = self.section)
        

@@ -19,7 +19,7 @@ import shapely
 import shapely.wkt
 
 
-def check_existance(path='',hybe='',channel='',typ='',model_type='',dataset='',section='',logger='FileU'):
+def check_existance(path='',hybe='',channel='',file_type='',model_type='',dataset='',section='',logger='FileU'):
     """
     check_existance Check if File Existsin accordance with established file structure
 
@@ -29,8 +29,8 @@ def check_existance(path='',hybe='',channel='',typ='',model_type='',dataset='',s
     :type hybe: str, optional
     :param channel: Name of Channel ('DeepBlue', 'FarRed',...)
     :type channel: str, optional
-    :param type: Data Type to save ('stitched','mask','anndata',...)
-    :type type: str, optional
+    :param file_type: Data Type to save ('stitched','mask','anndata',...)
+    :type file_type: str, optional
     :param model_type: segmentation Type ('total','nuclei','cytoplasm')
     :type model_type: str, optional
     :param logger: Logger to send logs can be a name of logger, defaults to 'FileU'
@@ -38,10 +38,10 @@ def check_existance(path='',hybe='',channel='',typ='',model_type='',dataset='',s
     :return : True of file exists, False otherwise
     :rtype : bool
     """
-    filename = generate_filename(path,hybe,channel,typ,model_type,dataset,section,logger=logger)
+    filename = generate_filename(path,hybe,channel,file_type,model_type,dataset,section,logger=logger)
     return os.path.exists(filename)
 
-def generate_filename(path,hybe,channel,typ,model_type,dataset,section,logger='FileU'):
+def generate_filename(path,hybe,channel,file_type,model_type,dataset,section,logger='FileU'):
     """
     fname Generate File Name 
 
@@ -51,8 +51,8 @@ def generate_filename(path,hybe,channel,typ,model_type,dataset,section,logger='F
     :type hybe: str
     :param channel: Name of Channel ('DeepBlue', 'FarRed',...)
     :type channel: str
-    :param type: Data Type to save ('stitched','mask','anndata',...)
-    :type type: str
+    :param file_type: Data Type to save ('stitched','mask','anndata',...)
+    :type file_type: str
     :param model_type: context dependents. For segmentation is Type ('total','nuclei','cytoplasm') for Layer it's layer type
     :type model_type: str
     :param logger: Logger to send logs can be a name of logger, defaults to 'FileU'
@@ -66,43 +66,48 @@ def generate_filename(path,hybe,channel,typ,model_type,dataset,section,logger='F
     if section == '' and dataset == '':
         (prefix,section) = os.path.split(path)
         (prefix,dataset) = os.path.split(prefix)
-    
-    out_path = os.path.join(path,typ)
+
+    out_path = os.path.join(path,file_type)
     if not os.path.exists(out_path):
         update_user('Making Type Path',logger=logger)
         os.mkdir(out_path)
+
+    backup_file_type = file_type
+    file_type = file_type.split('_')[0]
 
     if 'hybe' in hybe:
         hybe = hybe.split('hybe')[-1]
     if not 'Hybe' in hybe:
         hybe = 'Hybe'+hybe
-    if type == 'anndata':
-        fname = dataset+'_'+section+'_'+model_type+'_'+type+'.h5ad'
-    elif type =='matrix':
-        fname = dataset+'_'+section+'_'+model_type+'_'+type+'.csv'
-    elif type == 'metadata':
-        fname = dataset+'_'+section+'_'+model_type+'_'+type+'.csv'
-    elif type == 'mask':
+
+    if file_type == 'anndata':
+        fname = dataset+'_'+section+'_'+model_type+'_'+file_type+'.h5ad'
+    elif file_type =='matrix':
+        fname = dataset+'_'+section+'_'+model_type+'_'+file_type+'.csv'
+    elif file_type == 'metadata':
+        fname = dataset+'_'+section+'_'+model_type+'_'+file_type+'.csv'
+    elif file_type == 'mask':
         fname = dataset+'_'+section+'_'+model_type+'_'+'mask_stitched'+'.pt'
-    elif type == 'image':
+    elif file_type == 'image':
         fname = dataset+'_'+section+'_'+hybe+'_'+channel+'_'+'stitched'+'.tif'
-    elif type == 'stitched':
-        fname = dataset+'_'+section+'_'+hybe+'_'+channel+'_'+type+'.pt'
-    elif type == 'FF':
-        fname = dataset+'_'+section+'_'+channel+'_'+type+'.pt'
-    elif type == 'Layer':
-        fname = dataset+'_'+model_type+'_'+type+'.h5ad'
-    elif type == 'Taxonomy': 
-        fname = dataset+'_'+model_type+'_'+type+'.csv'
-    elif type == 'Geom':
-        fname = dataset+'_'+section+'_'+model_type+'_'+type+'.wkt'
+    elif file_type == 'stitched':
+        fname = dataset+'_'+section+'_'+hybe+'_'+channel+'_'+file_type+'.pt'
+    elif file_type == 'FF':
+        fname = dataset+'_'+section+'_'+channel+'_'+file_type+'.pt'
+    elif file_type == 'Layer':
+        fname = dataset+'_'+model_type+'_'+file_type+'.h5ad'
+    elif file_type == 'Taxonomy': 
+        fname = dataset+'_'+model_type+'_'+file_type+'.csv'
+    elif file_type == 'Geom':
+        fname = dataset+'_'+section+'_'+model_type+'_'+file_type+'.wkt'
     else:
-        update_user('Unsupported File Type '+typ,level=40,logger=logger)
-        fname = dataset+'_'+section+'_'+hybe+'_'+channel+'_'+typ
+        update_user('Unsupported File Type '+backup_file_type+'->'+file_type,level=40,logger=logger)
+        fname = dataset+'_'+section+'_'+hybe+'_'+channel+'_'+file_type
+        raise ValueError('Unsupported File Type '+backup_file_type+'->'+file_type+' '+fname)
     fname = os.path.join(out_path,fname)
     return fname
 
-def save(data,path='',hybe='',channel='',typ='',model_type='',dataset='',section='',logger='FileU'):
+def save(data,path='',hybe='',channel='',file_type='',model_type='',dataset='',section='',logger='FileU'):
     """
     save save File in accordance with established file structure
 
@@ -121,17 +126,18 @@ def save(data,path='',hybe='',channel='',typ='',model_type='',dataset='',section
     :param logger: Logger to send logs can be a name of logger, defaults to 'FileU'
     :type logger: str, logging.Logger, optional
     """
-    fname = generate_filename(path,hybe,channel,type,model_type,dataset,section,logger=logger)
-    update_user('Saving '+type,level=10,logger=logger)
-    if type == 'anndata':
+    fname = generate_filename(path,hybe,channel,file_type,model_type,dataset,section,logger=logger)
+    update_user('Saving '+file_type,level=10,logger=logger)
+    file_type = file_type.split('_')[0]
+    if file_type == 'anndata':
         data.write(fname)
-    elif typ =='matrix':
+    elif file_type =='matrix':
         data.to_csv(fname)
-    elif typ == 'metadata':
+    elif file_type == 'metadata':
         data.to_csv(fname)
-    elif typ == 'mask':
+    elif file_type == 'mask':
         torch.save(data,fname)
-    elif typ == 'image':
+    elif file_type == 'image':
         if not isinstance(data,np.ndarray):
             data = data.numpy()
         data = data.copy()
@@ -140,20 +146,20 @@ def save(data,path='',hybe='',channel='',typ='',model_type='',dataset='',section
         # pylint: disable=no-member
         cv2.imwrite(fname, data.astype('uint16'))
         # pylint: enable=no-member
-    elif typ == 'stitched':
+    elif file_type == 'stitched':
         torch.save(data,fname)
-    elif typ == 'FF':
+    elif file_type == 'FF':
         torch.save(data,fname)
-    elif typ == 'Layer':
+    elif file_type == 'Layer':
         data.write(fname)
-    elif typ == 'Taxonomy':
+    elif file_type == 'Taxonomy':
         data.to_csv(fname)
-    elif typ == 'Geom':
+    elif file_type == 'Geom':
         save_polygon_list(data,fname)
     else:
-        update_user('Unsupported File Type '+typ,level=30,logger=logger)
+        update_user('Unsupported File Type '+file_type,level=30,logger=logger)
 
-def load(path='',hybe='',channel='',typ='anndata',model_type='',dataset='',section='',logger='FileU'):
+def load(path='',hybe='',channel='',file_type='anndata',model_type='',dataset='',section='',logger='FileU'):
     """
     load load File in accordance with established file structure
 
@@ -163,8 +169,8 @@ def load(path='',hybe='',channel='',typ='anndata',model_type='',dataset='',secti
     :type hybe: str, optional
     :param channel: Name of Channel ('DeepBlue', 'FarRed',...)
     :type channel: str, optional
-    :param type: Data Type to save ('stitched','mask','anndata',...)
-    :type type: str, optional
+    :param file_type: Data Type to save ('stitched','mask','anndata',...)
+    :type file_type: str, optional
     :param model_type: segmentation Type ('total','nuclei','cytoplasm')
     :type model_type: str, optional
     :param logger: Logger to send logs can be a name of logger, defaults to 'FileU'
@@ -172,32 +178,33 @@ def load(path='',hybe='',channel='',typ='anndata',model_type='',dataset='',secti
     :return : Desired Data Object or None if not found
     :rtype : object
     """
-    fname = generate_filename(path,hybe,channel,type,model_type,dataset,section,logger=logger)
+    fname = generate_filename(path,hybe,channel,file_type,model_type,dataset,section,logger=logger)
+    file_type = file_type.split('_')[0]
     if os.path.exists(fname):
-        update_user('Loading '+typ,level=10,logger=logger)
-        if typ == 'anndata':
+        update_user('Loading '+file_type,level=10,logger=logger)
+        if file_type == 'anndata':
             data = anndata.read_h5ad(fname)
-        elif typ =='matrix':
+        elif file_type =='matrix':
             data = pd.read_csv(fname)
-        elif typ == 'metadata':
+        elif file_type == 'metadata':
             data = pd.read_csv(fname)
-        elif typ == 'mask':
+        elif file_type == 'mask':
             data = torch.load(fname)
-        elif typ == 'image':
+        elif file_type == 'image':
             data = cv2.imread(fname,cv2.IMREAD_UNCHANGED)
             data = data.astype('uint16')
-        elif typ == 'stitched':
+        elif file_type == 'stitched':
             data = torch.load(fname)
-        elif typ == 'FF':
+        elif file_type == 'FF':
             data = torch.load(fname)
-        elif typ == 'Layer':
+        elif file_type == 'Layer':
             data = anndata.read_h5ad(fname)
-        elif typ == 'Taxonomy':
+        elif file_type == 'Taxonomy':
             data = pd.read_csv(fname)
-        elif typ == 'Geom':
+        elif file_type == 'Geom':
             data = load_polygon_list(fname)
         else:
-            update_user('Unsupported File Type '+typ,level=30,logger=logger)
+            update_user('Unsupported File Type '+file_type,level=30,logger=logger)
             data = None
         return data
     else:

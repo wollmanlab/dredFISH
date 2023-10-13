@@ -6,51 +6,51 @@ from sklearn.neighbors import NearestNeighbors
 
 
 import sys
-sys.path.append('/home/rwollman/MyProjects/AH/Repos/dredFISH')
-from dredFISH.Utils.ConnectedComponentEntropy import ConnectedComponentEntropy
+# sys.path.append('/home/rwollman/MyProjects/AH/Repos/dredFISH')
+# from dredFISH.Utils.ConnectedComponentEntropy import ConnectedComponentEntropy
 
-def score_percolation_entropy(type_vec,ELD,total_cells = None, fudge_factor = 1.05, distvec = None,return_entropies = True): 
-    # type vec - the integer vector of types we want to test
-    # ELD - a sorted (by distances or K) list of edges in the spatial graph with the distance between them. 
-    # total_cells - in case we are doing a multi-section analysiis, specificy the number of section, decault is len(type_vec)
+# def score_percolation_entropy(type_vec,ELD,total_cells = None, fudge_factor = 1.05, distvec = None,return_entropies = True): 
+#     # type vec - the integer vector of types we want to test
+#     # ELD - a sorted (by distances or K) list of edges in the spatial graph with the distance between them. 
+#     # total_cells - in case we are doing a multi-section analysiis, specificy the number of section, decault is len(type_vec)
 
-    if total_cells is None: 
-        total_cells = len(type_vec)
+#     if total_cells is None: 
+#         total_cells = len(type_vec)
 
-    # calcualte the entropy of type_vec as convergance criteria 
-    _,cnt = np.unique(type_vec, return_counts=True)
-    freq = cnt/len(type_vec)
-    entropy_low_bound = -np.sum(freq * np.log2(freq))
+#     # calcualte the entropy of type_vec as convergance criteria 
+#     _,cnt = np.unique(type_vec, return_counts=True)
+#     freq = cnt/len(type_vec)
+#     entropy_low_bound = -np.sum(freq * np.log2(freq))
 
-    # update the entropy in case we are dealing with multi-section data
-    fudge_factor = fudge_factor * len(type_vec) / total_cells
+#     # update the entropy in case we are dealing with multi-section data
+#     fudge_factor = fudge_factor * len(type_vec) / total_cells
 
-    # permute types and find edges that connect the same type
-    type_vec_perm = np.random.permutation(type_vec)
-    ELD_real = ELD[np.equal(type_vec[ELD[:,0].astype(int)],type_vec[ELD[:,1].astype(int)]),:]
-    ELD_perm = ELD[np.equal(type_vec_perm[ELD[:,0].astype(int)],type_vec_perm[ELD[:,1].astype(int)]),:]
+#     # permute types and find edges that connect the same type
+#     type_vec_perm = np.random.permutation(type_vec)
+#     ELD_real = ELD[np.equal(type_vec[ELD[:,0].astype(int)],type_vec[ELD[:,1].astype(int)]),:]
+#     ELD_perm = ELD[np.equal(type_vec_perm[ELD[:,0].astype(int)],type_vec_perm[ELD[:,1].astype(int)]),:]
 
-    # calculate entropies as edges are edded
-    uf_real = ConnectedComponentEntropy(len(type_vec),total_cells)
-    entropy_real = uf_real.merge_all(ELD_real[:,:2].astype(int),entropy_low_bound * fudge_factor)
+#     # calculate entropies as edges are edded
+#     uf_real = ConnectedComponentEntropy(len(type_vec),total_cells)
+#     entropy_real = uf_real.merge_all(ELD_real[:,:2].astype(int),entropy_low_bound * fudge_factor)
 
-    uf_perm = ConnectedComponentEntropy(len(type_vec),total_cells)
-    entropy_perm = uf_perm.merge_all(ELD_perm[:,:2].astype(int),entropy_low_bound * fudge_factor)
+#     uf_perm = ConnectedComponentEntropy(len(type_vec),total_cells)
+#     entropy_perm = uf_perm.merge_all(ELD_perm[:,:2].astype(int),entropy_low_bound * fudge_factor)
 
-    # interpolate entropies to the same grid
-    if distvec is None: 
-        distvec = np.linspace(ELD[:,2].min(),ELD[:,2].max(),1000)
+#     # interpolate entropies to the same grid
+#     if distvec is None: 
+#         distvec = np.linspace(ELD[:,2].min(),ELD[:,2].max(),1000)
     
-    entropy_vecs = np.zeros((len(distvec),2))
-    entropy_vecs[:,0] = np.interp(distvec, ELD_real[:,2], entropy_real)
-    entropy_vecs[:,1] = np.interp(distvec, ELD_perm[:,2], entropy_perm)
+#     entropy_vecs = np.zeros((len(distvec),2))
+#     entropy_vecs[:,0] = np.interp(distvec, ELD_real[:,2], entropy_real)
+#     entropy_vecs[:,1] = np.interp(distvec, ELD_perm[:,2], entropy_perm)
 
-    scr = np.diff(entropy_vecs, axis=1).max()
+#     scr = np.diff(entropy_vecs, axis=1).max()
 
-    if return_entropies: 
-        return (scr,distvec,entropy_vecs)
-    else:
-        return scr
+#     if return_entropies: 
+#         return (scr,distvec,entropy_vecs)
+#     else:
+#         return scr
 
 
 def edge_list_from_XY_with_max_dist(XY,max_dist):

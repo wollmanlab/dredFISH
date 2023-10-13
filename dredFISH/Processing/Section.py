@@ -130,19 +130,7 @@ class Section_Class(object):
         if self.verbose:
             fileu.update_user(message,level=level,logger=self.log)
 
-    def save_data(self,model_type=''):
-        """
-        save_data Save anndata as well as matrix and metadata
-
-        :param model_type: type of segmentation ('nuclei','total','cytoplasm'), defaults to ''
-        :type model_type: str, optional
-        """
-        self.update_user('Saving Data '+model_type)
-        self.save(self.data,type='anndata',model_type=model_type)
-        self.save(self.data.obs,type='metadata',model_type=model_type)
-        self.save(pd.DataFrame(self.data.X,index=self.data.obs.index,columns=self.data.var.index),type='matrix',model_type=model_type)
-
-    def check_existance(self,hybe='',channel='',type='',model_type=''):
+    def check_existance(self,hybe='',channel='',file_type='',model_type=''):
         """
         check_existance wrapper to fileu.check_existance
 
@@ -157,9 +145,9 @@ class Section_Class(object):
         :return : True of file exists, False otherwise
         :rtype : bool
         """
-        return fileu.check_existance(self.path,hybe=hybe,channel=channel,type=type,model_type=model_type,logger=self.log)
+        return fileu.check_existance(self.path,hybe=hybe,channel=channel,file_type=file_type,model_type=model_type,logger=self.log)
 
-    def generate_filename(self,hybe,channel,type,model_type=''):
+    def generate_filename(self,hybe,channel,file_type,model_type=''):
         """
         fname Wrapper to fileu.generate_filename Generate Filename
 
@@ -174,9 +162,9 @@ class Section_Class(object):
         :return: File Path
         :rtype: str
         """
-        return fileu.fname(self.path,hybe=hybe,channel=channel,type=type,model_type=model_type,logger=self.log)
+        return fileu.fname(self.path,hybe=hybe,channel=channel,file_type=file_type,model_type=model_type,logger=self.log)
 
-    def save(self,data,hybe='',channel='',type='',model_type=''):
+    def save(self,data,hybe='',channel='',file_type='',model_type=''):
         """
         save Wrapper to fileu.save Sae Files
 
@@ -191,9 +179,9 @@ class Section_Class(object):
         :param model_type: segmentation Type ('total','nuclei','cytoplasm')
         :type model_type: str, optional
         """
-        fileu.save(data,path=self.path,hybe=hybe,channel=channel,type=type,model_type=model_type,logger=self.log)
+        fileu.save(data,path=self.path,hybe=hybe,channel=channel,file_type=file_type,model_type=model_type,logger=self.log)
 
-    def load(self,hybe='',channel='',type='anndata',model_type=''):
+    def load(self,hybe='',channel='',file_type='anndata',model_type=''):
         """
         load Wrapper to fileu.load Load Files
 
@@ -208,7 +196,7 @@ class Section_Class(object):
         :return : Desired Data Object or None if not found
         :rtype : object
         """
-        return fileu.load(path=self.path,hybe=hybe,channel=channel,type=type,model_type=model_type,logger=self.log)
+        return fileu.load(path=self.path,hybe=hybe,channel=channel,file_type=file_type,model_type=model_type,logger=self.log)
 
     def generate_iterable(self,iterable,message,length=0):
         """
@@ -324,13 +312,13 @@ class Section_Class(object):
             self.any_incomplete_hybes
             return None,None,None,None,None
         else:
-            nuc_exists = self.check_existance(hybe=hybe,channel=self.config.parameters['nucstain_channel'],type='stitched')
-            signal_exists = self.check_existance(hybe=hybe,channel=channel,type='stitched')
+            nuc_exists = self.check_existance(hybe=hybe,channel=self.config.parameters['nucstain_channel'],file_type='stitched')
+            signal_exists = self.check_existance(hybe=hybe,channel=channel,file_type='stitched')
             if (not self.config.parameters['overwrite'])&(nuc_exists&signal_exists):
                 self.update_user('Found Existing '+hybe+' Stitched')
                 if (hybe==self.config.parameters['nucstain_acq'])&(self.reference_stitched==''):
-                    nuc = self.load(hybe=hybe,channel=self.config.parameters['nucstain_channel'],type='stitched')
-                    signal = self.load(hybe=hybe,channel=channel,type='stitched')
+                    nuc = self.load(hybe=hybe,channel=self.config.parameters['nucstain_channel'],file_type='stitched')
+                    signal = self.load(hybe=hybe,channel=channel,file_type='stitched')
                     stitched = torch.dstack([nuc,signal])
                 else:
                     stitched = 0
@@ -519,31 +507,31 @@ class Section_Class(object):
 
                 #     stitched[:,:,1] = correction_image
 
-                self.save(stitched[:,:,0],hybe=hybe,channel=self.config.parameters['nucstain_channel'],type='stitched')
-                self.save(stitched[:,:,1],hybe=hybe,channel=channel,type='stitched')
+                self.save(stitched[:,:,0],hybe=hybe,channel=self.config.parameters['nucstain_channel'],file_type='stitched')
+                self.save(stitched[:,:,1],hybe=hybe,channel=channel,file_type='stitched')
                 nuclei = stitched[self.config.parameters['border']:-self.config.parameters['border'],
                                 self.config.parameters['border']:-self.config.parameters['border'],0].numpy()
                 scale = (np.array(nuclei.shape)*self.config.parameters['ratio']).astype(int)
                 nuclei_down = np.array(Image.fromarray(nuclei.astype(float)).resize((scale[1],scale[0]), Image.BICUBIC))
-                self.save(nuclei_down,hybe=hybe,channel=self.config.parameters['nucstain_channel'],type='image')
+                self.save(nuclei_down,hybe=hybe,channel=self.config.parameters['nucstain_channel'],file_type='image')
                 signal = stitched[self.config.parameters['border']:-self.config.parameters['border'],
                                 self.config.parameters['border']:-self.config.parameters['border'],1].numpy()
                 scale = (np.array(signal.shape)*self.config.parameters['ratio']).astype(int)
                 signal_down = np.array(Image.fromarray(signal.astype(float)).resize((scale[1],scale[0]), Image.BICUBIC))
-                self.save(signal_down,hybe=hybe,channel=channel,type='image')
+                self.save(signal_down,hybe=hybe,channel=channel,file_type='image')
 
-                self.save(stitched[:,:,2],hybe=hybe,channel=self.config.parameters['nucstain_channel'],type='stitched_raw')
-                self.save(stitched[:,:,3],hybe=hybe,channel=channel,type='stitched_raw')
+                self.save(stitched[:,:,2],hybe=hybe,channel=self.config.parameters['nucstain_channel'],file_type='stitched_raw')
+                self.save(stitched[:,:,3],hybe=hybe,channel=channel,file_type='stitched_raw')
                 nuclei_raw = stitched[self.config.parameters['border']:-self.config.parameters['border'],
                                 self.config.parameters['border']:-self.config.parameters['border'],2].numpy()
                 scale_raw = (np.array(nuclei_raw.shape)*self.config.parameters['ratio']).astype(int)
                 nuclei_raw_down = np.array(Image.fromarray(nuclei_raw.astype(float)).resize((scale_raw[1],scale_raw[0]), Image.BICUBIC))
-                self.save(nuclei_raw_down,hybe=hybe,channel=self.config.parameters['nucstain_channel'],type='image_raw')
+                self.save(nuclei_raw_down,hybe=hybe,channel=self.config.parameters['nucstain_channel'],file_type='image_raw')
                 signal_raw = stitched[self.config.parameters['border']:-self.config.parameters['border'],
                                 self.config.parameters['border']:-self.config.parameters['border'],3].numpy()
                 scale_raw = (np.array(signal_raw.shape)*self.config.parameters['ratio']).astype(int)
                 signal_raw_down = np.array(Image.fromarray(signal_raw.astype(float)).resize((scale_raw[1],scale_raw[0]), Image.BICUBIC))
-                self.save(signal_raw_down,hybe=hybe,channel=channel,type='image_raw')
+                self.save(signal_raw_down,hybe=hybe,channel=channel,file_type='image_raw')
                 return stitched
 
     def stitch(self):
@@ -557,20 +545,20 @@ class Section_Class(object):
         else:
             bkg_acq = ''
         if isinstance(self.FF,str) | isinstance(self.nuc_FF,str):
-            if self.check_existance(channel=self.config.parameters['total_channel'],type='FF'):
-                self.FF = self.load(channel=self.config.parameters['total_channel'],type='FF')
+            if self.check_existance(channel=self.config.parameters['total_channel'],file_type='FF'):
+                self.FF = self.load(channel=self.config.parameters['total_channel'],file_type='FF')
             else:
                 FF = generate_FF(self.image_metadata,acq,channel,bkg_acq='',posnames=self.posnames,parameters=self.config.parameters,verbose=self.verbose)
                 self.FF = FF
-                self.save(FF,channel=channel,type='FF')
-                self.save(FF,hybe='FF',channel=channel,type='image_FF')
-            if self.check_existance(channel=self.config.parameters['nucstain_channel'],type='FF'):
-                self.nuc_FF = self.load(channel=self.config.parameters['nucstain_channel'],type='FF')
+                self.save(FF,channel=channel,file_type='FF')
+                self.save(FF,hybe='FF',channel=channel,file_type='image_FF')
+            if self.check_existance(channel=self.config.parameters['nucstain_channel'],file_type='FF'):
+                self.nuc_FF = self.load(channel=self.config.parameters['nucstain_channel'],file_type='FF')
             else:
                 nuc_FF = generate_FF(self.image_metadata,acq,self.config.parameters['nucstain_channel'],bkg_acq='',posnames=self.posnames,parameters=self.config.parameters,verbose=self.verbose)
                 self.nuc_FF = nuc_FF
-                self.save(nuc_FF,channel=self.config.parameters['nucstain_channel'],type='FF')
-                self.save(FF,hybe='FF',channel=self.config.parameters['nucstain_channel'],type='image_FF')
+                self.save(nuc_FF,channel=self.config.parameters['nucstain_channel'],file_type='FF')
+                self.save(FF,hybe='FF',channel=self.config.parameters['nucstain_channel'],file_type='image_FF')
         """ Generate Refernce """
         self.any_incomplete_hybes = False
         self.reference_stitched = self.stitcher(self.config.parameters['nucstain_acq'],self.config.parameters['total_channel'])
@@ -593,33 +581,33 @@ class Section_Class(object):
         :type model_type: str, optional
         """      
 
-        if (not self.config.parameters['segment_overwrite'])&self.check_existance(type='mask',model_type=model_type):
-            self.mask = self.load(type='mask',model_type=model_type)
+        if (not self.config.parameters['segment_overwrite'])&self.check_existance(file_type='mask',model_type=model_type):
+            self.mask = self.load(file_type='mask',model_type=model_type)
         else:
             """ Cytoplasm"""
             if 'cytoplasm' in model_type:
                 """ Check Total"""
-                if self.check_existance(type='mask',model_type='total'):
+                if self.check_existance(file_type='mask',model_type='total'):
                     """ Load """
-                    total = self.load(type='mask',model_type='total')
+                    total = self.load(file_type='mask',model_type='total')
                 else:
                     self.segment(model_type='total')
                     total = self.mask
                 """ Check Nuclei"""
-                if self.check_existance(type='mask',model_type='nuclei'):
+                if self.check_existance(file_type='mask',model_type='nuclei'):
                     """ Load """
-                    nuclei = self.load(type='mask',model_type='nuclei')
+                    nuclei = self.load(file_type='mask',model_type='nuclei')
                 else:
                     self.segment(model_type='nuclei')
                     nuclei = self.mask
                 cytoplasm = total
                 cytoplasm[nuclei>0] = 0
                 self.mask = cytoplasm
-                self.save(self.mask,type='mask',model_type=model_type)
+                self.save(self.mask,file_type='mask',model_type=model_type)
             else:
                 """ Total & Nuclei"""
-                if self.check_existance(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],type='stitched'):
-                    nucstain = self.load(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],type='stitched')
+                if self.check_existance(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='stitched'):
+                    nucstain = self.load(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='stitched')
                     model = models.Cellpose(model_type='nuclei',gpu=self.config.parameters['segment_gpu'])
                     self.mask = torch.zeros_like(nucstain)
                 else:
@@ -631,16 +619,16 @@ class Section_Class(object):
                     if self.config.parameters['total_acq'] == 'all':
                         total = ''
                         for r,h,c in self.generate_iterable(self.config.bitmap,'Loading Total by Summing All Measurements'):
-                            if self.check_existance(hybe=h,channel=c,type='stitched'):
+                            if self.check_existance(hybe=h,channel=c,file_type='stitched'):
                                 if isinstance(total,str):
-                                    total = self.load(hybe=h,channel=c,type='stitched')
+                                    total = self.load(hybe=h,channel=c,file_type='stitched')
                                 else:
-                                    total = total+self.load(hybe=h,channel=c,type='stitched')
+                                    total = total+self.load(hybe=h,channel=c,file_type='stitched')
                             else:
                                 total=None
                     else:
-                        if self.check_existance(hybe=self.config.parameters['total_acq'],channel=self.config.parameters['total_channel'],type='stitched'):
-                            total = self.load(hybe=self.config.parameters['total_acq'],channel=self.config.parameters['total_channel'],type='stitched')
+                        if self.check_existance(hybe=self.config.parameters['total_acq'],channel=self.config.parameters['total_channel'],file_type='stitched'):
+                            total = self.load(hybe=self.config.parameters['total_acq'],channel=self.config.parameters['total_channel'],file_type='stitched')
                             model = models.Cellpose(model_type='cyto2',gpu=self.config.parameters['segment_gpu'])
                             self.mask = torch.zeros_like(total)
                             if isinstance(nucstain,type(None)):
@@ -750,11 +738,11 @@ class Section_Class(object):
                         del raw_mask_image,flows,styles,diams
                         torch.cuda.empty_cache()
                     if 'nuclei' in model_type:
-                        if self.check_existance(type='mask',model_type='total'):
-                            total = self.load(type='mask',model_type='total')
+                        if self.check_existance(file_type='mask',model_type='total'):
+                            total = self.load(file_type='mask',model_type='total')
                             total[self.mask==0] = 0 # Set non nuclear to 0
                             self.mask = total # replace mask with total&nuclear
-                    self.save(self.mask,type='mask',model_type=model_type)
+                    self.save(self.mask,file_type='mask',model_type=model_type)
 
     def pull_vectors(self,model_type='nuclei'):
         """
@@ -764,8 +752,8 @@ class Section_Class(object):
         :type model_type: str, optional
         """        
         proceed = True
-        if (not self.config.parameters['vector_overwrite'])&self.check_existance(type='anndata',model_type=model_type):
-            self.data = self.load(type='anndata',model_type=model_type)
+        if (not self.config.parameters['vector_overwrite'])&self.check_existance(file_type='anndata',model_type=model_type):
+            self.data = self.load(file_type='anndata',model_type=model_type)
         else:
             idxes = torch.where(self.mask!=0)
             labels = self.mask[idxes]
@@ -774,11 +762,11 @@ class Section_Class(object):
             pixel_vectors = torch.zeros([idxes[0].shape[0],len(self.config.bitmap)+1],dtype=torch.int32)
             pixel_vectors_raw = torch.zeros([idxes[0].shape[0],len(self.config.bitmap)+1],dtype=torch.int32)
             for i,(r,h,c) in self.generate_iterable(enumerate(self.config.bitmap),'Generating Pixel Vectors',length=len(self.config.bitmap)):
-                pixel_vectors[:,i] = self.load(hybe=h,channel=c,type='stitched')[idxes]
-                pixel_vectors_raw[:,i] = self.load(hybe=h,channel=c,type='stitched_raw')[idxes]
+                pixel_vectors[:,i] = self.load(hybe=h,channel=c,file_type='stitched')[idxes]
+                pixel_vectors_raw[:,i] = self.load(hybe=h,channel=c,file_type='stitched_raw')[idxes]
             # Nucstain Signal
-            pixel_vectors[:,-1] = self.load(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],type='stitched')[idxes]
-            pixel_vectors_raw[:,-1] = self.load(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],type='stitched_raw')[idxes]
+            pixel_vectors[:,-1] = self.load(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='stitched')[idxes]
+            pixel_vectors_raw[:,-1] = self.load(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='stitched_raw')[idxes]
 
             unique_labels = torch.unique(labels)
             self.vectors = torch.zeros([unique_labels.shape[0],pixel_vectors.shape[1]],dtype=torch.int32)
@@ -822,10 +810,10 @@ class Section_Class(object):
             self.data.obs['nonspecific_readout_raw'] = self.data.layers['raw_vectors'][:,self.data.var.index=='Nonspecific_Readout']
             self.data = self.data[:,self.data.var.index.isin(['PolyT','Nonspecific_Encoding','Nonspecific_Readout'])==False]
 
-            self.save(self.data.obs,type='metadata',model_type=model_type)
-            self.save(pd.DataFrame(self.data.layers['processed_vectors'],index=self.data.obs.index,columns=self.data.var.index),type='matrix',model_type=model_type)
-            self.save(pd.DataFrame(self.data.layers['raw_vectors'],index=self.data.obs.index,columns=self.data.var.index),type='matrix_raw',model_type=model_type)
-            self.save(self.data,type='anndata',model_type=model_type)
+            self.save(self.data.obs,file_type='metadata',model_type=model_type)
+            self.save(pd.DataFrame(self.data.layers['processed_vectors'],index=self.data.obs.index,columns=self.data.var.index),file_type='matrix',model_type=model_type)
+            self.save(pd.DataFrame(self.data.layers['raw_vectors'],index=self.data.obs.index,columns=self.data.var.index),file_type='matrix_raw',model_type=model_type)
+            self.save(self.data,file_type='anndata',model_type=model_type)
 
 
 def generate_FF(image_metadata,acq,channel,posnames=[],bkg_acq='',parameters={},verbose=False):
