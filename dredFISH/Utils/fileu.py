@@ -72,11 +72,14 @@ def generate_filename(path,hybe,channel,file_type,model_type,dataset,section,log
         update_user('Making Type Path',logger=logger)
         os.mkdir(out_path)
 
+    backup_file_type = file_type
+    file_type = file_type.split('_')[0]
+
     if 'hybe' in hybe:
         hybe = hybe.split('hybe')[-1]
     if not 'Hybe' in hybe:
         hybe = 'Hybe'+hybe
-    file_type = file_type.split('_')[0]
+
     if file_type == 'anndata':
         fname = dataset+'_'+section+'_'+model_type+'_'+file_type+'.h5ad'
     elif file_type =='matrix':
@@ -98,8 +101,9 @@ def generate_filename(path,hybe,channel,file_type,model_type,dataset,section,log
     elif file_type == 'Geom':
         fname = dataset+'_'+section+'_'+model_type+'_'+file_type+'.wkt'
     else:
-        update_user('Unsupported File Type '+file_type,level=40,logger=logger)
+        update_user('Unsupported File Type '+backup_file_type+'->'+file_type,level=40,logger=logger)
         fname = dataset+'_'+section+'_'+hybe+'_'+channel+'_'+file_type
+        raise ValueError('Unsupported File Type '+backup_file_type+'->'+file_type+' '+fname)
     fname = os.path.join(out_path,fname)
     return fname
 
@@ -124,6 +128,7 @@ def save(data,path='',hybe='',channel='',file_type='',model_type='',dataset='',s
     """
     fname = generate_filename(path,hybe,channel,file_type,model_type,dataset,section,logger=logger)
     update_user('Saving '+file_type,level=10,logger=logger)
+    file_type = file_type.split('_')[0]
     if file_type == 'anndata':
         data.write(fname)
     elif file_type =='matrix':
@@ -174,6 +179,7 @@ def load(path='',hybe='',channel='',file_type='anndata',model_type='',dataset=''
     :rtype : object
     """
     fname = generate_filename(path,hybe,channel,file_type,model_type,dataset,section,logger=logger)
+    file_type = file_type.split('_')[0]
     if os.path.exists(fname):
         update_user('Loading '+file_type,level=10,logger=logger)
         if file_type == 'anndata':
