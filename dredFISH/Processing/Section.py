@@ -814,6 +814,13 @@ class Section_Class(object):
             self.save(pd.DataFrame(self.data.layers['processed_vectors'],index=self.data.obs.index,columns=self.data.var.index),file_type='matrix',model_type=model_type)
             self.save(pd.DataFrame(self.data.layers['raw_vectors'],index=self.data.obs.index,columns=self.data.var.index),file_type='matrix_raw',model_type=model_type)
             self.save(self.data,file_type='anndata',model_type=model_type)
+            self.remove_temporary_files()
+
+    def remove_temporary_files(self):
+        for file_type in  self.generate_iterable(['stitched','stitched_raw','FF'],message='Removing Temporary Files'):
+            fname = self.generate_filename(hybe='', channel='', file_type=file_type, model_type='')
+            dirname = os.path.dirname(fname)
+            shutil.rmtree(dirname)
 
 
 def generate_FF(image_metadata,acq,channel,posnames=[],bkg_acq='',parameters={},verbose=False):
