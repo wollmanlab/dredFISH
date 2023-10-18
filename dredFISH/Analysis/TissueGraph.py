@@ -327,9 +327,9 @@ class TissueMultiGraph:
                 print("!!`cell` layer already exists; return...")
                 return
 
-        if len(hybes)==0:
-            for i in range(1,25):
-                hybes.append(f"hybe{i:.0f}")
+        # if len(hybes)==0:
+        #     for i in range(1,25):
+        #         hybes.append(f"hybe{i:.0f}")
 
         # find list of sections
         section_names = os.listdir(self.inputpath)
@@ -341,7 +341,8 @@ class TissueMultiGraph:
             section_path = os.path.join(self.inputpath,s)
             meta = fileu.load(section_path,file_type='metadata',model_type=measurement_type)
             matrix = fileu.load(section_path,file_type='matrix',model_type=measurement_type)
-            matrix = np.array(matrix[hybes])
+            if np.array(hybes).shape[0]>0:
+                matrix = np.array(matrix[hybes])
             meta['stage_x'] = meta['stage_x'] + x_max
             x_max = meta['stage_x'].max()
             dfall_meta.append(meta)
