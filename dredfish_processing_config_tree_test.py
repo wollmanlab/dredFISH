@@ -127,3 +127,4 @@ parameters['background_estimate_iters'] = 0
 parameters['stain_correction'] = False
 parameters['stain_correction_downsample'] = 10
 parameters['stain_correction_kernel'] = 1000
+parameters['overlap'] = 0.02 # 2% overlap
