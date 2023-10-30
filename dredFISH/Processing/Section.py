@@ -800,7 +800,7 @@ class Section_Class(object):
             for i in tqdm(range(labels.shape[0]),desc=str(datetime.now().strftime("%H:%M:%S"))+' Generating Label Converter'):
                 converter[int(labels[i])].append(i)
             for i,label in tqdm(enumerate(unique_labels),total=unique_labels.shape[0],desc=str(datetime.now().strftime("%H:%M:%S"))+' Generating Cell Vectors and Metadata'):
-                m = converter[int(label)]#labels==label
+                m = converter[int(label)]
                 self.vectors[i,:] = torch.median(pixel_vectors[m,:],axis=0).values
                 self.vectors_raw[i,:] = torch.median(pixel_vectors_raw[m,:],axis=0).values
                 pxy = pixel_xy[m,:]
