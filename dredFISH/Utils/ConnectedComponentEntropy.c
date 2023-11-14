@@ -3,22 +3,13 @@
 /* BEGIN: Cython Metadata
 {
     "distutils": {
-        "depends": [
-            "/home/rwollman/miniconda3/envs/AH/lib/python3.9/site-packages/numpy/core/include/numpy/arrayobject.h",
-            "/home/rwollman/miniconda3/envs/AH/lib/python3.9/site-packages/numpy/core/include/numpy/arrayscalars.h",
-            "/home/rwollman/miniconda3/envs/AH/lib/python3.9/site-packages/numpy/core/include/numpy/ndarrayobject.h",
-            "/home/rwollman/miniconda3/envs/AH/lib/python3.9/site-packages/numpy/core/include/numpy/ndarraytypes.h",
-            "/home/rwollman/miniconda3/envs/AH/lib/python3.9/site-packages/numpy/core/include/numpy/ufuncobject.h"
-        ],
-        "include_dirs": [
-            "/home/rwollman/miniconda3/envs/AH/lib/python3.9/site-packages/numpy/core/include"
-        ],
-        "name": "ConnectedComponentEntropy",
+        "depends": [],
+        "name": "dredFISH.Utils.ConnectedComponentEntropy",
         "sources": [
-            "ConnectedComponentEntropy.pyx"
+            "/home/rwollman/MyProjects/AH/Repos/dredFISH/dredFISH/Utils/ConnectedComponentEntropy.pyx"
         ]
     },
-    "module_name": "ConnectedComponentEntropy"
+    "module_name": "dredFISH.Utils.ConnectedComponentEntropy"
 }
 END: Cython Metadata */
 
@@ -626,8 +617,8 @@ static CYTHON_INLINE float __PYX_NAN() {
   #endif
 #endif
 
-#define __PYX_HAVE__ConnectedComponentEntropy
-#define __PYX_HAVE_API__ConnectedComponentEntropy
+#define __PYX_HAVE__dredFISH__Utils__ConnectedComponentEntropy
+#define __PYX_HAVE_API__dredFISH__Utils__ConnectedComponentEntropy
 /* Early includes */
 #include <string.h>
 #include <stdio.h>
@@ -1126,7 +1117,7 @@ static CYTHON_INLINE __pyx_t_double_complex __pyx_t_double_complex_from_parts(do
 
 
 /*--- Type declarations ---*/
-struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy;
+struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy;
 
 /* "../../../../../../miniconda3/envs/AH/lib/python3.9/site-packages/numpy/__init__.pxd":729
  * ctypedef npy_longdouble longdouble_t
@@ -1163,30 +1154,30 @@ typedef npy_clongdouble __pyx_t_5numpy_clongdouble_t;
  * cdef inline object PyArray_MultiIterNew1(a):
  */
 typedef npy_cdouble __pyx_t_5numpy_complex_t;
-struct __pyx_opt_args_25ConnectedComponentEntropy_25ConnectedComponentEntropy_merge_all;
+struct __pyx_opt_args_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_merge_all;
 
-/* "ConnectedComponentEntropy.pyx":50
+/* "dredFISH/Utils/ConnectedComponentEntropy.pyx":50
  *         self.entropy -=  self.size[v_root]/self.n * log2(self.size[v_root]/self.n)
  * 
  *     cpdef merge_all(self, np.ndarray[np.int_t, ndim=2] pairs, float entropy_low_bound = 0.0):             # <<<<<<<<<<<<<<
  *         cdef int i, num_pairs = pairs.shape[0]
  *         cdef double run_fraction
  */
-struct __pyx_opt_args_25ConnectedComponentEntropy_25ConnectedComponentEntropy_merge_all {
+struct __pyx_opt_args_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_merge_all {
   int __pyx_n;
   float entropy_low_bound;
 };
 
-/* "ConnectedComponentEntropy.pyx":10
+/* "dredFISH/Utils/ConnectedComponentEntropy.pyx":10
  * cimport numpy as np
  * 
  * cdef class ConnectedComponentEntropy:             # <<<<<<<<<<<<<<
  *     cdef int n
  *     cdef np.ndarray parent, rank
  */
-struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy {
+struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy {
   PyObject_HEAD
-  struct __pyx_vtabstruct_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_vtab;
+  struct __pyx_vtabstruct_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_vtab;
   int n;
   PyArrayObject *parent;
   PyArrayObject *rank;
@@ -1196,12 +1187,13 @@ struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy {
 
 
 
-struct __pyx_vtabstruct_25ConnectedComponentEntropy_ConnectedComponentEntropy {
-  int (*find)(struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *, int, int __pyx_skip_dispatch);
-  PyObject *(*merge)(struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *, int, int, int __pyx_skip_dispatch);
-  PyObject *(*merge_all)(struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *, PyArrayObject *, int __pyx_skip_dispatch, struct __pyx_opt_args_25ConnectedComponentEntropy_25ConnectedComponentEntropy_merge_all *__pyx_optional_args);
+struct __pyx_vtabstruct_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy {
+  int (*find)(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *, int, int __pyx_skip_dispatch);
+  PyObject *(*merge)(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *, int, int, int __pyx_skip_dispatch);
+  PyObject *(*merge_all)(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *, PyArrayObject *, int __pyx_skip_dispatch, struct __pyx_opt_args_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_merge_all *__pyx_optional_args);
+  PyArrayObject *(*get_all_roots)(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *, int __pyx_skip_dispatch);
 };
-static struct __pyx_vtabstruct_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_vtabptr_25ConnectedComponentEntropy_ConnectedComponentEntropy;
+static struct __pyx_vtabstruct_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_vtabptr_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy;
 
 /* --- Runtime support code (head) --- */
 /* Refnanny.proto */
@@ -1499,6 +1491,13 @@ static void __Pyx_RaiseBufferIndexError(int axis);
         __Pyx__ArgTypeTest(obj, type, name, exact))
 static int __Pyx__ArgTypeTest(PyObject *obj, PyTypeObject *type, const char *name, int exact);
 
+/* PyObjectCallNoArg.proto */
+#if CYTHON_COMPILING_IN_CPYTHON
+static CYTHON_INLINE PyObject* __Pyx_PyObject_CallNoArg(PyObject *func);
+#else
+#define __Pyx_PyObject_CallNoArg(func) __Pyx_PyObject_Call(func, __pyx_empty_tuple, NULL)
+#endif
+
 /* PyErrExceptionMatches.proto */
 #if CYTHON_FAST_THREAD_STATE
 #define __Pyx_PyErr_ExceptionMatches(err) __Pyx_PyErr_ExceptionMatchesInState(__pyx_tstate, err)
@@ -1766,9 +1765,10 @@ static int __Pyx_check_binary_version(void);
 /* InitStrings.proto */
 static int __Pyx_InitStrings(__Pyx_StringTabEntry *t);
 
-static int __pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy_find(struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, int __pyx_v_u, int __pyx_skip_dispatch); /* proto*/
-static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy_merge(struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, int __pyx_v_u, int __pyx_v_v, int __pyx_skip_dispatch); /* proto*/
-static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy_merge_all(struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, PyArrayObject *__pyx_v_pairs, int __pyx_skip_dispatch, struct __pyx_opt_args_25ConnectedComponentEntropy_25ConnectedComponentEntropy_merge_all *__pyx_optional_args); /* proto*/
+static int __pyx_f_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_find(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, int __pyx_v_u, int __pyx_skip_dispatch); /* proto*/
+static PyObject *__pyx_f_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_merge(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, int __pyx_v_u, int __pyx_v_v, int __pyx_skip_dispatch); /* proto*/
+static PyObject *__pyx_f_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_merge_all(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, PyArrayObject *__pyx_v_pairs, int __pyx_skip_dispatch, struct __pyx_opt_args_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_merge_all *__pyx_optional_args); /* proto*/
+static PyArrayObject *__pyx_f_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_get_all_roots(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, int __pyx_skip_dispatch); /* proto*/
 
 /* Module declarations from 'cython' */
 
@@ -1812,15 +1812,15 @@ static PyTypeObject *__pyx_ptype_5numpy_flexible = 0;
 static PyTypeObject *__pyx_ptype_5numpy_character = 0;
 static PyTypeObject *__pyx_ptype_5numpy_ufunc = 0;
 
-/* Module declarations from 'ConnectedComponentEntropy' */
-static PyTypeObject *__pyx_ptype_25ConnectedComponentEntropy_ConnectedComponentEntropy = 0;
-static PyObject *__pyx_f_25ConnectedComponentEntropy___pyx_unpickle_ConnectedComponentEntropy__set_state(struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *, PyObject *); /*proto*/
+/* Module declarations from 'dredFISH.Utils.ConnectedComponentEntropy' */
+static PyTypeObject *__pyx_ptype_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy = 0;
+static PyObject *__pyx_f_8dredFISH_5Utils_25ConnectedComponentEntropy___pyx_unpickle_ConnectedComponentEntropy__set_state(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *, PyObject *); /*proto*/
 static __Pyx_TypeInfo __Pyx_TypeInfo_nn___pyx_t_5numpy_int_t = { "int_t", NULL, sizeof(__pyx_t_5numpy_int_t), { 0 }, 0, IS_UNSIGNED(__pyx_t_5numpy_int_t) ? 'U' : 'I', IS_UNSIGNED(__pyx_t_5numpy_int_t), 0 };
-#define __Pyx_MODULE_NAME "ConnectedComponentEntropy"
-extern int __pyx_module_is_main_ConnectedComponentEntropy;
-int __pyx_module_is_main_ConnectedComponentEntropy = 0;
+#define __Pyx_MODULE_NAME "dredFISH.Utils.ConnectedComponentEntropy"
+extern int __pyx_module_is_main_dredFISH__Utils__ConnectedComponentEntropy;
+int __pyx_module_is_main_dredFISH__Utils__ConnectedComponentEntropy = 0;
 
-/* Implementation of 'ConnectedComponentEntropy' */
+/* Implementation of 'dredFISH.Utils.ConnectedComponentEntropy' */
 static PyObject *__pyx_builtin_range;
 static PyObject *__pyx_builtin_ImportError;
 static const char __pyx_k_u[] = "u";
@@ -1834,6 +1834,7 @@ static const char __pyx_k_name[] = "__name__";
 static const char __pyx_k_ones[] = "ones";
 static const char __pyx_k_test[] = "__test__";
 static const char __pyx_k_dtype[] = "dtype";
+static const char __pyx_k_empty[] = "empty";
 static const char __pyx_k_int32[] = "int32";
 static const char __pyx_k_merge[] = "merge";
 static const char __pyx_k_numpy[] = "numpy";
@@ -1861,6 +1862,7 @@ static const char __pyx_k_ImportError[] = "ImportError";
 static const char __pyx_k_PickleError[] = "PickleError";
 static const char __pyx_k_pyx_checksum[] = "__pyx_checksum";
 static const char __pyx_k_stringsource[] = "stringsource";
+static const char __pyx_k_get_all_roots[] = "get_all_roots";
 static const char __pyx_k_reduce_cython[] = "__reduce_cython__";
 static const char __pyx_k_pyx_PickleError[] = "__pyx_PickleError";
 static const char __pyx_k_setstate_cython[] = "__setstate_cython__";
@@ -1870,6 +1872,7 @@ static const char __pyx_k_ConnectedComponentEntropy[] = "ConnectedComponentEntro
 static const char __pyx_k_pyx_unpickle_ConnectedComponen[] = "__pyx_unpickle_ConnectedComponentEntropy";
 static const char __pyx_k_numpy_core_multiarray_failed_to[] = "numpy.core.multiarray failed to import";
 static const char __pyx_k_Incompatible_checksums_s_vs_0x21[] = "Incompatible checksums (%s vs 0x2197205 = (entropy, n, parent, rank, size))";
+static const char __pyx_k_dredFISH_Utils_ConnectedComponen[] = "dredFISH.Utils.ConnectedComponentEntropy";
 static const char __pyx_k_numpy_core_umath_failed_to_impor[] = "numpy.core.umath failed to import";
 static PyObject *__pyx_n_s_ConnectedComponentEntropy;
 static PyObject *__pyx_n_s_ImportError;
@@ -1879,10 +1882,13 @@ static PyObject *__pyx_n_s_arange;
 static PyObject *__pyx_n_s_asarray;
 static PyObject *__pyx_n_s_cline_in_traceback;
 static PyObject *__pyx_n_s_dict;
+static PyObject *__pyx_n_s_dredFISH_Utils_ConnectedComponen;
 static PyObject *__pyx_n_s_dtype;
+static PyObject *__pyx_n_s_empty;
 static PyObject *__pyx_n_s_entropy_low_bound;
 static PyObject *__pyx_n_s_find;
 static PyObject *__pyx_n_s_float64;
+static PyObject *__pyx_n_s_get_all_roots;
 static PyObject *__pyx_n_s_getstate;
 static PyObject *__pyx_n_s_import;
 static PyObject *__pyx_n_s_int32;
@@ -1919,14 +1925,15 @@ static PyObject *__pyx_n_s_u;
 static PyObject *__pyx_n_s_update;
 static PyObject *__pyx_n_s_v;
 static PyObject *__pyx_n_s_zeros;
-static int __pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntropy___init__(struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, int __pyx_v_n_section, int __pyx_v_n_total); /* proto */
-static PyObject *__pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntropy_2find(struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, int __pyx_v_u); /* proto */
-static PyObject *__pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntropy_4merge(struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, int __pyx_v_u, int __pyx_v_v); /* proto */
-static PyObject *__pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntropy_6merge_all(struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, PyArrayObject *__pyx_v_pairs, float __pyx_v_entropy_low_bound); /* proto */
-static PyObject *__pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntropy_8__reduce_cython__(struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self); /* proto */
-static PyObject *__pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntropy_10__setstate_cython__(struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, PyObject *__pyx_v___pyx_state); /* proto */
-static PyObject *__pyx_pf_25ConnectedComponentEntropy___pyx_unpickle_ConnectedComponentEntropy(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v___pyx_type, long __pyx_v___pyx_checksum, PyObject *__pyx_v___pyx_state); /* proto */
-static PyObject *__pyx_tp_new_25ConnectedComponentEntropy_ConnectedComponentEntropy(PyTypeObject *t, PyObject *a, PyObject *k); /*proto*/
+static int __pyx_pf_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy___init__(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, int __pyx_v_n_section, int __pyx_v_n_total); /* proto */
+static PyObject *__pyx_pf_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_2find(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, int __pyx_v_u); /* proto */
+static PyObject *__pyx_pf_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_4merge(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, int __pyx_v_u, int __pyx_v_v); /* proto */
+static PyObject *__pyx_pf_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_6merge_all(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, PyArrayObject *__pyx_v_pairs, float __pyx_v_entropy_low_bound); /* proto */
+static PyObject *__pyx_pf_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_8get_all_roots(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self); /* proto */
+static PyObject *__pyx_pf_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_10__reduce_cython__(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self); /* proto */
+static PyObject *__pyx_pf_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_12__setstate_cython__(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, PyObject *__pyx_v___pyx_state); /* proto */
+static PyObject *__pyx_pf_8dredFISH_5Utils_25ConnectedComponentEntropy___pyx_unpickle_ConnectedComponentEntropy(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v___pyx_type, long __pyx_v___pyx_checksum, PyObject *__pyx_v___pyx_state); /* proto */
+static PyObject *__pyx_tp_new_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy(PyTypeObject *t, PyObject *a, PyObject *k); /*proto*/
 static PyObject *__pyx_int_0;
 static PyObject *__pyx_int_1;
 static PyObject *__pyx_int_35222021;
@@ -1936,7 +1943,7 @@ static PyObject *__pyx_tuple__3;
 static PyObject *__pyx_codeobj__4;
 /* Late includes */
 
-/* "ConnectedComponentEntropy.pyx":16
+/* "dredFISH/Utils/ConnectedComponentEntropy.pyx":16
  *     cdef double entropy
  * 
  *     def __init__(self, int n_section, int n_total = -1):             # <<<<<<<<<<<<<<
@@ -1945,8 +1952,8 @@ static PyObject *__pyx_codeobj__4;
  */
 
 /* Python wrapper */
-static int __pyx_pw_25ConnectedComponentEntropy_25ConnectedComponentEntropy_1__init__(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static int __pyx_pw_25ConnectedComponentEntropy_25ConnectedComponentEntropy_1__init__(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+static int __pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_1__init__(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static int __pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_1__init__(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   int __pyx_v_n_section;
   int __pyx_v_n_total;
   int __pyx_lineno = 0;
@@ -2004,18 +2011,18 @@ static int __pyx_pw_25ConnectedComponentEntropy_25ConnectedComponentEntropy_1__i
   __pyx_L5_argtuple_error:;
   __Pyx_RaiseArgtupleInvalid("__init__", 0, 1, 2, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 16, __pyx_L3_error)
   __pyx_L3_error:;
-  __Pyx_AddTraceback("ConnectedComponentEntropy.ConnectedComponentEntropy.__init__", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("dredFISH.Utils.ConnectedComponentEntropy.ConnectedComponentEntropy.__init__", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return -1;
   __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntropy___init__(((struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *)__pyx_v_self), __pyx_v_n_section, __pyx_v_n_total);
+  __pyx_r = __pyx_pf_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy___init__(((struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *)__pyx_v_self), __pyx_v_n_section, __pyx_v_n_total);
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static int __pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntropy___init__(struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, int __pyx_v_n_section, int __pyx_v_n_total) {
+static int __pyx_pf_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy___init__(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, int __pyx_v_n_section, int __pyx_v_n_total) {
   int __pyx_r;
   __Pyx_RefNannyDeclarations
   int __pyx_t_1;
@@ -2029,7 +2036,7 @@ static int __pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntropy___in
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("__init__", 0);
 
-  /* "ConnectedComponentEntropy.pyx":17
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":17
  * 
  *     def __init__(self, int n_section, int n_total = -1):
  *         if n_total == -1:             # <<<<<<<<<<<<<<
@@ -2039,7 +2046,7 @@ static int __pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntropy___in
   __pyx_t_1 = ((__pyx_v_n_total == -1L) != 0);
   if (__pyx_t_1) {
 
-    /* "ConnectedComponentEntropy.pyx":18
+    /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":18
  *     def __init__(self, int n_section, int n_total = -1):
  *         if n_total == -1:
  *             n_total = n_section             # <<<<<<<<<<<<<<
@@ -2048,7 +2055,7 @@ static int __pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntropy___in
  */
     __pyx_v_n_total = __pyx_v_n_section;
 
-    /* "ConnectedComponentEntropy.pyx":17
+    /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":17
  * 
  *     def __init__(self, int n_section, int n_total = -1):
  *         if n_total == -1:             # <<<<<<<<<<<<<<
@@ -2057,7 +2064,7 @@ static int __pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntropy___in
  */
   }
 
-  /* "ConnectedComponentEntropy.pyx":19
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":19
  *         if n_total == -1:
  *             n_total = n_section
  *         self.n = n_total             # <<<<<<<<<<<<<<
@@ -2066,7 +2073,7 @@ static int __pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntropy___in
  */
   __pyx_v_self->n = __pyx_v_n_total;
 
-  /* "ConnectedComponentEntropy.pyx":20
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":20
  *             n_total = n_section
  *         self.n = n_total
  *         self.parent = np.arange(n_section, dtype=np.int32)             # <<<<<<<<<<<<<<
@@ -2106,7 +2113,7 @@ static int __pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntropy___in
   __pyx_v_self->parent = ((PyArrayObject *)__pyx_t_6);
   __pyx_t_6 = 0;
 
-  /* "ConnectedComponentEntropy.pyx":21
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":21
  *         self.n = n_total
  *         self.parent = np.arange(n_section, dtype=np.int32)
  *         self.rank = np.zeros(n_section, dtype=np.int32)             # <<<<<<<<<<<<<<
@@ -2146,7 +2153,7 @@ static int __pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntropy___in
   __pyx_v_self->rank = ((PyArrayObject *)__pyx_t_5);
   __pyx_t_5 = 0;
 
-  /* "ConnectedComponentEntropy.pyx":22
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":22
  *         self.parent = np.arange(n_section, dtype=np.int32)
  *         self.rank = np.zeros(n_section, dtype=np.int32)
  *         self.size = np.ones(n_section, dtype=np.float64)             # <<<<<<<<<<<<<<
@@ -2186,7 +2193,7 @@ static int __pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntropy___in
   __pyx_v_self->size = ((PyArrayObject *)__pyx_t_3);
   __pyx_t_3 = 0;
 
-  /* "ConnectedComponentEntropy.pyx":23
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":23
  *         self.rank = np.zeros(n_section, dtype=np.int32)
  *         self.size = np.ones(n_section, dtype=np.float64)
  *         self.entropy = n_section / n_total * log2(n_total)             # <<<<<<<<<<<<<<
@@ -2199,7 +2206,7 @@ static int __pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntropy___in
   }
   __pyx_v_self->entropy = ((((double)__pyx_v_n_section) / ((double)__pyx_v_n_total)) * log2(__pyx_v_n_total));
 
-  /* "ConnectedComponentEntropy.pyx":16
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":16
  *     cdef double entropy
  * 
  *     def __init__(self, int n_section, int n_total = -1):             # <<<<<<<<<<<<<<
@@ -2216,14 +2223,14 @@ static int __pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntropy___in
   __Pyx_XDECREF(__pyx_t_4);
   __Pyx_XDECREF(__pyx_t_5);
   __Pyx_XDECREF(__pyx_t_6);
-  __Pyx_AddTraceback("ConnectedComponentEntropy.ConnectedComponentEntropy.__init__", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("dredFISH.Utils.ConnectedComponentEntropy.ConnectedComponentEntropy.__init__", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = -1;
   __pyx_L0:;
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-/* "ConnectedComponentEntropy.pyx":25
+/* "dredFISH/Utils/ConnectedComponentEntropy.pyx":25
  *         self.entropy = n_section / n_total * log2(n_total)
  * 
  *     cpdef int find(self, int u):             # <<<<<<<<<<<<<<
@@ -2231,8 +2238,8 @@ static int __pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntropy___in
  *             return u
  */
 
-static PyObject *__pyx_pw_25ConnectedComponentEntropy_25ConnectedComponentEntropy_3find(PyObject *__pyx_v_self, PyObject *__pyx_arg_u); /*proto*/
-static int __pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy_find(struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, int __pyx_v_u, int __pyx_skip_dispatch) {
+static PyObject *__pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_3find(PyObject *__pyx_v_self, PyObject *__pyx_arg_u); /*proto*/
+static int __pyx_f_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_find(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, int __pyx_v_u, int __pyx_skip_dispatch) {
   int __pyx_r;
   __Pyx_RefNannyDeclarations
   PyObject *__pyx_t_1 = NULL;
@@ -2257,7 +2264,7 @@ static int __pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy_find(
       #endif
       __pyx_t_1 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_self), __pyx_n_s_find); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 25, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_1);
-      if (!PyCFunction_Check(__pyx_t_1) || (PyCFunction_GET_FUNCTION(__pyx_t_1) != (PyCFunction)(void*)__pyx_pw_25ConnectedComponentEntropy_25ConnectedComponentEntropy_3find)) {
+      if (!PyCFunction_Check(__pyx_t_1) || (PyCFunction_GET_FUNCTION(__pyx_t_1) != (PyCFunction)(void*)__pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_3find)) {
         __pyx_t_3 = __Pyx_PyInt_From_int(__pyx_v_u); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 25, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_3);
         __Pyx_INCREF(__pyx_t_1);
@@ -2296,7 +2303,7 @@ static int __pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy_find(
     #endif
   }
 
-  /* "ConnectedComponentEntropy.pyx":26
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":26
  * 
  *     cpdef int find(self, int u):
  *         if self.parent[u] == u:             # <<<<<<<<<<<<<<
@@ -2314,7 +2321,7 @@ static int __pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy_find(
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
   if (__pyx_t_7) {
 
-    /* "ConnectedComponentEntropy.pyx":27
+    /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":27
  *     cpdef int find(self, int u):
  *         if self.parent[u] == u:
  *             return u             # <<<<<<<<<<<<<<
@@ -2324,7 +2331,7 @@ static int __pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy_find(
     __pyx_r = __pyx_v_u;
     goto __pyx_L0;
 
-    /* "ConnectedComponentEntropy.pyx":26
+    /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":26
  * 
  *     cpdef int find(self, int u):
  *         if self.parent[u] == u:             # <<<<<<<<<<<<<<
@@ -2333,7 +2340,7 @@ static int __pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy_find(
  */
   }
 
-  /* "ConnectedComponentEntropy.pyx":28
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":28
  *         if self.parent[u] == u:
  *             return u
  *         self.parent[u] = self.find(self.parent[u])             # <<<<<<<<<<<<<<
@@ -2344,12 +2351,12 @@ static int __pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy_find(
   __Pyx_GOTREF(__pyx_t_4);
   __pyx_t_6 = __Pyx_PyInt_As_int(__pyx_t_4); if (unlikely((__pyx_t_6 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 28, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-  __pyx_t_4 = __Pyx_PyInt_From_int(((struct __pyx_vtabstruct_25ConnectedComponentEntropy_ConnectedComponentEntropy *)__pyx_v_self->__pyx_vtab)->find(__pyx_v_self, __pyx_t_6, 0)); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 28, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyInt_From_int(((struct __pyx_vtabstruct_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *)__pyx_v_self->__pyx_vtab)->find(__pyx_v_self, __pyx_t_6, 0)); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 28, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   if (unlikely(__Pyx_SetItemInt(((PyObject *)__pyx_v_self->parent), __pyx_v_u, __pyx_t_4, int, 1, __Pyx_PyInt_From_int, 0, 1, 1) < 0)) __PYX_ERR(0, 28, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "ConnectedComponentEntropy.pyx":29
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":29
  *             return u
  *         self.parent[u] = self.find(self.parent[u])
  *         return self.parent[u]             # <<<<<<<<<<<<<<
@@ -2363,7 +2370,7 @@ static int __pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy_find(
   __pyx_r = __pyx_t_6;
   goto __pyx_L0;
 
-  /* "ConnectedComponentEntropy.pyx":25
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":25
  *         self.entropy = n_section / n_total * log2(n_total)
  * 
  *     cpdef int find(self, int u):             # <<<<<<<<<<<<<<
@@ -2378,7 +2385,7 @@ static int __pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy_find(
   __Pyx_XDECREF(__pyx_t_3);
   __Pyx_XDECREF(__pyx_t_4);
   __Pyx_XDECREF(__pyx_t_5);
-  __Pyx_WriteUnraisable("ConnectedComponentEntropy.ConnectedComponentEntropy.find", __pyx_clineno, __pyx_lineno, __pyx_filename, 1, 0);
+  __Pyx_WriteUnraisable("dredFISH.Utils.ConnectedComponentEntropy.ConnectedComponentEntropy.find", __pyx_clineno, __pyx_lineno, __pyx_filename, 1, 0);
   __pyx_r = 0;
   __pyx_L0:;
   __Pyx_RefNannyFinishContext();
@@ -2386,8 +2393,8 @@ static int __pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy_find(
 }
 
 /* Python wrapper */
-static PyObject *__pyx_pw_25ConnectedComponentEntropy_25ConnectedComponentEntropy_3find(PyObject *__pyx_v_self, PyObject *__pyx_arg_u); /*proto*/
-static PyObject *__pyx_pw_25ConnectedComponentEntropy_25ConnectedComponentEntropy_3find(PyObject *__pyx_v_self, PyObject *__pyx_arg_u) {
+static PyObject *__pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_3find(PyObject *__pyx_v_self, PyObject *__pyx_arg_u); /*proto*/
+static PyObject *__pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_3find(PyObject *__pyx_v_self, PyObject *__pyx_arg_u) {
   int __pyx_v_u;
   int __pyx_lineno = 0;
   const char *__pyx_filename = NULL;
@@ -2400,18 +2407,18 @@ static PyObject *__pyx_pw_25ConnectedComponentEntropy_25ConnectedComponentEntrop
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
-  __Pyx_AddTraceback("ConnectedComponentEntropy.ConnectedComponentEntropy.find", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("dredFISH.Utils.ConnectedComponentEntropy.ConnectedComponentEntropy.find", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntropy_2find(((struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *)__pyx_v_self), ((int)__pyx_v_u));
+  __pyx_r = __pyx_pf_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_2find(((struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *)__pyx_v_self), ((int)__pyx_v_u));
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntropy_2find(struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, int __pyx_v_u) {
+static PyObject *__pyx_pf_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_2find(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, int __pyx_v_u) {
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   PyObject *__pyx_t_1 = NULL;
@@ -2420,7 +2427,7 @@ static PyObject *__pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntrop
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("find", 0);
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = __Pyx_PyInt_From_int(__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy_find(__pyx_v_self, __pyx_v_u, 1)); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 25, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyInt_From_int(__pyx_f_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_find(__pyx_v_self, __pyx_v_u, 1)); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 25, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
@@ -2429,7 +2436,7 @@ static PyObject *__pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntrop
   /* function exit code */
   __pyx_L1_error:;
   __Pyx_XDECREF(__pyx_t_1);
-  __Pyx_AddTraceback("ConnectedComponentEntropy.ConnectedComponentEntropy.find", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("dredFISH.Utils.ConnectedComponentEntropy.ConnectedComponentEntropy.find", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   __Pyx_XGIVEREF(__pyx_r);
@@ -2437,7 +2444,7 @@ static PyObject *__pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntrop
   return __pyx_r;
 }
 
-/* "ConnectedComponentEntropy.pyx":31
+/* "dredFISH/Utils/ConnectedComponentEntropy.pyx":31
  *         return self.parent[u]
  * 
  *     cpdef merge(self, int u, int v):             # <<<<<<<<<<<<<<
@@ -2445,8 +2452,8 @@ static PyObject *__pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntrop
  *         u_root = self.find(u)
  */
 
-static PyObject *__pyx_pw_25ConnectedComponentEntropy_25ConnectedComponentEntropy_5merge(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy_merge(struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, int __pyx_v_u, int __pyx_v_v, int __pyx_skip_dispatch) {
+static PyObject *__pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_5merge(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyObject *__pyx_f_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_merge(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, int __pyx_v_u, int __pyx_v_v, int __pyx_skip_dispatch) {
   int __pyx_v_u_root;
   int __pyx_v_v_root;
   PyObject *__pyx_v_v_prev_size = NULL;
@@ -2480,7 +2487,7 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
       #endif
       __pyx_t_1 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_self), __pyx_n_s_merge); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 31, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_1);
-      if (!PyCFunction_Check(__pyx_t_1) || (PyCFunction_GET_FUNCTION(__pyx_t_1) != (PyCFunction)(void*)__pyx_pw_25ConnectedComponentEntropy_25ConnectedComponentEntropy_5merge)) {
+      if (!PyCFunction_Check(__pyx_t_1) || (PyCFunction_GET_FUNCTION(__pyx_t_1) != (PyCFunction)(void*)__pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_5merge)) {
         __Pyx_XDECREF(__pyx_r);
         __pyx_t_3 = __Pyx_PyInt_From_int(__pyx_v_u); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 31, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_3);
@@ -2554,25 +2561,25 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
     #endif
   }
 
-  /* "ConnectedComponentEntropy.pyx":33
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":33
  *     cpdef merge(self, int u, int v):
  *         cdef int u_root, v_root
  *         u_root = self.find(u)             # <<<<<<<<<<<<<<
  *         v_root = self.find(v)
  *         if u_root == v_root:
  */
-  __pyx_v_u_root = ((struct __pyx_vtabstruct_25ConnectedComponentEntropy_ConnectedComponentEntropy *)__pyx_v_self->__pyx_vtab)->find(__pyx_v_self, __pyx_v_u, 0);
+  __pyx_v_u_root = ((struct __pyx_vtabstruct_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *)__pyx_v_self->__pyx_vtab)->find(__pyx_v_self, __pyx_v_u, 0);
 
-  /* "ConnectedComponentEntropy.pyx":34
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":34
  *         cdef int u_root, v_root
  *         u_root = self.find(u)
  *         v_root = self.find(v)             # <<<<<<<<<<<<<<
  *         if u_root == v_root:
  *             return
  */
-  __pyx_v_v_root = ((struct __pyx_vtabstruct_25ConnectedComponentEntropy_ConnectedComponentEntropy *)__pyx_v_self->__pyx_vtab)->find(__pyx_v_self, __pyx_v_v, 0);
+  __pyx_v_v_root = ((struct __pyx_vtabstruct_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *)__pyx_v_self->__pyx_vtab)->find(__pyx_v_self, __pyx_v_v, 0);
 
-  /* "ConnectedComponentEntropy.pyx":35
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":35
  *         u_root = self.find(u)
  *         v_root = self.find(v)
  *         if u_root == v_root:             # <<<<<<<<<<<<<<
@@ -2582,7 +2589,7 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
   __pyx_t_9 = ((__pyx_v_u_root == __pyx_v_v_root) != 0);
   if (__pyx_t_9) {
 
-    /* "ConnectedComponentEntropy.pyx":36
+    /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":36
  *         v_root = self.find(v)
  *         if u_root == v_root:
  *             return             # <<<<<<<<<<<<<<
@@ -2593,7 +2600,7 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
     __pyx_r = Py_None; __Pyx_INCREF(Py_None);
     goto __pyx_L0;
 
-    /* "ConnectedComponentEntropy.pyx":35
+    /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":35
  *         u_root = self.find(u)
  *         v_root = self.find(v)
  *         if u_root == v_root:             # <<<<<<<<<<<<<<
@@ -2602,7 +2609,7 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
  */
   }
 
-  /* "ConnectedComponentEntropy.pyx":37
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":37
  *         if u_root == v_root:
  *             return
  *         if self.rank[u_root] > self.rank[v_root]:             # <<<<<<<<<<<<<<
@@ -2620,7 +2627,7 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
   if (__pyx_t_9) {
 
-    /* "ConnectedComponentEntropy.pyx":38
+    /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":38
  *             return
  *         if self.rank[u_root] > self.rank[v_root]:
  *             u_root, v_root = v_root, u_root             # <<<<<<<<<<<<<<
@@ -2632,7 +2639,7 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
     __pyx_v_u_root = __pyx_t_7;
     __pyx_v_v_root = __pyx_t_10;
 
-    /* "ConnectedComponentEntropy.pyx":37
+    /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":37
  *         if u_root == v_root:
  *             return
  *         if self.rank[u_root] > self.rank[v_root]:             # <<<<<<<<<<<<<<
@@ -2641,7 +2648,7 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
  */
   }
 
-  /* "ConnectedComponentEntropy.pyx":39
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":39
  *         if self.rank[u_root] > self.rank[v_root]:
  *             u_root, v_root = v_root, u_root
  *         self.parent[u_root] = v_root             # <<<<<<<<<<<<<<
@@ -2653,7 +2660,7 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
   if (unlikely(__Pyx_SetItemInt(((PyObject *)__pyx_v_self->parent), __pyx_v_u_root, __pyx_t_5, int, 1, __Pyx_PyInt_From_int, 0, 1, 1) < 0)) __PYX_ERR(0, 39, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
 
-  /* "ConnectedComponentEntropy.pyx":40
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":40
  *             u_root, v_root = v_root, u_root
  *         self.parent[u_root] = v_root
  *         if self.rank[u_root] == self.rank[v_root]:             # <<<<<<<<<<<<<<
@@ -2671,7 +2678,7 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   if (__pyx_t_9) {
 
-    /* "ConnectedComponentEntropy.pyx":41
+    /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":41
  *         self.parent[u_root] = v_root
  *         if self.rank[u_root] == self.rank[v_root]:
  *             self.rank[v_root] += 1             # <<<<<<<<<<<<<<
@@ -2690,7 +2697,7 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
     __Pyx_DECREF(((PyObject *)__pyx_t_11)); __pyx_t_11 = 0;
 
-    /* "ConnectedComponentEntropy.pyx":40
+    /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":40
  *             u_root, v_root = v_root, u_root
  *         self.parent[u_root] = v_root
  *         if self.rank[u_root] == self.rank[v_root]:             # <<<<<<<<<<<<<<
@@ -2699,7 +2706,7 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
  */
   }
 
-  /* "ConnectedComponentEntropy.pyx":42
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":42
  *         if self.rank[u_root] == self.rank[v_root]:
  *             self.rank[v_root] += 1
  *         v_prev_size = self.size[v_root]             # <<<<<<<<<<<<<<
@@ -2711,7 +2718,7 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
   __pyx_v_v_prev_size = __pyx_t_2;
   __pyx_t_2 = 0;
 
-  /* "ConnectedComponentEntropy.pyx":43
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":43
  *             self.rank[v_root] += 1
  *         v_prev_size = self.size[v_root]
  *         u_prev_size = self.size[u_root]             # <<<<<<<<<<<<<<
@@ -2723,7 +2730,7 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
   __pyx_v_u_prev_size = __pyx_t_2;
   __pyx_t_2 = 0;
 
-  /* "ConnectedComponentEntropy.pyx":44
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":44
  *         v_prev_size = self.size[v_root]
  *         u_prev_size = self.size[u_root]
  *         self.size[v_root] += self.size[u_root]             # <<<<<<<<<<<<<<
@@ -2745,7 +2752,7 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
   __Pyx_DECREF(((PyObject *)__pyx_t_11)); __pyx_t_11 = 0;
 
-  /* "ConnectedComponentEntropy.pyx":45
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":45
  *         u_prev_size = self.size[u_root]
  *         self.size[v_root] += self.size[u_root]
  *         self.size[u_root] = 0             # <<<<<<<<<<<<<<
@@ -2754,7 +2761,7 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
  */
   if (unlikely(__Pyx_SetItemInt(((PyObject *)__pyx_v_self->size), __pyx_v_u_root, __pyx_int_0, int, 1, __Pyx_PyInt_From_int, 0, 1, 1) < 0)) __PYX_ERR(0, 45, __pyx_L1_error)
 
-  /* "ConnectedComponentEntropy.pyx":46
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":46
  *         self.size[v_root] += self.size[u_root]
  *         self.size[u_root] = 0
  *         self.entropy += v_prev_size/self.n * log2(v_prev_size/self.n)             # <<<<<<<<<<<<<<
@@ -2789,7 +2796,7 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
   __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
   __pyx_v_self->entropy = __pyx_t_12;
 
-  /* "ConnectedComponentEntropy.pyx":47
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":47
  *         self.size[u_root] = 0
  *         self.entropy += v_prev_size/self.n * log2(v_prev_size/self.n)
  *         self.entropy += u_prev_size/self.n * log2(u_prev_size/self.n)             # <<<<<<<<<<<<<<
@@ -2824,7 +2831,7 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   __pyx_v_self->entropy = __pyx_t_12;
 
-  /* "ConnectedComponentEntropy.pyx":48
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":48
  *         self.entropy += v_prev_size/self.n * log2(v_prev_size/self.n)
  *         self.entropy += u_prev_size/self.n * log2(u_prev_size/self.n)
  *         self.entropy -=  self.size[v_root]/self.n * log2(self.size[v_root]/self.n)             # <<<<<<<<<<<<<<
@@ -2865,7 +2872,7 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
   __pyx_v_self->entropy = __pyx_t_12;
 
-  /* "ConnectedComponentEntropy.pyx":31
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":31
  *         return self.parent[u]
  * 
  *     cpdef merge(self, int u, int v):             # <<<<<<<<<<<<<<
@@ -2885,7 +2892,7 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
   __Pyx_XDECREF(__pyx_t_6);
   __Pyx_XDECREF(__pyx_t_8);
   __Pyx_XDECREF(((PyObject *)__pyx_t_11));
-  __Pyx_AddTraceback("ConnectedComponentEntropy.ConnectedComponentEntropy.merge", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("dredFISH.Utils.ConnectedComponentEntropy.ConnectedComponentEntropy.merge", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = 0;
   __pyx_L0:;
   __Pyx_XDECREF(__pyx_v_v_prev_size);
@@ -2896,8 +2903,8 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
 }
 
 /* Python wrapper */
-static PyObject *__pyx_pw_25ConnectedComponentEntropy_25ConnectedComponentEntropy_5merge(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static PyObject *__pyx_pw_25ConnectedComponentEntropy_25ConnectedComponentEntropy_5merge(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+static PyObject *__pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_5merge(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyObject *__pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_5merge(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   int __pyx_v_u;
   int __pyx_v_v;
   int __pyx_lineno = 0;
@@ -2948,18 +2955,18 @@ static PyObject *__pyx_pw_25ConnectedComponentEntropy_25ConnectedComponentEntrop
   __pyx_L5_argtuple_error:;
   __Pyx_RaiseArgtupleInvalid("merge", 1, 2, 2, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 31, __pyx_L3_error)
   __pyx_L3_error:;
-  __Pyx_AddTraceback("ConnectedComponentEntropy.ConnectedComponentEntropy.merge", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("dredFISH.Utils.ConnectedComponentEntropy.ConnectedComponentEntropy.merge", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntropy_4merge(((struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *)__pyx_v_self), __pyx_v_u, __pyx_v_v);
+  __pyx_r = __pyx_pf_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_4merge(((struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *)__pyx_v_self), __pyx_v_u, __pyx_v_v);
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntropy_4merge(struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, int __pyx_v_u, int __pyx_v_v) {
+static PyObject *__pyx_pf_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_4merge(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, int __pyx_v_u, int __pyx_v_v) {
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   PyObject *__pyx_t_1 = NULL;
@@ -2968,7 +2975,7 @@ static PyObject *__pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntrop
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("merge", 0);
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = __pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy_merge(__pyx_v_self, __pyx_v_u, __pyx_v_v, 1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 31, __pyx_L1_error)
+  __pyx_t_1 = __pyx_f_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_merge(__pyx_v_self, __pyx_v_u, __pyx_v_v, 1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 31, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
@@ -2977,7 +2984,7 @@ static PyObject *__pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntrop
   /* function exit code */
   __pyx_L1_error:;
   __Pyx_XDECREF(__pyx_t_1);
-  __Pyx_AddTraceback("ConnectedComponentEntropy.ConnectedComponentEntropy.merge", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("dredFISH.Utils.ConnectedComponentEntropy.ConnectedComponentEntropy.merge", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   __Pyx_XGIVEREF(__pyx_r);
@@ -2985,7 +2992,7 @@ static PyObject *__pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntrop
   return __pyx_r;
 }
 
-/* "ConnectedComponentEntropy.pyx":50
+/* "dredFISH/Utils/ConnectedComponentEntropy.pyx":50
  *         self.entropy -=  self.size[v_root]/self.n * log2(self.size[v_root]/self.n)
  * 
  *     cpdef merge_all(self, np.ndarray[np.int_t, ndim=2] pairs, float entropy_low_bound = 0.0):             # <<<<<<<<<<<<<<
@@ -2993,8 +3000,8 @@ static PyObject *__pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntrop
  *         cdef double run_fraction
  */
 
-static PyObject *__pyx_pw_25ConnectedComponentEntropy_25ConnectedComponentEntropy_7merge_all(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy_merge_all(struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, PyArrayObject *__pyx_v_pairs, int __pyx_skip_dispatch, struct __pyx_opt_args_25ConnectedComponentEntropy_25ConnectedComponentEntropy_merge_all *__pyx_optional_args) {
+static PyObject *__pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_7merge_all(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyObject *__pyx_f_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_merge_all(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, PyArrayObject *__pyx_v_pairs, int __pyx_skip_dispatch, struct __pyx_opt_args_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_merge_all *__pyx_optional_args) {
   float __pyx_v_entropy_low_bound = ((float)0.0);
   int __pyx_v_i;
   int __pyx_v_num_pairs;
@@ -3049,7 +3056,7 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
       #endif
       __pyx_t_1 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_self), __pyx_n_s_merge_all); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 50, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_1);
-      if (!PyCFunction_Check(__pyx_t_1) || (PyCFunction_GET_FUNCTION(__pyx_t_1) != (PyCFunction)(void*)__pyx_pw_25ConnectedComponentEntropy_25ConnectedComponentEntropy_7merge_all)) {
+      if (!PyCFunction_Check(__pyx_t_1) || (PyCFunction_GET_FUNCTION(__pyx_t_1) != (PyCFunction)(void*)__pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_7merge_all)) {
         __Pyx_XDECREF(__pyx_r);
         __pyx_t_3 = PyFloat_FromDouble(__pyx_v_entropy_low_bound); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 50, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_3);
@@ -3119,7 +3126,7 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
     #endif
   }
 
-  /* "ConnectedComponentEntropy.pyx":51
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":51
  * 
  *     cpdef merge_all(self, np.ndarray[np.int_t, ndim=2] pairs, float entropy_low_bound = 0.0):
  *         cdef int i, num_pairs = pairs.shape[0]             # <<<<<<<<<<<<<<
@@ -3128,7 +3135,7 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
  */
   __pyx_v_num_pairs = (__pyx_v_pairs->dimensions[0]);
 
-  /* "ConnectedComponentEntropy.pyx":53
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":53
  *         cdef int i, num_pairs = pairs.shape[0]
  *         cdef double run_fraction
  *         cdef np.ndarray entropy_log = np.ones(num_pairs, dtype=np.float64) * entropy_low_bound             # <<<<<<<<<<<<<<
@@ -3171,7 +3178,7 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
   __pyx_v_entropy_log = ((PyArrayObject *)__pyx_t_4);
   __pyx_t_4 = 0;
 
-  /* "ConnectedComponentEntropy.pyx":54
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":54
  *         cdef double run_fraction
  *         cdef np.ndarray entropy_log = np.ones(num_pairs, dtype=np.float64) * entropy_low_bound
  *         for i in range(num_pairs):             # <<<<<<<<<<<<<<
@@ -3183,7 +3190,7 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
   for (__pyx_t_9 = 0; __pyx_t_9 < __pyx_t_8; __pyx_t_9+=1) {
     __pyx_v_i = __pyx_t_9;
 
-    /* "ConnectedComponentEntropy.pyx":55
+    /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":55
  *         cdef np.ndarray entropy_log = np.ones(num_pairs, dtype=np.float64) * entropy_low_bound
  *         for i in range(num_pairs):
  *             self.merge(pairs[i, 0], pairs[i, 1])             # <<<<<<<<<<<<<<
@@ -3220,11 +3227,11 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
       __Pyx_RaiseBufferIndexError(__pyx_t_12);
       __PYX_ERR(0, 55, __pyx_L1_error)
     }
-    __pyx_t_4 = ((struct __pyx_vtabstruct_25ConnectedComponentEntropy_ConnectedComponentEntropy *)__pyx_v_self->__pyx_vtab)->merge(__pyx_v_self, (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_pairs.rcbuffer->pybuffer.buf, __pyx_t_10, __pyx_pybuffernd_pairs.diminfo[0].strides, __pyx_t_11, __pyx_pybuffernd_pairs.diminfo[1].strides)), (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_pairs.rcbuffer->pybuffer.buf, __pyx_t_13, __pyx_pybuffernd_pairs.diminfo[0].strides, __pyx_t_14, __pyx_pybuffernd_pairs.diminfo[1].strides)), 0); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 55, __pyx_L1_error)
+    __pyx_t_4 = ((struct __pyx_vtabstruct_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *)__pyx_v_self->__pyx_vtab)->merge(__pyx_v_self, (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_pairs.rcbuffer->pybuffer.buf, __pyx_t_10, __pyx_pybuffernd_pairs.diminfo[0].strides, __pyx_t_11, __pyx_pybuffernd_pairs.diminfo[1].strides)), (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_pairs.rcbuffer->pybuffer.buf, __pyx_t_13, __pyx_pybuffernd_pairs.diminfo[0].strides, __pyx_t_14, __pyx_pybuffernd_pairs.diminfo[1].strides)), 0); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 55, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_4);
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-    /* "ConnectedComponentEntropy.pyx":56
+    /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":56
  *         for i in range(num_pairs):
  *             self.merge(pairs[i, 0], pairs[i, 1])
  *             entropy_log[i] = self.entropy             # <<<<<<<<<<<<<<
@@ -3236,7 +3243,7 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
     if (unlikely(__Pyx_SetItemInt(((PyObject *)__pyx_v_entropy_log), __pyx_v_i, __pyx_t_4, int, 1, __Pyx_PyInt_From_int, 0, 1, 1) < 0)) __PYX_ERR(0, 56, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-    /* "ConnectedComponentEntropy.pyx":57
+    /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":57
  *             self.merge(pairs[i, 0], pairs[i, 1])
  *             entropy_log[i] = self.entropy
  *             if self.entropy <= entropy_low_bound:             # <<<<<<<<<<<<<<
@@ -3246,7 +3253,7 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
     __pyx_t_15 = ((__pyx_v_self->entropy <= __pyx_v_entropy_low_bound) != 0);
     if (__pyx_t_15) {
 
-      /* "ConnectedComponentEntropy.pyx":58
+      /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":58
  *             entropy_log[i] = self.entropy
  *             if self.entropy <= entropy_low_bound:
  *                 run_fraction = 100*i/num_pairs             # <<<<<<<<<<<<<<
@@ -3260,7 +3267,7 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
       }
       __pyx_v_run_fraction = (((double)__pyx_t_16) / ((double)__pyx_v_num_pairs));
 
-      /* "ConnectedComponentEntropy.pyx":59
+      /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":59
  *             if self.entropy <= entropy_low_bound:
  *                 run_fraction = 100*i/num_pairs
  *                 printf("reached lower bound at iter %d - %.0f%% of edges\n", i, run_fraction)             # <<<<<<<<<<<<<<
@@ -3269,15 +3276,16 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
  */
       (void)(printf(((char const *)"reached lower bound at iter %d - %.0f%% of edges\n"), __pyx_v_i, __pyx_v_run_fraction));
 
-      /* "ConnectedComponentEntropy.pyx":60
+      /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":60
  *                 run_fraction = 100*i/num_pairs
  *                 printf("reached lower bound at iter %d - %.0f%% of edges\n", i, run_fraction)
  *                 break             # <<<<<<<<<<<<<<
  *         return np.asarray(entropy_log)
+ * 
  */
       goto __pyx_L4_break;
 
-      /* "ConnectedComponentEntropy.pyx":57
+      /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":57
  *             self.merge(pairs[i, 0], pairs[i, 1])
  *             entropy_log[i] = self.entropy
  *             if self.entropy <= entropy_low_bound:             # <<<<<<<<<<<<<<
@@ -3288,10 +3296,12 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
   }
   __pyx_L4_break:;
 
-  /* "ConnectedComponentEntropy.pyx":61
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":61
  *                 printf("reached lower bound at iter %d - %.0f%% of edges\n", i, run_fraction)
  *                 break
  *         return np.asarray(entropy_log)             # <<<<<<<<<<<<<<
+ * 
+ *     cpdef np.ndarray get_all_roots(self):
  */
   __Pyx_XDECREF(__pyx_r);
   __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_n_s_np); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 61, __pyx_L1_error)
@@ -3318,7 +3328,7 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
   __pyx_t_4 = 0;
   goto __pyx_L0;
 
-  /* "ConnectedComponentEntropy.pyx":50
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":50
  *         self.entropy -=  self.size[v_root]/self.n * log2(self.size[v_root]/self.n)
  * 
  *     cpdef merge_all(self, np.ndarray[np.int_t, ndim=2] pairs, float entropy_low_bound = 0.0):             # <<<<<<<<<<<<<<
@@ -3340,7 +3350,7 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
     __Pyx_ErrFetch(&__pyx_type, &__pyx_value, &__pyx_tb);
     __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_pairs.rcbuffer->pybuffer);
   __Pyx_ErrRestore(__pyx_type, __pyx_value, __pyx_tb);}
-  __Pyx_AddTraceback("ConnectedComponentEntropy.ConnectedComponentEntropy.merge_all", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("dredFISH.Utils.ConnectedComponentEntropy.ConnectedComponentEntropy.merge_all", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = 0;
   goto __pyx_L2;
   __pyx_L0:;
@@ -3353,8 +3363,8 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy
 }
 
 /* Python wrapper */
-static PyObject *__pyx_pw_25ConnectedComponentEntropy_25ConnectedComponentEntropy_7merge_all(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static PyObject *__pyx_pw_25ConnectedComponentEntropy_25ConnectedComponentEntropy_7merge_all(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+static PyObject *__pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_7merge_all(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyObject *__pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_7merge_all(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyArrayObject *__pyx_v_pairs = 0;
   float __pyx_v_entropy_low_bound;
   int __pyx_lineno = 0;
@@ -3412,12 +3422,12 @@ static PyObject *__pyx_pw_25ConnectedComponentEntropy_25ConnectedComponentEntrop
   __pyx_L5_argtuple_error:;
   __Pyx_RaiseArgtupleInvalid("merge_all", 0, 1, 2, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 50, __pyx_L3_error)
   __pyx_L3_error:;
-  __Pyx_AddTraceback("ConnectedComponentEntropy.ConnectedComponentEntropy.merge_all", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("dredFISH.Utils.ConnectedComponentEntropy.ConnectedComponentEntropy.merge_all", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
   if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_pairs), __pyx_ptype_5numpy_ndarray, 1, "pairs", 0))) __PYX_ERR(0, 50, __pyx_L1_error)
-  __pyx_r = __pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntropy_6merge_all(((struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *)__pyx_v_self), __pyx_v_pairs, __pyx_v_entropy_low_bound);
+  __pyx_r = __pyx_pf_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_6merge_all(((struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *)__pyx_v_self), __pyx_v_pairs, __pyx_v_entropy_low_bound);
 
   /* function exit code */
   goto __pyx_L0;
@@ -3428,13 +3438,13 @@ static PyObject *__pyx_pw_25ConnectedComponentEntropy_25ConnectedComponentEntrop
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntropy_6merge_all(struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, PyArrayObject *__pyx_v_pairs, float __pyx_v_entropy_low_bound) {
+static PyObject *__pyx_pf_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_6merge_all(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, PyArrayObject *__pyx_v_pairs, float __pyx_v_entropy_low_bound) {
   __Pyx_LocalBuf_ND __pyx_pybuffernd_pairs;
   __Pyx_Buffer __pyx_pybuffer_pairs;
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   PyObject *__pyx_t_1 = NULL;
-  struct __pyx_opt_args_25ConnectedComponentEntropy_25ConnectedComponentEntropy_merge_all __pyx_t_2;
+  struct __pyx_opt_args_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_merge_all __pyx_t_2;
   int __pyx_lineno = 0;
   const char *__pyx_filename = NULL;
   int __pyx_clineno = 0;
@@ -3451,7 +3461,7 @@ static PyObject *__pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntrop
   __Pyx_XDECREF(__pyx_r);
   __pyx_t_2.__pyx_n = 1;
   __pyx_t_2.entropy_low_bound = __pyx_v_entropy_low_bound;
-  __pyx_t_1 = __pyx_vtabptr_25ConnectedComponentEntropy_ConnectedComponentEntropy->merge_all(__pyx_v_self, __pyx_v_pairs, 1, &__pyx_t_2); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 50, __pyx_L1_error)
+  __pyx_t_1 = __pyx_vtabptr_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy->merge_all(__pyx_v_self, __pyx_v_pairs, 1, &__pyx_t_2); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 50, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
@@ -3466,12 +3476,220 @@ static PyObject *__pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntrop
     __Pyx_ErrFetch(&__pyx_type, &__pyx_value, &__pyx_tb);
     __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_pairs.rcbuffer->pybuffer);
   __Pyx_ErrRestore(__pyx_type, __pyx_value, __pyx_tb);}
-  __Pyx_AddTraceback("ConnectedComponentEntropy.ConnectedComponentEntropy.merge_all", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("dredFISH.Utils.ConnectedComponentEntropy.ConnectedComponentEntropy.merge_all", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   goto __pyx_L2;
   __pyx_L0:;
   __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_pairs.rcbuffer->pybuffer);
   __pyx_L2:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "dredFISH/Utils/ConnectedComponentEntropy.pyx":63
+ *         return np.asarray(entropy_log)
+ * 
+ *     cpdef np.ndarray get_all_roots(self):             # <<<<<<<<<<<<<<
+ *         cdef np.ndarray roots = np.empty(self.n, dtype=np.int32)
+ *         cdef int i
+ */
+
+static PyObject *__pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_9get_all_roots(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused); /*proto*/
+static PyArrayObject *__pyx_f_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_get_all_roots(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, int __pyx_skip_dispatch) {
+  PyArrayObject *__pyx_v_roots = 0;
+  int __pyx_v_i;
+  PyArrayObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  PyObject *__pyx_t_2 = NULL;
+  PyObject *__pyx_t_3 = NULL;
+  PyObject *__pyx_t_4 = NULL;
+  PyObject *__pyx_t_5 = NULL;
+  int __pyx_t_6;
+  int __pyx_t_7;
+  int __pyx_t_8;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("get_all_roots", 0);
+  /* Check if called by wrapper */
+  if (unlikely(__pyx_skip_dispatch)) ;
+  /* Check if overridden in Python */
+  else if (unlikely((Py_TYPE(((PyObject *)__pyx_v_self))->tp_dictoffset != 0) || (Py_TYPE(((PyObject *)__pyx_v_self))->tp_flags & (Py_TPFLAGS_IS_ABSTRACT | Py_TPFLAGS_HEAPTYPE)))) {
+    #if CYTHON_USE_DICT_VERSIONS && CYTHON_USE_PYTYPE_LOOKUP && CYTHON_USE_TYPE_SLOTS
+    static PY_UINT64_T __pyx_tp_dict_version = __PYX_DICT_VERSION_INIT, __pyx_obj_dict_version = __PYX_DICT_VERSION_INIT;
+    if (unlikely(!__Pyx_object_dict_version_matches(((PyObject *)__pyx_v_self), __pyx_tp_dict_version, __pyx_obj_dict_version))) {
+      PY_UINT64_T __pyx_type_dict_guard = __Pyx_get_tp_dict_version(((PyObject *)__pyx_v_self));
+      #endif
+      __pyx_t_1 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_self), __pyx_n_s_get_all_roots); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 63, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_1);
+      if (!PyCFunction_Check(__pyx_t_1) || (PyCFunction_GET_FUNCTION(__pyx_t_1) != (PyCFunction)(void*)__pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_9get_all_roots)) {
+        __Pyx_XDECREF(((PyObject *)__pyx_r));
+        __Pyx_INCREF(__pyx_t_1);
+        __pyx_t_3 = __pyx_t_1; __pyx_t_4 = NULL;
+        if (CYTHON_UNPACK_METHODS && unlikely(PyMethod_Check(__pyx_t_3))) {
+          __pyx_t_4 = PyMethod_GET_SELF(__pyx_t_3);
+          if (likely(__pyx_t_4)) {
+            PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_3);
+            __Pyx_INCREF(__pyx_t_4);
+            __Pyx_INCREF(function);
+            __Pyx_DECREF_SET(__pyx_t_3, function);
+          }
+        }
+        __pyx_t_2 = (__pyx_t_4) ? __Pyx_PyObject_CallOneArg(__pyx_t_3, __pyx_t_4) : __Pyx_PyObject_CallNoArg(__pyx_t_3);
+        __Pyx_XDECREF(__pyx_t_4); __pyx_t_4 = 0;
+        if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 63, __pyx_L1_error)
+        __Pyx_GOTREF(__pyx_t_2);
+        __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+        if (!(likely(((__pyx_t_2) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_2, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 63, __pyx_L1_error)
+        __pyx_r = ((PyArrayObject *)__pyx_t_2);
+        __pyx_t_2 = 0;
+        __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+        goto __pyx_L0;
+      }
+      #if CYTHON_USE_DICT_VERSIONS && CYTHON_USE_PYTYPE_LOOKUP && CYTHON_USE_TYPE_SLOTS
+      __pyx_tp_dict_version = __Pyx_get_tp_dict_version(((PyObject *)__pyx_v_self));
+      __pyx_obj_dict_version = __Pyx_get_object_dict_version(((PyObject *)__pyx_v_self));
+      if (unlikely(__pyx_type_dict_guard != __pyx_tp_dict_version)) {
+        __pyx_tp_dict_version = __pyx_obj_dict_version = __PYX_DICT_VERSION_INIT;
+      }
+      #endif
+      __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+      #if CYTHON_USE_DICT_VERSIONS && CYTHON_USE_PYTYPE_LOOKUP && CYTHON_USE_TYPE_SLOTS
+    }
+    #endif
+  }
+
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":64
+ * 
+ *     cpdef np.ndarray get_all_roots(self):
+ *         cdef np.ndarray roots = np.empty(self.n, dtype=np.int32)             # <<<<<<<<<<<<<<
+ *         cdef int i
+ *         for i in range(self.n):
+ */
+  __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_n_s_np); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 64, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_empty); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 64, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  __pyx_t_1 = __Pyx_PyInt_From_int(__pyx_v_self->n); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 64, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_t_3 = PyTuple_New(1); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 64, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_3);
+  __Pyx_GIVEREF(__pyx_t_1);
+  PyTuple_SET_ITEM(__pyx_t_3, 0, __pyx_t_1);
+  __pyx_t_1 = 0;
+  __pyx_t_1 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 64, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __Pyx_GetModuleGlobalName(__pyx_t_4, __pyx_n_s_np); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 64, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_n_s_int32); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 64, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_5);
+  __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+  if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_dtype, __pyx_t_5) < 0) __PYX_ERR(0, 64, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+  __pyx_t_5 = __Pyx_PyObject_Call(__pyx_t_2, __pyx_t_3, __pyx_t_1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 64, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_5);
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  if (!(likely(((__pyx_t_5) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_5, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 64, __pyx_L1_error)
+  __pyx_v_roots = ((PyArrayObject *)__pyx_t_5);
+  __pyx_t_5 = 0;
+
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":66
+ *         cdef np.ndarray roots = np.empty(self.n, dtype=np.int32)
+ *         cdef int i
+ *         for i in range(self.n):             # <<<<<<<<<<<<<<
+ *             roots[i] = self.find(i)
+ *         return roots
+ */
+  __pyx_t_6 = __pyx_v_self->n;
+  __pyx_t_7 = __pyx_t_6;
+  for (__pyx_t_8 = 0; __pyx_t_8 < __pyx_t_7; __pyx_t_8+=1) {
+    __pyx_v_i = __pyx_t_8;
+
+    /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":67
+ *         cdef int i
+ *         for i in range(self.n):
+ *             roots[i] = self.find(i)             # <<<<<<<<<<<<<<
+ *         return roots
+ */
+    __pyx_t_5 = __Pyx_PyInt_From_int(((struct __pyx_vtabstruct_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *)__pyx_v_self->__pyx_vtab)->find(__pyx_v_self, __pyx_v_i, 0)); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 67, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_5);
+    if (unlikely(__Pyx_SetItemInt(((PyObject *)__pyx_v_roots), __pyx_v_i, __pyx_t_5, int, 1, __Pyx_PyInt_From_int, 0, 1, 1) < 0)) __PYX_ERR(0, 67, __pyx_L1_error)
+    __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+  }
+
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":68
+ *         for i in range(self.n):
+ *             roots[i] = self.find(i)
+ *         return roots             # <<<<<<<<<<<<<<
+ */
+  __Pyx_XDECREF(((PyObject *)__pyx_r));
+  __Pyx_INCREF(((PyObject *)__pyx_v_roots));
+  __pyx_r = __pyx_v_roots;
+  goto __pyx_L0;
+
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":63
+ *         return np.asarray(entropy_log)
+ * 
+ *     cpdef np.ndarray get_all_roots(self):             # <<<<<<<<<<<<<<
+ *         cdef np.ndarray roots = np.empty(self.n, dtype=np.int32)
+ *         cdef int i
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_XDECREF(__pyx_t_2);
+  __Pyx_XDECREF(__pyx_t_3);
+  __Pyx_XDECREF(__pyx_t_4);
+  __Pyx_XDECREF(__pyx_t_5);
+  __Pyx_AddTraceback("dredFISH.Utils.ConnectedComponentEntropy.ConnectedComponentEntropy.get_all_roots", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = 0;
+  __pyx_L0:;
+  __Pyx_XDECREF((PyObject *)__pyx_v_roots);
+  __Pyx_XGIVEREF((PyObject *)__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* Python wrapper */
+static PyObject *__pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_9get_all_roots(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused); /*proto*/
+static PyObject *__pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_9get_all_roots(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused) {
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("get_all_roots (wrapper)", 0);
+  __pyx_r = __pyx_pf_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_8get_all_roots(((struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *)__pyx_v_self));
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_8get_all_roots(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("get_all_roots", 0);
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = ((PyObject *)__pyx_f_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_get_all_roots(__pyx_v_self, 1)); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 63, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("dredFISH.Utils.ConnectedComponentEntropy.ConnectedComponentEntropy.get_all_roots", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
   __Pyx_XGIVEREF(__pyx_r);
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
@@ -3484,19 +3702,19 @@ static PyObject *__pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntrop
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_25ConnectedComponentEntropy_25ConnectedComponentEntropy_9__reduce_cython__(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused); /*proto*/
-static PyObject *__pyx_pw_25ConnectedComponentEntropy_25ConnectedComponentEntropy_9__reduce_cython__(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused) {
+static PyObject *__pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_11__reduce_cython__(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused); /*proto*/
+static PyObject *__pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_11__reduce_cython__(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused) {
   PyObject *__pyx_r = 0;
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("__reduce_cython__ (wrapper)", 0);
-  __pyx_r = __pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntropy_8__reduce_cython__(((struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *)__pyx_v_self));
+  __pyx_r = __pyx_pf_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_10__reduce_cython__(((struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *)__pyx_v_self));
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntropy_8__reduce_cython__(struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self) {
+static PyObject *__pyx_pf_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_10__reduce_cython__(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self) {
   PyObject *__pyx_v_state = 0;
   PyObject *__pyx_v__dict = 0;
   int __pyx_v_use_setstate;
@@ -3735,7 +3953,7 @@ static PyObject *__pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntrop
   __Pyx_XDECREF(__pyx_t_1);
   __Pyx_XDECREF(__pyx_t_2);
   __Pyx_XDECREF(__pyx_t_3);
-  __Pyx_AddTraceback("ConnectedComponentEntropy.ConnectedComponentEntropy.__reduce_cython__", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("dredFISH.Utils.ConnectedComponentEntropy.ConnectedComponentEntropy.__reduce_cython__", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   __Pyx_XDECREF(__pyx_v_state);
@@ -3753,19 +3971,19 @@ static PyObject *__pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntrop
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_25ConnectedComponentEntropy_25ConnectedComponentEntropy_11__setstate_cython__(PyObject *__pyx_v_self, PyObject *__pyx_v___pyx_state); /*proto*/
-static PyObject *__pyx_pw_25ConnectedComponentEntropy_25ConnectedComponentEntropy_11__setstate_cython__(PyObject *__pyx_v_self, PyObject *__pyx_v___pyx_state) {
+static PyObject *__pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_13__setstate_cython__(PyObject *__pyx_v_self, PyObject *__pyx_v___pyx_state); /*proto*/
+static PyObject *__pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_13__setstate_cython__(PyObject *__pyx_v_self, PyObject *__pyx_v___pyx_state) {
   PyObject *__pyx_r = 0;
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("__setstate_cython__ (wrapper)", 0);
-  __pyx_r = __pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntropy_10__setstate_cython__(((struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *)__pyx_v_self), ((PyObject *)__pyx_v___pyx_state));
+  __pyx_r = __pyx_pf_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_12__setstate_cython__(((struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *)__pyx_v_self), ((PyObject *)__pyx_v___pyx_state));
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntropy_10__setstate_cython__(struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, PyObject *__pyx_v___pyx_state) {
+static PyObject *__pyx_pf_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_12__setstate_cython__(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v_self, PyObject *__pyx_v___pyx_state) {
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   PyObject *__pyx_t_1 = NULL;
@@ -3780,7 +3998,7 @@ static PyObject *__pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntrop
  *     __pyx_unpickle_ConnectedComponentEntropy__set_state(self, __pyx_state)             # <<<<<<<<<<<<<<
  */
   if (!(likely(PyTuple_CheckExact(__pyx_v___pyx_state))||((__pyx_v___pyx_state) == Py_None)||(PyErr_Format(PyExc_TypeError, "Expected %.16s, got %.200s", "tuple", Py_TYPE(__pyx_v___pyx_state)->tp_name), 0))) __PYX_ERR(1, 17, __pyx_L1_error)
-  __pyx_t_1 = __pyx_f_25ConnectedComponentEntropy___pyx_unpickle_ConnectedComponentEntropy__set_state(__pyx_v_self, ((PyObject*)__pyx_v___pyx_state)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 17, __pyx_L1_error)
+  __pyx_t_1 = __pyx_f_8dredFISH_5Utils_25ConnectedComponentEntropy___pyx_unpickle_ConnectedComponentEntropy__set_state(__pyx_v_self, ((PyObject*)__pyx_v___pyx_state)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 17, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
@@ -3796,7 +4014,7 @@ static PyObject *__pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntrop
   goto __pyx_L0;
   __pyx_L1_error:;
   __Pyx_XDECREF(__pyx_t_1);
-  __Pyx_AddTraceback("ConnectedComponentEntropy.ConnectedComponentEntropy.__setstate_cython__", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("dredFISH.Utils.ConnectedComponentEntropy.ConnectedComponentEntropy.__setstate_cython__", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   __Pyx_XGIVEREF(__pyx_r);
@@ -3811,9 +4029,9 @@ static PyObject *__pyx_pf_25ConnectedComponentEntropy_25ConnectedComponentEntrop
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_25ConnectedComponentEntropy_1__pyx_unpickle_ConnectedComponentEntropy(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static PyMethodDef __pyx_mdef_25ConnectedComponentEntropy_1__pyx_unpickle_ConnectedComponentEntropy = {"__pyx_unpickle_ConnectedComponentEntropy", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_25ConnectedComponentEntropy_1__pyx_unpickle_ConnectedComponentEntropy, METH_VARARGS|METH_KEYWORDS, 0};
-static PyObject *__pyx_pw_25ConnectedComponentEntropy_1__pyx_unpickle_ConnectedComponentEntropy(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+static PyObject *__pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_1__pyx_unpickle_ConnectedComponentEntropy(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyMethodDef __pyx_mdef_8dredFISH_5Utils_25ConnectedComponentEntropy_1__pyx_unpickle_ConnectedComponentEntropy = {"__pyx_unpickle_ConnectedComponentEntropy", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_1__pyx_unpickle_ConnectedComponentEntropy, METH_VARARGS|METH_KEYWORDS, 0};
+static PyObject *__pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_1__pyx_unpickle_ConnectedComponentEntropy(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyObject *__pyx_v___pyx_type = 0;
   long __pyx_v___pyx_checksum;
   PyObject *__pyx_v___pyx_state = 0;
@@ -3875,18 +4093,18 @@ static PyObject *__pyx_pw_25ConnectedComponentEntropy_1__pyx_unpickle_ConnectedC
   __pyx_L5_argtuple_error:;
   __Pyx_RaiseArgtupleInvalid("__pyx_unpickle_ConnectedComponentEntropy", 1, 3, 3, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 1, __pyx_L3_error)
   __pyx_L3_error:;
-  __Pyx_AddTraceback("ConnectedComponentEntropy.__pyx_unpickle_ConnectedComponentEntropy", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("dredFISH.Utils.ConnectedComponentEntropy.__pyx_unpickle_ConnectedComponentEntropy", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_25ConnectedComponentEntropy___pyx_unpickle_ConnectedComponentEntropy(__pyx_self, __pyx_v___pyx_type, __pyx_v___pyx_checksum, __pyx_v___pyx_state);
+  __pyx_r = __pyx_pf_8dredFISH_5Utils_25ConnectedComponentEntropy___pyx_unpickle_ConnectedComponentEntropy(__pyx_self, __pyx_v___pyx_type, __pyx_v___pyx_checksum, __pyx_v___pyx_state);
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_25ConnectedComponentEntropy___pyx_unpickle_ConnectedComponentEntropy(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v___pyx_type, long __pyx_v___pyx_checksum, PyObject *__pyx_v___pyx_state) {
+static PyObject *__pyx_pf_8dredFISH_5Utils_25ConnectedComponentEntropy___pyx_unpickle_ConnectedComponentEntropy(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v___pyx_type, long __pyx_v___pyx_checksum, PyObject *__pyx_v___pyx_state) {
   PyObject *__pyx_v___pyx_PickleError = 0;
   PyObject *__pyx_v___pyx_result = 0;
   PyObject *__pyx_r = NULL;
@@ -3983,7 +4201,7 @@ static PyObject *__pyx_pf_25ConnectedComponentEntropy___pyx_unpickle_ConnectedCo
  *     if __pyx_state is not None:
  *         __pyx_unpickle_ConnectedComponentEntropy__set_state(<ConnectedComponentEntropy> __pyx_result, __pyx_state)
  */
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_ptype_25ConnectedComponentEntropy_ConnectedComponentEntropy), __pyx_n_s_new); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 7, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_ptype_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy), __pyx_n_s_new); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 7, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __pyx_t_4 = NULL;
   if (CYTHON_UNPACK_METHODS && likely(PyMethod_Check(__pyx_t_2))) {
@@ -4022,7 +4240,7 @@ static PyObject *__pyx_pf_25ConnectedComponentEntropy___pyx_unpickle_ConnectedCo
  * cdef __pyx_unpickle_ConnectedComponentEntropy__set_state(ConnectedComponentEntropy __pyx_result, tuple __pyx_state):
  */
     if (!(likely(PyTuple_CheckExact(__pyx_v___pyx_state))||((__pyx_v___pyx_state) == Py_None)||(PyErr_Format(PyExc_TypeError, "Expected %.16s, got %.200s", "tuple", Py_TYPE(__pyx_v___pyx_state)->tp_name), 0))) __PYX_ERR(1, 9, __pyx_L1_error)
-    __pyx_t_3 = __pyx_f_25ConnectedComponentEntropy___pyx_unpickle_ConnectedComponentEntropy__set_state(((struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *)__pyx_v___pyx_result), ((PyObject*)__pyx_v___pyx_state)); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 9, __pyx_L1_error)
+    __pyx_t_3 = __pyx_f_8dredFISH_5Utils_25ConnectedComponentEntropy___pyx_unpickle_ConnectedComponentEntropy__set_state(((struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *)__pyx_v___pyx_result), ((PyObject*)__pyx_v___pyx_state)); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 9, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_3);
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
@@ -4059,7 +4277,7 @@ static PyObject *__pyx_pf_25ConnectedComponentEntropy___pyx_unpickle_ConnectedCo
   __Pyx_XDECREF(__pyx_t_3);
   __Pyx_XDECREF(__pyx_t_4);
   __Pyx_XDECREF(__pyx_t_5);
-  __Pyx_AddTraceback("ConnectedComponentEntropy.__pyx_unpickle_ConnectedComponentEntropy", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("dredFISH.Utils.ConnectedComponentEntropy.__pyx_unpickle_ConnectedComponentEntropy", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   __Pyx_XDECREF(__pyx_v___pyx_PickleError);
@@ -4077,7 +4295,7 @@ static PyObject *__pyx_pf_25ConnectedComponentEntropy___pyx_unpickle_ConnectedCo
  *     if len(__pyx_state) > 5 and hasattr(__pyx_result, '__dict__'):
  */
 
-static PyObject *__pyx_f_25ConnectedComponentEntropy___pyx_unpickle_ConnectedComponentEntropy__set_state(struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v___pyx_result, PyObject *__pyx_v___pyx_state) {
+static PyObject *__pyx_f_8dredFISH_5Utils_25ConnectedComponentEntropy___pyx_unpickle_ConnectedComponentEntropy__set_state(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *__pyx_v___pyx_result, PyObject *__pyx_v___pyx_state) {
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   PyObject *__pyx_t_1 = NULL;
@@ -4238,7 +4456,7 @@ static PyObject *__pyx_f_25ConnectedComponentEntropy___pyx_unpickle_ConnectedCom
   __Pyx_XDECREF(__pyx_t_8);
   __Pyx_XDECREF(__pyx_t_9);
   __Pyx_XDECREF(__pyx_t_10);
-  __Pyx_AddTraceback("ConnectedComponentEntropy.__pyx_unpickle_ConnectedComponentEntropy__set_state", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("dredFISH.Utils.ConnectedComponentEntropy.__pyx_unpickle_ConnectedComponentEntropy__set_state", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = 0;
   __pyx_L0:;
   __Pyx_XGIVEREF(__pyx_r);
@@ -5262,10 +5480,10 @@ static CYTHON_INLINE NPY_DATETIMEUNIT __pyx_f_5numpy_get_datetime64_unit(PyObjec
   __pyx_L0:;
   return __pyx_r;
 }
-static struct __pyx_vtabstruct_25ConnectedComponentEntropy_ConnectedComponentEntropy __pyx_vtable_25ConnectedComponentEntropy_ConnectedComponentEntropy;
+static struct __pyx_vtabstruct_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy __pyx_vtable_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy;
 
-static PyObject *__pyx_tp_new_25ConnectedComponentEntropy_ConnectedComponentEntropy(PyTypeObject *t, CYTHON_UNUSED PyObject *a, CYTHON_UNUSED PyObject *k) {
-  struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *p;
+static PyObject *__pyx_tp_new_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy(PyTypeObject *t, CYTHON_UNUSED PyObject *a, CYTHON_UNUSED PyObject *k) {
+  struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *p;
   PyObject *o;
   if (likely((t->tp_flags & Py_TPFLAGS_IS_ABSTRACT) == 0)) {
     o = (*t->tp_alloc)(t, 0);
@@ -5273,16 +5491,16 @@ static PyObject *__pyx_tp_new_25ConnectedComponentEntropy_ConnectedComponentEntr
     o = (PyObject *) PyBaseObject_Type.tp_new(t, __pyx_empty_tuple, 0);
   }
   if (unlikely(!o)) return 0;
-  p = ((struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *)o);
-  p->__pyx_vtab = __pyx_vtabptr_25ConnectedComponentEntropy_ConnectedComponentEntropy;
+  p = ((struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *)o);
+  p->__pyx_vtab = __pyx_vtabptr_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy;
   p->parent = ((PyArrayObject *)Py_None); Py_INCREF(Py_None);
   p->rank = ((PyArrayObject *)Py_None); Py_INCREF(Py_None);
   p->size = ((PyArrayObject *)Py_None); Py_INCREF(Py_None);
   return o;
 }
 
-static void __pyx_tp_dealloc_25ConnectedComponentEntropy_ConnectedComponentEntropy(PyObject *o) {
-  struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *p = (struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *)o;
+static void __pyx_tp_dealloc_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy(PyObject *o) {
+  struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *p = (struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *)o;
   #if CYTHON_USE_TP_FINALIZE
   if (unlikely(PyType_HasFeature(Py_TYPE(o), Py_TPFLAGS_HAVE_FINALIZE) && Py_TYPE(o)->tp_finalize) && !_PyGC_FINALIZED(o)) {
     if (PyObject_CallFinalizerFromDealloc(o)) return;
@@ -5295,9 +5513,9 @@ static void __pyx_tp_dealloc_25ConnectedComponentEntropy_ConnectedComponentEntro
   (*Py_TYPE(o)->tp_free)(o);
 }
 
-static int __pyx_tp_traverse_25ConnectedComponentEntropy_ConnectedComponentEntropy(PyObject *o, visitproc v, void *a) {
+static int __pyx_tp_traverse_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy(PyObject *o, visitproc v, void *a) {
   int e;
-  struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *p = (struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *)o;
+  struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *p = (struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *)o;
   if (p->parent) {
     e = (*v)(((PyObject *)p->parent), a); if (e) return e;
   }
@@ -5310,9 +5528,9 @@ static int __pyx_tp_traverse_25ConnectedComponentEntropy_ConnectedComponentEntro
   return 0;
 }
 
-static int __pyx_tp_clear_25ConnectedComponentEntropy_ConnectedComponentEntropy(PyObject *o) {
+static int __pyx_tp_clear_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy(PyObject *o) {
   PyObject* tmp;
-  struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *p = (struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *)o;
+  struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *p = (struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *)o;
   tmp = ((PyObject*)p->parent);
   p->parent = ((PyArrayObject *)Py_None); Py_INCREF(Py_None);
   Py_XDECREF(tmp);
@@ -5325,21 +5543,22 @@ static int __pyx_tp_clear_25ConnectedComponentEntropy_ConnectedComponentEntropy(
   return 0;
 }
 
-static PyMethodDef __pyx_methods_25ConnectedComponentEntropy_ConnectedComponentEntropy[] = {
-  {"find", (PyCFunction)__pyx_pw_25ConnectedComponentEntropy_25ConnectedComponentEntropy_3find, METH_O, 0},
-  {"merge", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_25ConnectedComponentEntropy_25ConnectedComponentEntropy_5merge, METH_VARARGS|METH_KEYWORDS, 0},
-  {"merge_all", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_25ConnectedComponentEntropy_25ConnectedComponentEntropy_7merge_all, METH_VARARGS|METH_KEYWORDS, 0},
-  {"__reduce_cython__", (PyCFunction)__pyx_pw_25ConnectedComponentEntropy_25ConnectedComponentEntropy_9__reduce_cython__, METH_NOARGS, 0},
-  {"__setstate_cython__", (PyCFunction)__pyx_pw_25ConnectedComponentEntropy_25ConnectedComponentEntropy_11__setstate_cython__, METH_O, 0},
+static PyMethodDef __pyx_methods_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy[] = {
+  {"find", (PyCFunction)__pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_3find, METH_O, 0},
+  {"merge", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_5merge, METH_VARARGS|METH_KEYWORDS, 0},
+  {"merge_all", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_7merge_all, METH_VARARGS|METH_KEYWORDS, 0},
+  {"get_all_roots", (PyCFunction)__pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_9get_all_roots, METH_NOARGS, 0},
+  {"__reduce_cython__", (PyCFunction)__pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_11__reduce_cython__, METH_NOARGS, 0},
+  {"__setstate_cython__", (PyCFunction)__pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_13__setstate_cython__, METH_O, 0},
   {0, 0, 0, 0}
 };
 
-static PyTypeObject __pyx_type_25ConnectedComponentEntropy_ConnectedComponentEntropy = {
+static PyTypeObject __pyx_type_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy = {
   PyVarObject_HEAD_INIT(0, 0)
-  "ConnectedComponentEntropy.ConnectedComponentEntropy", /*tp_name*/
-  sizeof(struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy), /*tp_basicsize*/
+  "dredFISH.Utils.ConnectedComponentEntropy.ConnectedComponentEntropy", /*tp_name*/
+  sizeof(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy), /*tp_basicsize*/
   0, /*tp_itemsize*/
-  __pyx_tp_dealloc_25ConnectedComponentEntropy_ConnectedComponentEntropy, /*tp_dealloc*/
+  __pyx_tp_dealloc_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy, /*tp_dealloc*/
   #if PY_VERSION_HEX < 0x030800b4
   0, /*tp_print*/
   #endif
@@ -5366,13 +5585,13 @@ static PyTypeObject __pyx_type_25ConnectedComponentEntropy_ConnectedComponentEnt
   0, /*tp_as_buffer*/
   Py_TPFLAGS_DEFAULT|Py_TPFLAGS_HAVE_VERSION_TAG|Py_TPFLAGS_CHECKTYPES|Py_TPFLAGS_HAVE_NEWBUFFER|Py_TPFLAGS_BASETYPE|Py_TPFLAGS_HAVE_GC, /*tp_flags*/
   0, /*tp_doc*/
-  __pyx_tp_traverse_25ConnectedComponentEntropy_ConnectedComponentEntropy, /*tp_traverse*/
-  __pyx_tp_clear_25ConnectedComponentEntropy_ConnectedComponentEntropy, /*tp_clear*/
+  __pyx_tp_traverse_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy, /*tp_traverse*/
+  __pyx_tp_clear_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy, /*tp_clear*/
   0, /*tp_richcompare*/
   0, /*tp_weaklistoffset*/
   0, /*tp_iter*/
   0, /*tp_iternext*/
-  __pyx_methods_25ConnectedComponentEntropy_ConnectedComponentEntropy, /*tp_methods*/
+  __pyx_methods_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy, /*tp_methods*/
   0, /*tp_members*/
   0, /*tp_getset*/
   0, /*tp_base*/
@@ -5380,9 +5599,9 @@ static PyTypeObject __pyx_type_25ConnectedComponentEntropy_ConnectedComponentEnt
   0, /*tp_descr_get*/
   0, /*tp_descr_set*/
   0, /*tp_dictoffset*/
-  __pyx_pw_25ConnectedComponentEntropy_25ConnectedComponentEntropy_1__init__, /*tp_init*/
+  __pyx_pw_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_1__init__, /*tp_init*/
   0, /*tp_alloc*/
-  __pyx_tp_new_25ConnectedComponentEntropy_ConnectedComponentEntropy, /*tp_new*/
+  __pyx_tp_new_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy, /*tp_new*/
   0, /*tp_free*/
   0, /*tp_is_gc*/
   0, /*tp_bases*/
@@ -5457,10 +5676,13 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_asarray, __pyx_k_asarray, sizeof(__pyx_k_asarray), 0, 0, 1, 1},
   {&__pyx_n_s_cline_in_traceback, __pyx_k_cline_in_traceback, sizeof(__pyx_k_cline_in_traceback), 0, 0, 1, 1},
   {&__pyx_n_s_dict, __pyx_k_dict, sizeof(__pyx_k_dict), 0, 0, 1, 1},
+  {&__pyx_n_s_dredFISH_Utils_ConnectedComponen, __pyx_k_dredFISH_Utils_ConnectedComponen, sizeof(__pyx_k_dredFISH_Utils_ConnectedComponen), 0, 0, 1, 1},
   {&__pyx_n_s_dtype, __pyx_k_dtype, sizeof(__pyx_k_dtype), 0, 0, 1, 1},
+  {&__pyx_n_s_empty, __pyx_k_empty, sizeof(__pyx_k_empty), 0, 0, 1, 1},
   {&__pyx_n_s_entropy_low_bound, __pyx_k_entropy_low_bound, sizeof(__pyx_k_entropy_low_bound), 0, 0, 1, 1},
   {&__pyx_n_s_find, __pyx_k_find, sizeof(__pyx_k_find), 0, 0, 1, 1},
   {&__pyx_n_s_float64, __pyx_k_float64, sizeof(__pyx_k_float64), 0, 0, 1, 1},
+  {&__pyx_n_s_get_all_roots, __pyx_k_get_all_roots, sizeof(__pyx_k_get_all_roots), 0, 0, 1, 1},
   {&__pyx_n_s_getstate, __pyx_k_getstate, sizeof(__pyx_k_getstate), 0, 0, 1, 1},
   {&__pyx_n_s_import, __pyx_k_import, sizeof(__pyx_k_import), 0, 0, 1, 1},
   {&__pyx_n_s_int32, __pyx_k_int32, sizeof(__pyx_k_int32), 0, 0, 1, 1},
@@ -5598,21 +5820,22 @@ static int __Pyx_modinit_type_init_code(void) {
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("__Pyx_modinit_type_init_code", 0);
   /*--- Type init code ---*/
-  __pyx_vtabptr_25ConnectedComponentEntropy_ConnectedComponentEntropy = &__pyx_vtable_25ConnectedComponentEntropy_ConnectedComponentEntropy;
-  __pyx_vtable_25ConnectedComponentEntropy_ConnectedComponentEntropy.find = (int (*)(struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *, int, int __pyx_skip_dispatch))__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy_find;
-  __pyx_vtable_25ConnectedComponentEntropy_ConnectedComponentEntropy.merge = (PyObject *(*)(struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *, int, int, int __pyx_skip_dispatch))__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy_merge;
-  __pyx_vtable_25ConnectedComponentEntropy_ConnectedComponentEntropy.merge_all = (PyObject *(*)(struct __pyx_obj_25ConnectedComponentEntropy_ConnectedComponentEntropy *, PyArrayObject *, int __pyx_skip_dispatch, struct __pyx_opt_args_25ConnectedComponentEntropy_25ConnectedComponentEntropy_merge_all *__pyx_optional_args))__pyx_f_25ConnectedComponentEntropy_25ConnectedComponentEntropy_merge_all;
-  if (PyType_Ready(&__pyx_type_25ConnectedComponentEntropy_ConnectedComponentEntropy) < 0) __PYX_ERR(0, 10, __pyx_L1_error)
+  __pyx_vtabptr_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy = &__pyx_vtable_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy;
+  __pyx_vtable_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy.find = (int (*)(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *, int, int __pyx_skip_dispatch))__pyx_f_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_find;
+  __pyx_vtable_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy.merge = (PyObject *(*)(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *, int, int, int __pyx_skip_dispatch))__pyx_f_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_merge;
+  __pyx_vtable_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy.merge_all = (PyObject *(*)(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *, PyArrayObject *, int __pyx_skip_dispatch, struct __pyx_opt_args_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_merge_all *__pyx_optional_args))__pyx_f_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_merge_all;
+  __pyx_vtable_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy.get_all_roots = (PyArrayObject *(*)(struct __pyx_obj_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy *, int __pyx_skip_dispatch))__pyx_f_8dredFISH_5Utils_25ConnectedComponentEntropy_25ConnectedComponentEntropy_get_all_roots;
+  if (PyType_Ready(&__pyx_type_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy) < 0) __PYX_ERR(0, 10, __pyx_L1_error)
   #if PY_VERSION_HEX < 0x030800B1
-  __pyx_type_25ConnectedComponentEntropy_ConnectedComponentEntropy.tp_print = 0;
+  __pyx_type_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy.tp_print = 0;
   #endif
-  if ((CYTHON_USE_TYPE_SLOTS && CYTHON_USE_PYTYPE_LOOKUP) && likely(!__pyx_type_25ConnectedComponentEntropy_ConnectedComponentEntropy.tp_dictoffset && __pyx_type_25ConnectedComponentEntropy_ConnectedComponentEntropy.tp_getattro == PyObject_GenericGetAttr)) {
-    __pyx_type_25ConnectedComponentEntropy_ConnectedComponentEntropy.tp_getattro = __Pyx_PyObject_GenericGetAttr;
+  if ((CYTHON_USE_TYPE_SLOTS && CYTHON_USE_PYTYPE_LOOKUP) && likely(!__pyx_type_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy.tp_dictoffset && __pyx_type_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy.tp_getattro == PyObject_GenericGetAttr)) {
+    __pyx_type_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy.tp_getattro = __Pyx_PyObject_GenericGetAttr;
   }
-  if (__Pyx_SetVtable(__pyx_type_25ConnectedComponentEntropy_ConnectedComponentEntropy.tp_dict, __pyx_vtabptr_25ConnectedComponentEntropy_ConnectedComponentEntropy) < 0) __PYX_ERR(0, 10, __pyx_L1_error)
-  if (PyObject_SetAttr(__pyx_m, __pyx_n_s_ConnectedComponentEntropy, (PyObject *)&__pyx_type_25ConnectedComponentEntropy_ConnectedComponentEntropy) < 0) __PYX_ERR(0, 10, __pyx_L1_error)
-  if (__Pyx_setup_reduce((PyObject*)&__pyx_type_25ConnectedComponentEntropy_ConnectedComponentEntropy) < 0) __PYX_ERR(0, 10, __pyx_L1_error)
-  __pyx_ptype_25ConnectedComponentEntropy_ConnectedComponentEntropy = &__pyx_type_25ConnectedComponentEntropy_ConnectedComponentEntropy;
+  if (__Pyx_SetVtable(__pyx_type_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy.tp_dict, __pyx_vtabptr_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy) < 0) __PYX_ERR(0, 10, __pyx_L1_error)
+  if (PyObject_SetAttr(__pyx_m, __pyx_n_s_ConnectedComponentEntropy, (PyObject *)&__pyx_type_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy) < 0) __PYX_ERR(0, 10, __pyx_L1_error)
+  if (__Pyx_setup_reduce((PyObject*)&__pyx_type_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy) < 0) __PYX_ERR(0, 10, __pyx_L1_error)
+  __pyx_ptype_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy = &__pyx_type_8dredFISH_5Utils_25ConnectedComponentEntropy_ConnectedComponentEntropy;
   __Pyx_RefNannyFinishContext();
   return 0;
   __pyx_L1_error:;
@@ -5870,14 +6093,14 @@ if (!__Pyx_RefNanny) {
   #if PY_MAJOR_VERSION < 3 && (__PYX_DEFAULT_STRING_ENCODING_IS_ASCII || __PYX_DEFAULT_STRING_ENCODING_IS_DEFAULT)
   if (__Pyx_init_sys_getdefaultencoding_params() < 0) __PYX_ERR(0, 1, __pyx_L1_error)
   #endif
-  if (__pyx_module_is_main_ConnectedComponentEntropy) {
+  if (__pyx_module_is_main_dredFISH__Utils__ConnectedComponentEntropy) {
     if (PyObject_SetAttr(__pyx_m, __pyx_n_s_name, __pyx_n_s_main) < 0) __PYX_ERR(0, 1, __pyx_L1_error)
   }
   #if PY_MAJOR_VERSION >= 3
   {
     PyObject *modules = PyImport_GetModuleDict(); if (unlikely(!modules)) __PYX_ERR(0, 1, __pyx_L1_error)
-    if (!PyDict_GetItemString(modules, "ConnectedComponentEntropy")) {
-      if (unlikely(PyDict_SetItemString(modules, "ConnectedComponentEntropy", __pyx_m) < 0)) __PYX_ERR(0, 1, __pyx_L1_error)
+    if (!PyDict_GetItemString(modules, "dredFISH.Utils.ConnectedComponentEntropy")) {
+      if (unlikely(PyDict_SetItemString(modules, "dredFISH.Utils.ConnectedComponentEntropy", __pyx_m) < 0)) __PYX_ERR(0, 1, __pyx_L1_error)
     }
   }
   #endif
@@ -5898,7 +6121,7 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_patch_abc() < 0) __PYX_ERR(0, 1, __pyx_L1_error)
   #endif
 
-  /* "ConnectedComponentEntropy.pyx":7
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":7
  * from libc.math cimport log2
  * 
  * import numpy as np             # <<<<<<<<<<<<<<
@@ -5915,12 +6138,12 @@ if (!__Pyx_RefNanny) {
  *     cdef object __pyx_PickleError
  *     cdef object __pyx_result
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_25ConnectedComponentEntropy_1__pyx_unpickle_ConnectedComponentEntropy, NULL, __pyx_n_s_ConnectedComponentEntropy); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 1, __pyx_L1_error)
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_8dredFISH_5Utils_25ConnectedComponentEntropy_1__pyx_unpickle_ConnectedComponentEntropy, NULL, __pyx_n_s_dredFISH_Utils_ConnectedComponen); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 1, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_pyx_unpickle_ConnectedComponen, __pyx_t_1) < 0) __PYX_ERR(1, 1, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "ConnectedComponentEntropy.pyx":1
+  /* "dredFISH/Utils/ConnectedComponentEntropy.pyx":1
  * # cython: language_level=3             # <<<<<<<<<<<<<<
  * cimport cython
  * 
@@ -5945,11 +6168,11 @@ if (!__Pyx_RefNanny) {
   __Pyx_XDECREF(__pyx_t_1);
   if (__pyx_m) {
     if (__pyx_d) {
-      __Pyx_AddTraceback("init ConnectedComponentEntropy", __pyx_clineno, __pyx_lineno, __pyx_filename);
+      __Pyx_AddTraceback("init dredFISH.Utils.ConnectedComponentEntropy", __pyx_clineno, __pyx_lineno, __pyx_filename);
     }
     Py_CLEAR(__pyx_m);
   } else if (!PyErr_Occurred()) {
-    PyErr_SetString(PyExc_ImportError, "init ConnectedComponentEntropy");
+    PyErr_SetString(PyExc_ImportError, "init dredFISH.Utils.ConnectedComponentEntropy");
   }
   __pyx_L0:;
   __Pyx_RefNannyFinishContext();
@@ -7387,6 +7610,28 @@ fail:;
         name, type->tp_name, Py_TYPE(obj)->tp_name);
     return 0;
 }
+
+/* PyObjectCallNoArg */
+  #if CYTHON_COMPILING_IN_CPYTHON
+static CYTHON_INLINE PyObject* __Pyx_PyObject_CallNoArg(PyObject *func) {
+#if CYTHON_FAST_PYCALL
+    if (PyFunction_Check(func)) {
+        return __Pyx_PyFunction_FastCall(func, NULL, 0);
+    }
+#endif
+#ifdef __Pyx_CyFunction_USED
+    if (likely(PyCFunction_Check(func) || __Pyx_CyFunction_Check(func)))
+#else
+    if (likely(PyCFunction_Check(func)))
+#endif
+    {
+        if (likely(PyCFunction_GET_FLAGS(func) & METH_NOARGS)) {
+            return __Pyx_PyObject_CallMethO(func, NULL);
+        }
+    }
+    return __Pyx_PyObject_Call(func, __pyx_empty_tuple, NULL);
+}
+#endif
 
 /* PyErrExceptionMatches */
   #if CYTHON_FAST_THREAD_STATE

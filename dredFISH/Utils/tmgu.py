@@ -1,57 +1,24 @@
 import numpy as np
-from collections import Counter
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+import seaborn as sns
+
 import igraph
 from scipy import sparse
 from sklearn.neighbors import NearestNeighbors
 
+import matplotlib.animation as animation
+from IPython.display import HTML
 
 import sys
-# sys.path.append('/home/rwollman/MyProjects/AH/Repos/dredFISH')
-# from dredFISH.Utils.ConnectedComponentEntropy import ConnectedComponentEntropy
+import time
+sys.path.append('/home/rwollman/MyProjects/AH/Repos/dredFISH')
+from dredFISH.Utils.ConnectedComponentEntropy import ConnectedComponentEntropy
 
-# def score_percolation_entropy(type_vec,ELD,total_cells = None, fudge_factor = 1.05, distvec = None,return_entropies = True): 
-#     # type vec - the integer vector of types we want to test
-#     # ELD - a sorted (by distances or K) list of edges in the spatial graph with the distance between them. 
-#     # total_cells - in case we are doing a multi-section analysiis, specificy the number of section, decault is len(type_vec)
-
-#     if total_cells is None: 
-#         total_cells = len(type_vec)
-
-#     # calcualte the entropy of type_vec as convergance criteria 
-#     _,cnt = np.unique(type_vec, return_counts=True)
-#     freq = cnt/len(type_vec)
-#     entropy_low_bound = -np.sum(freq * np.log2(freq))
-
-#     # update the entropy in case we are dealing with multi-section data
-#     fudge_factor = fudge_factor * len(type_vec) / total_cells
-
-#     # permute types and find edges that connect the same type
-#     type_vec_perm = np.random.permutation(type_vec)
-#     ELD_real = ELD[np.equal(type_vec[ELD[:,0].astype(int)],type_vec[ELD[:,1].astype(int)]),:]
-#     ELD_perm = ELD[np.equal(type_vec_perm[ELD[:,0].astype(int)],type_vec_perm[ELD[:,1].astype(int)]),:]
-
-#     # calculate entropies as edges are edded
-#     uf_real = ConnectedComponentEntropy(len(type_vec),total_cells)
-#     entropy_real = uf_real.merge_all(ELD_real[:,:2].astype(int),entropy_low_bound * fudge_factor)
-
-#     uf_perm = ConnectedComponentEntropy(len(type_vec),total_cells)
-#     entropy_perm = uf_perm.merge_all(ELD_perm[:,:2].astype(int),entropy_low_bound * fudge_factor)
-
-#     # interpolate entropies to the same grid
-#     if distvec is None: 
-#         distvec = np.linspace(ELD[:,2].min(),ELD[:,2].max(),1000)
-    
-#     entropy_vecs = np.zeros((len(distvec),2))
-#     entropy_vecs[:,0] = np.interp(distvec, ELD_real[:,2], entropy_real)
-#     entropy_vecs[:,1] = np.interp(distvec, ELD_perm[:,2], entropy_perm)
-
-#     scr = np.diff(entropy_vecs, axis=1).max()
-
-#     if return_entropies: 
-#         return (scr,distvec,entropy_vecs)
-#     else:
-#         return scr
-
+def list_entropy(X):
+        _, cnt = np.unique(X, return_counts=True)
+        freq = cnt / len(X)
+        return -(np.sum(freq * np.log2(freq)))
 
 def edge_list_from_XY_with_max_dist(XY,max_dist):
     nbrs = NearestNeighbors(radius = max_dist, algorithm = 'ball_tree').fit(XY)
@@ -66,7 +33,7 @@ def edge_list_from_XY_with_max_dist(XY,max_dist):
 
     return ELD
 
-def edge_list_from_XY_with_k(XY,k):
+def edge_list_from_XY_with_k(XY,k,include_dist = False):
     nbrs = NearestNeighbors(n_neighbors=k+1, algorithm='ball_tree').fit(XY)
     distances, indices = nbrs.kneighbors(XY)
     distances = distances[:,1:]
@@ -76,89 +43,12 @@ def edge_list_from_XY_with_k(XY,k):
     ix_rows = ix_rows.T.flatten()
     ix_ks = ix_ks.T.flatten()
     ix_cols = indices.T.flatten()
+    dists = distances.T.flatten()
     ELK = np.hstack((ix_rows[:,np.newaxis],ix_cols[:,np.newaxis],ix_ks[:,np.newaxis]))
-
+    if include_dist: 
+        ELK = np.hstack((ELK,dists[:,np.newaxis]))
     return ELK
 
-def entropy_from_ELO_and_type(ELO,type_vec,epsilon,return_all = False):
-    # first, remove edges that are of order > K to convert ELO to EL
-    EL = ELO[ELO[:,2]<=epsilon,:2]
-
-    # calculate zones for real and perm cases
-    type_perm = np.random.permutation(type_vec)
-    EL_real = EL[np.take(type_vec,EL[:,0].astype(int)) == np.take(type_vec,EL[:,1].astype(int)),:]
-    EL_perm = EL[np.take(type_perm,EL[:,0].astype(int)) == np.take(type_perm,EL[:,1].astype(int)),:]
-
-    N = len(type_vec)
-    ZG_real = igraph.Graph(N, edges=EL_real, directed = False)
-    ZG_perm = igraph.Graph(N, edges=EL_perm, directed = False)
-
-    Pzone_real = np.array(ZG_real.components().sizes())/N
-    Pzone_perm = np.array(ZG_perm.components().sizes())/N
-
-    Entropy_real = -np.sum(Pzone_real * np.log2(Pzone_real))
-    Entropy_perm = -np.sum(Pzone_perm * np.log2(Pzone_perm))
-
-    Scr = Entropy_perm - Entropy_real
-
-    if return_all: 
-        return (Scr,Entropy_perm,Entropy_real)
-    else: 
-        return Scr
-
-def cond_entropy_from_EL_and_type(EL,TypeVec,return_all = False):
-    EL = EL[np.take(TypeVec,EL[:,0]) == np.take(TypeVec,EL[:,1]),:]
-    N = len(TypeVec)
-    IsoZonesGraph = igraph.Graph(N, edges=EL, directed = False)
-    cmp = IsoZonesGraph.components()
-    IxMapping = np.array(cmp.membership)
-    Pzones = np.bincount(IxMapping)/N
-    Ptypes = np.bincount(TypeVec)/N
-    Entropy_Zone = -np.sum(Pzones * np.log2(Pzones))
-
-    Ptypes = Ptypes[Ptypes>0]
-    Entropy_Types=-np.sum(Ptypes*np.log2(Ptypes))
-    
-    cond_entropy = Entropy_Zone-Entropy_Types
-    if return_all: 
-        return (Entropy_Zone,Entropy_Types,cond_entropy)
-    else: 
-        return(cond_entropy)
-
-
-
-def count_values(V,refvals,max_val = None, sz = None,norm_to_one = True):
-    """
-    count_values - simple tabulation with default values (refvals)
-    """
-    raise NotImplementedError('moved functionality into TissueGraph.type_freq')
-    # below are performance optimization attempts that I ended up moving to TG.type_freq
-    # before AI: 
-    # Cnt = Counter(V)
-    # if sz is not None: 
-    #     for i in range(len(V)): 
-    #         Cnt.update({V[i] : sz[i]-1}) # V[i] is already represented, so we need to subtract 1 from sz[i]  
-            
-    # cntdict = dict(Cnt)
-
-    # suggestion 1 from AI: 
-    # unique, counts = np.unique(V, return_counts=True)
-    # cntdict = dict(zip(unique, counts))
-    # if sz is not None:
-    #     cntdict.update(dict(zip(V, sz)))
-    # missing = list(set(refvals) - set(V))
-    # cntdict.update(zip(missing, np.zeros(len(missing))))
-
-    # suggestion 2 from AI (to avoid the np.unique in the outside call of TissueGraph.type_freq)
-    # if max_val is None:
-    #     max_val = np.max(refvals)
-    # cnts = np.bincount(V, minlength=max_val+1)
-    # if sz is not None:
-    #     cnts += np.bincount(V, weights=sz, minlength=max_val+1) - 1
-
-    # Pv = cnts / np.sum(cnts) if norm_to_one else cnts
-
-    return(Pv)
 
 def adjacency_to_igraph(adj_mtx, weighted=False, directed=True, simplify=True):
     """
@@ -264,3 +154,306 @@ def get_local_type_abundance(
     
     return env_mat
 
+class GraphPercolation:
+    def __init__(self, XY, type_vec, maxK = None):
+        self.N = XY.shape[0]
+        self.XY = XY
+        self.type_vec = type_vec
+        self.maxK = maxK
+        self.n_types = len(np.unique(type_vec))
+
+        if maxK is None: 
+            self.maxK = self.N-1
+
+    def save(self,filename): 
+        np.savez(filename,XY = self.XY,
+                         type_vec = self.type_vec,
+                         Zones = self.Zones,
+                         Zones_perm = self.Zones_perm,
+                         ent_real = self.ent_real,
+                         ent_perm = self.ent_perm,
+                         pbond_vec = self.pbond_vec,
+                         ent_type_real = self.ent_type_real,
+                         ent_type_perm = self.ent_type_perm,
+                         maxK = self.maxK
+                         )
+        
+    def load(self,filename): 
+        dump = np.load(filename)
+        self.XY = dump['XY']
+        self.type_vec = dump['type_vec']
+        self.Zones = dump['Zones']
+        self.Zones_perm = dump['Zones_perm']
+        self.ent_real = dump['ent_real']
+        self.ent_perm = dump['ent_perm']
+        self.pbond_vec = dump['pbond_vec']
+        self.ent_type_real = dump['ent_type_real']
+        self.ent_type_perm = dump['ent_type_perm']
+        self.maxK = dump['maxK']
+        self.n_types = len(np.unique(self.type_vec))
+        self.N = len(self.type_vec)
+
+    def calc_ELKexp(self, permute=False): 
+        ELK = self.ELKfull
+        if permute: 
+            type_vec = np.random.permutation(self.type_vec)
+        else: 
+            type_vec = self.type_vec
+
+        type_left = type_vec[ELK[:,0].astype(int)]
+        type_right = type_vec[ELK[:,1].astype(int)]
+
+        _,ix_inv,type_frac = np.unique(type_vec,return_inverse = True,return_counts=True)
+        type_frac = type_frac[ix_inv]/len(type_vec)
+        type_frac  = type_frac[ELK[:,0].astype(int)][type_left==type_right]
+        ELKexp = np.hstack((ELK[type_left==type_right,:],type_frac[:,np.newaxis]))
+
+        blocks = np.split(ELKexp, np.where(np.diff(ELK[:,2]))[0]+1)
+        blocks_mod = list()
+        for block in blocks:
+            if  block.shape[0] == 0: 
+                continue
+            np.random.shuffle(block)
+            k_cont = block[:,2] + np.arange(block.shape[0])/block.shape[0]-1
+            pbond = 1-np.exp(-k_cont*block[:,3])
+            ordr = np.argsort(pbond)
+            blocks_mod.append(np.hstack((block[ordr,:2],pbond[ordr,np.newaxis])))
+
+        ELKexp = np.concatenate(blocks_mod)
+        return ELKexp
+
+    def bond_percolation(self,permute = False, pbond_vec = np.linspace(0,1,101), return_zones = False, verbose = False): 
+        # get the edges of same type with weights
+        ELP = self.calc_ELKexp(permute = permute)
+
+        # union find object: 
+        uf = ConnectedComponentEntropy(self.N)
+
+        # zone entropy at each pbond_vec value
+        ent = np.full(len(pbond_vec)-1, np.nan)
+        if return_zones: 
+            Zones = np.full((self.N, len(pbond_vec)-1),np.nan)
+
+        start = time.time()
+        for i in range(len(pbond_vec)-1):
+            if verbose: 
+                print(f"iter: {i}/{len(pbond_vec)} time: {time.time()-start:.0f}")
+
+            ix_to_merge = np.logical_and(ELP[:,2] > pbond_vec[i],ELP[:,2] <= pbond_vec[i+1])
+            if not ix_to_merge.any():
+                if i>0:
+                    ent[i] = ent[i-1]
+                else: 
+                    ent[i]  = np.log2(self.N) 
+                if return_zones:
+                    if i>0: 
+                        Zones[:,i] = Zones[:,i-1]
+                    else: 
+                        Zones[:,i] = np.arange(self.N)
+            else: 
+                ent[i] = uf.merge_all(ELP[ix_to_merge,:2].astype(int))[-1]
+                if return_zones:
+                    Zones[:,i] = [uf.find(c) for c in range(self.N)] 
+        
+        # update self attribytes
+        self.pbond_vec = pbond_vec[1:]
+        if permute: 
+            self.ent_perm = ent
+        else: 
+            self.ent_real = ent
+        if return_zones: 
+            if not permute:
+                self.Zones = Zones.astype(int) 
+            else: 
+                self.Zones_perm = Zones.astype(int)
+            return ent, Zones
+
+        return ent
+
+    def percolation(self, return_zones = True, verbose = False):
+        self.with_zones = return_zones
+        start=time.time()
+        if verbose: 
+            print(f"Calc edges from XY")
+        self.ELKfull = edge_list_from_XY_with_k(self.XY, self.maxK)
+        if verbose: 
+            print(f"Done: Calc edges from XY - time: {time.time()-start:.0f}")
+            print(f"Starting real percolation return_zones = {return_zones}")
+            print(f"Starting real percolation - return_zones = {return_zones}") 
+
+        self.bond_percolation(permute = False, return_zones= return_zones, verbose = verbose)
+        if verbose:
+            print(f"Done with real percolation - time: {time.time()-start:.0f}")
+            print(f"Starting perm percolation - return_zones = {return_zones}")  
+
+        self.bond_percolation(permute = True, return_zones= return_zones, verbose = verbose)
+        if verbose:
+            print(f"Done with perm percolation - time: {time.time()-start:.0f}")
+
+        if return_zones:
+            if verbose:
+                print(f"Starting to calc type entropy") 
+            self.ent_type_real = np.zeros((self.Zones.shape[1],self.n_types))
+            self.ent_type_perm = np.zeros((self.Zones_perm.shape[1],self.n_types))
+
+            for t in range(self.n_types): 
+                for i in range(self.Zones.shape[1]): 
+                    self.ent_type_real[i,t] = list_entropy(self.Zones[self.type_vec==t,i])
+                    self.ent_type_perm[i,t] = list_entropy(self.Zones_perm[self.type_vec==t,i])
+            if verbose:
+                print(f"Done with calc type entropy - time: {time.time()-start:.0f}")
+
+    def score(self):
+        dent = self.ent_perm-self.ent_real
+        scr = np.trapz(np.abs(dent), x=self.pbond_vec, axis=0)
+        return scr
+    
+    def plot_entropy_by_type(self, ax = None):
+        if not self.with_zones: 
+            raise ValueError(f"Zones were not calcualted, so cant show entropy_by_type")
+        if ax is None: 
+            plt.figure()
+            ax = plt.gca()
+
+        ax.plot(self.pbond_vec, self.ent_type_real, '.-')
+        ax.axhline(y=np.log2(self.N), color='black', linestyle='--', linewidth=0.5)
+        ax.set_xlabel('Pbond')
+        ax.set_ylabel('Entropy')
+
+
+    def plot_entropy_vs_perm(self,ax = None): 
+        if ax is None: 
+            plt.figure()
+            ax = plt.gca()
+        
+        ax.plot(self.pbond_vec, self.ent_real, '-')
+        ax.plot(self.pbond_vec, self.ent_perm, '--')
+        ax.axhline(y=np.log2(self.N), color='black', linestyle='--', linewidth=0.5)
+        ax.set_ylabel('Entropy')
+        ax.set_xlabel('Pbond')
+        ax.set_xlim([0,1])
+        ax.set_ylim([0,1.1*np.log2(self.N)])
+        ax.set_title(f"Score = {self.score():.2f}")
+
+
+    def show_all(self):
+        fig,axs = plt.subplots(1,2,figsize=(10,5))
+        axs = axs.T
+        self.plot_entropy_by_type(ax=axs.flatten()[0])
+        self.plot_entropy_vs_perm(ax=axs.flatten()[1])
+        plt.show()
+
+
+
+
+class ToyGraph:
+    def __init__(self, Nside, pattern = 'random', n_types = None, perm_xy = True, **kwargs,):
+        self.N = Nside**2
+        self.X, self.Y = np.meshgrid(np.arange(Nside), np.arange(Nside))
+        self.XY = np.hstack((self.X.flatten()[:,np.newaxis], self.Y.flatten()[:,np.newaxis])).astype(float)
+
+
+        if pattern == 'random': 
+            self.frac = kwargs.get('frac', 0.5)
+            self.type_vec = np.zeros(self.N)
+            indices = np.random.choice(np.arange(self.N), int(self.frac * self.N), replace=False)
+            self.type_vec[indices] = 1
+            self.G = np.zeros((Nside,Nside))
+            rows, cols = np.unravel_index(indices, (Nside, Nside))
+            self.G[rows,cols] = 1
+        elif pattern == 'squares': 
+            self.G = np.zeros((Nside,Nside))
+            self.border = kwargs.get('border', 0)
+            self.square_side = kwargs.get('size', int(Nside/4))
+            ix1=np.arange(self.border,self.border + self.square_side)
+            ix2=np.arange(Nside - self.border - self.square_side,Nside - self.border)
+            self.G[ix1[:, None],ix1] = 1
+            self.G[ix1[:, None],ix2] = 1
+            self.G[ix2[:, None],ix1] = 1
+            self.G[ix2[:, None],ix2] = 1
+            self.type_vec = self.G.ravel()
+            self.frac = self.G.mean()
+        elif pattern == 'grid': 
+            self.G = np.zeros((Nside,Nside))
+            self.num_squares = kwargs.get('num_squares', 4)
+            square_size = Nside // self.num_squares
+            cnt=-1
+            for i in range(self.num_squares):
+                for j in range(self.num_squares):
+                    cnt += 1
+                    self.G[i*square_size:(i+1)*square_size, j*square_size:(j+1)*square_size] = cnt
+            self.type_vec = self.G.ravel()
+            self.frac = self.G.mean()
+
+        if perm_xy:
+            prm = np.random.permutation(np.arange(self.N))
+        else: 
+            prm = np.arange(self.N)
+
+        self.ordr = np.argsort(prm)
+        self.XY=self.XY[prm,:]
+        self.type_vec=self.type_vec[prm]
+
+        self.n_types = len(np.unique(self.type_vec))
+
+    def update_type(self,type_vec): 
+        self.type_vec = type_vec
+        self.G = type_vec.reshape(self.G.shape)
+        self.n_types = len(np.unique(self.type_vec))
+
+    def show_graph(self,ax = None):
+        ax = sns.heatmap(self.G,cbar=False,ax=ax)
+        ax.axis('equal')
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+    def show_zones(self, ZoneVec, ax = None, clrs = None):
+        ZoneVec = ZoneVec[self.ordr]
+        zones = np.reshape(ZoneVec,(np.sqrt(self.N).astype(int),np.sqrt(self.N).astype(int)))
+        cmap = plt.cm.get_cmap('nipy_spectral', len(np.unique(ZoneVec)))
+        if clrs is None: 
+            clrs = cmap(np.linspace(0, 1, len(np.unique(ZoneVec))))
+            np.random.shuffle(clrs)
+        cmap = mcolors.ListedColormap(clrs)
+        ax = sns.heatmap(zones, cmap=cmap,cbar=False,ax = ax,vmin=0,vmax=len(clrs))
+        ax.axis('equal')
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+    def show_all(self, ZoneVec):
+        fig,axs = plt.subplots(1,2,figsize=(10,5))
+        axs = axs.T
+        self.show_graph(ax=axs.flatten()[0])
+        self.show_zones(ZoneVec,ax=axs.flatten()[1])
+        plt.show()
+
+    def create_animation(self, Zones, filename = None):
+        fig, ax = plt.subplots()
+
+        all_rgbs = list()
+        cmap = plt.cm.get_cmap('nipy_spectral', self.N)
+
+        rgb_real = cmap(np.linspace(0, 1, self.N))
+        np.random.shuffle(rgb_real)
+
+        def animate(i):
+            ax.clear()    
+            self.show_zones(Zones[:,i], ax=ax, clrs = rgb_real)
+
+        ani = animation.FuncAnimation(fig, animate, frames=Zones.shape[1], interval=200)
+        if filename is not None:
+            ani.save(filename + '.gif', writer='imagemagick')
+
+        html = HTML(ani.to_jshtml())
+        if filename is not None: 
+            with open(filename + '.html', 'w') as f:
+                f.write("<html>\n")
+                f.write("<head>\n")
+                f.write("<title>Animation</title>\n")
+                f.write("</head>\n")
+                f.write("<body>\n")
+                f.write(html.data)
+                f.write("</body>\n")
+                f.write("</html>")
+                
+        return html

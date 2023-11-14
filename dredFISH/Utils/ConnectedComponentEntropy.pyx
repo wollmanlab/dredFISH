@@ -59,3 +59,4 @@ cdef class ConnectedComponentEntropy:
                 printf("reached lower bound at iter %d - %.0f%% of edges\n", i, run_fraction)
                 break
         return np.asarray(entropy_log)
+
