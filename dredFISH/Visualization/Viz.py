@@ -208,6 +208,68 @@ class DapiValueDistributions(View):
             if self.max_dapi_line is not None: 
                 self.Panels[0].ax.axvline(self.max_dapi_line)
 
+class SumValueDistributions(View):
+    def __init__(self,TMG,figsize = (16,8),min_sum_line = None,max_sum_line = None):
+        super().__init__(TMG,name = "Log10 Sum per section violin",figsize = figsize)
+        num_values = TMG.Layers[0].adata.X.sum(1)
+        num_values[num_values<0] = 0
+        num_values = np.log10(num_values+1)
+        min_sum_line = np.log10(min_sum_line+1)
+        max_sum_line = np.log10(max_sum_line+1)
+        self.min_sum_line=min_sum_line
+        self.max_sum_line=max_sum_line
+        
+        if self.TMG.Nsections > 1:
+            P = Violin(V = self, cat_values = TMG.Layers[0].Section,num_values = num_values,xlabel='Section',ylabel='Sum')
+        else: 
+            P = Histogram(V = self,values_to_count = num_values,xlabel='Sum')
+
+    def show(self): 
+        super().show()
+        if self.TMG.Nsections > 1:
+            if self.min_sum_line is not None: 
+                self.Panels[0].ax.axhline(self.min_sum_line)
+            if self.max_sum_line is not None: 
+                self.Panels[0].ax.axhline(self.max_sum_line)
+        else: 
+            if self.min_sum_line is not None: 
+                self.Panels[0].ax.axvline(self.min_sum_line)
+            if self.max_sum_line is not None: 
+                self.Panels[0].ax.axvline(self.max_sum_line)
+
+class ValueDistributions(View):
+    def __init__(self,TMG,num_values,log=False,title='',figsize = (16,8),min_line = None,max_line = None):
+        super().__init__(TMG,name = title+" per section violin",figsize = figsize)
+        if log:
+            title = 'Log10 '+title
+            num_values[num_values<0] = 0
+            num_values = np.log10(num_values+1)
+            if not isinstance(min_line,type(None)):
+                min_line = np.log10(min_line+1)
+            if not isinstance(max_line,type(None)):
+                max_line = np.log10(max_line+1)
+        self.min_line=min_line
+        self.max_line=max_line
+        
+        if self.TMG.Nsections > 1:
+            P = Violin(V = self, cat_values = TMG.Layers[0].Section,num_values = num_values,xlabel='Section',ylabel=title)
+        else: 
+            P = Histogram(V = self,values_to_count = num_values,xlabel=title)
+
+    def show(self): 
+        super().show()
+        if self.TMG.Nsections > 1:
+            if self.min_line is not None: 
+                self.Panels[0].ax.axhline(self.min_line)
+            if self.max_line is not None: 
+                self.Panels[0].ax.axhline(self.max_line)
+        else: 
+            if self.min_line is not None: 
+                self.Panels[0].ax.axvline(self.min_line)
+            if self.max_line is not None: 
+                self.Panels[0].ax.axvline(self.max_line)
+
+
 """ class IsoZonesView(View):
     # A view with two panels: a isozone colorpleth with node_size and log-log hist
     # simple overloading of colorpleth, only different is that we're getting values from TMG 
@@ -636,8 +698,8 @@ class Scatter(Panel):
         self.Data['s'] = s
         self.xtick = kwargs.get('xtick',None)
         self.ytick = kwargs.get('ytick',None)
-        self.xlabel = kwargs.get('',None)
-        self.ylabel = kwargs.get('',None)
+        self.xlabel = kwargs.get('xlabel',None)
+        self.ylabel = kwargs.get('ylabel',None)
         self.label_font_size = kwargs.get('label_font_size',20)
        
     def plot(self):
@@ -659,8 +721,8 @@ class Violin(Panel):
 
         self.Data['cat_values'] = cat_values
         self.Data['num_values'] = num_values
-        self.xlabel = kwargs.get('',None)
-        self.ylabel = kwargs.get('',None)
+        self.xlabel = kwargs.get('xlabel',None)
+        self.ylabel = kwargs.get('ylabel',None)
 
     def plot(self):
         df = pd.DataFrame({'cat' : self.Data['cat_values'],
@@ -668,6 +730,8 @@ class Violin(Panel):
         sns.violinplot(ax = self.ax,data = df,x = "cat", y = "num")
         self.ax.set_xlabel(self.xlabel)
         self.ax.set_ylabel(self.ylabel)
+
+    
         
 
 class Histogram(Panel):
@@ -677,7 +741,7 @@ class Histogram(Panel):
         super().__init__(V = V,name=name, pos=pos)
         self.n_bins = n_bins 
         self.Data['values_to_count'] = values_to_count
-        self.xlabel = kwargs.get('',None)
+        self.xlabel = kwargs.get('xlabel',None)
 
     def plot(self): 
         self.ax.hist(self.Data['values_to_count'], bins=self.n_bins)

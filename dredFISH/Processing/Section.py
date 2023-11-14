@@ -32,14 +32,14 @@ from skimage import (
 
 """ TO DO LIST
  1. Add blocking so multiple computers could work on one dataset
- 2. Check onfly processing
+ 2. Check onfly processing (Rsync Blocking Permissions)
  3. 
 
 """
 
 class Section_Class(object):
     """
-    Section_Class Primary Class to Process DredFISH Sections
+    Section_Class Primary Class to Process dredFISH Sections
     """
     def __init__(self,
                  metadata_path,
@@ -312,13 +312,29 @@ class Section_Class(object):
             self.any_incomplete_hybes
             return None,None,None,None,None
         else:
-            nuc_exists = self.check_existance(hybe=hybe,channel=self.config.parameters['nucstain_channel'],file_type='stitched')
-            signal_exists = self.check_existance(hybe=hybe,channel=channel,file_type='stitched')
+            nuc_exists = self.check_existance(
+                hybe=hybe,
+                channel=self.config.parameters['nucstain_channel'],
+                file_type='stitched'
+            )
+            signal_exists = self.check_existance(
+                hybe=hybe,
+                channel=channel,
+                file_type='stitched'
+            )
             if (not self.config.parameters['overwrite'])&(nuc_exists&signal_exists):
                 self.update_user('Found Existing '+hybe+' Stitched')
                 if (hybe==self.config.parameters['nucstain_acq'])&(self.reference_stitched==''):
-                    nuc = self.load(hybe=hybe,channel=self.config.parameters['nucstain_channel'],file_type='stitched')
-                    signal = self.load(hybe=hybe,channel=channel,file_type='stitched')
+                    nuc = self.load(
+                        hybe=hybe,
+                        channel=self.config.parameters['nucstain_channel'],
+                        file_type='stitched'
+                    )
+                    signal = self.load(
+                        hybe=hybe,
+                        channel=channel,
+                        file_type='stitched'
+                    )
                     stitched = torch.dstack([nuc,signal])
                 else:
                     stitched = 0
@@ -397,7 +413,7 @@ class Section_Class(object):
                         destination = stitched[img_x_min:img_x_max,img_y_min:img_y_max,0]
                         mask = destination!=0
                         overlap =  mask.sum()/destination.ravel().shape[0]
-                        if overlap>0.02: # atleast 2% of overlap???
+                        if overlap>self.config.parameters['overlap']: 
                             mask_x = destination.max(1).values!=0
                             ref = destination[mask_x,:]
                             mask_y = ref.max(0).values!=0
@@ -405,6 +421,7 @@ class Section_Class(object):
                             ref = ref[:,mask_y]
                             non_ref = nuc[mask_x,:]
                             non_ref = non_ref[:,mask_y]
+                            # Check if Beads work here
                             shift, error = register(ref.numpy(), non_ref.numpy(),10)
                             if (error!=np.inf)&(np.max(np.abs(shift))<=self.config.parameters['border']):
                                 translation_y = int(shift[1])
@@ -604,6 +621,9 @@ class Section_Class(object):
                 cytoplasm[nuclei>0] = 0
                 self.mask = cytoplasm
                 self.save(self.mask,file_type='mask',model_type=model_type)
+            elif 'beads' in model_type:
+                self.update_user('Bead Segmentation Not Implemented',level=50)
+                """ Add Bead Segmentation Code Here """
             else:
                 """ Total & Nuclei"""
                 if self.check_existance(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='stitched'):
@@ -660,12 +680,12 @@ class Section_Class(object):
                             tot = total[(x*x_step):((x+1)*x_step),(y*y_step):((y+1)*y_step)].numpy()
                             stk = np.dstack([nuc,tot,np.zeros_like(nuc)])
                             diameter = int(self.config.parameters['segment_diameter']*1.5)
-                            min_size = int(self.config.parameters['segment_diameter']*10*1.5)
+                            min_size = int(self.config.parameters['segment_min_size']*1.5)
                             channels = [1,2]
                         else:
                             stk = nuc
                             diameter = int(self.config.parameters['segment_diameter'])
-                            min_size = int(self.config.parameters['segment_diameter']*10)
+                            min_size = int(self.config.parameters['segment_min_size'])
                             channels = [0,0]
                         if stk.max()==0:
                             continue
@@ -780,7 +800,7 @@ class Section_Class(object):
             for i in tqdm(range(labels.shape[0]),desc=str(datetime.now().strftime("%H:%M:%S"))+' Generating Label Converter'):
                 converter[int(labels[i])].append(i)
             for i,label in tqdm(enumerate(unique_labels),total=unique_labels.shape[0],desc=str(datetime.now().strftime("%H:%M:%S"))+' Generating Cell Vectors and Metadata'):
-                m = converter[int(label)]#labels==label
+                m = converter[int(label)]
                 self.vectors[i,:] = torch.median(pixel_vectors[m,:],axis=0).values
                 self.vectors_raw[i,:] = torch.median(pixel_vectors_raw[m,:],axis=0).values
                 pxy = pixel_xy[m,:]
@@ -802,6 +822,7 @@ class Section_Class(object):
             self.data.layers['raw_vectors'] = self.vectors_raw.numpy()
             self.data.layers['processed_vectors'] = self.vectors.numpy()
             self.data.layers['raw'] = self.vectors.numpy()
+            """ Make Compatable with Beads? """
             self.data.obs['polyt'] = self.data.layers['processed_vectors'][:,self.data.var.index=='PolyT']
             self.data.obs['polyt_raw'] = self.data.layers['raw_vectors'][:,self.data.var.index=='PolyT']
             self.data.obs['nonspecific_encoding'] = self.data.layers['processed_vectors'][:,self.data.var.index=='Nonspecific_Encoding']
@@ -814,6 +835,19 @@ class Section_Class(object):
             self.save(pd.DataFrame(self.data.layers['processed_vectors'],index=self.data.obs.index,columns=self.data.var.index),file_type='matrix',model_type=model_type)
             self.save(pd.DataFrame(self.data.layers['raw_vectors'],index=self.data.obs.index,columns=self.data.var.index),file_type='matrix_raw',model_type=model_type)
             self.save(self.data,file_type='anndata',model_type=model_type)
+            self.remove_temporary_files()
+
+    def remove_temporary_files(self,data_types = ['stitched','stitched_raw','FF']):
+        """
+        remove_temporary_files Remove Temporary Processing Files To Save Disk Space
+
+        :param data_types: Data Types to Remove, defaults to ['stitched','stitched_raw','FF']
+        :type data_types: list, optional
+        """
+        for file_type in  self.generate_iterable(data_types,message='Removing Temporary Files'):
+            fname = self.generate_filename(hybe='', channel='', file_type=file_type, model_type='')
+            dirname = os.path.dirname(fname)
+            shutil.rmtree(dirname)
 
 
 def generate_FF(image_metadata,acq,channel,posnames=[],bkg_acq='',parameters={},verbose=False):
@@ -850,8 +884,9 @@ def generate_FF(image_metadata,acq,channel,posnames=[],bkg_acq='',parameters={},
                 print(posname,acq,bkg_acq)
                 print(e)
                 continue
-        FF = torch.quantile(torch.dstack(FF),0.5,dim=2).numpy()
-        vmin,vmax = np.percentile(FF[np.isnan(FF)==False],[0.1,99.9])
+        FF = torch.quantile(torch.dstack(FF),0.5,dim=2).numpy() # Assumption is that for each pixel half of the images wont have a cell there
+        vmin,vmax = np.percentile(FF[np.isnan(FF)==False],[0.1,99.9]) 
+        # Maybe add median filter to FF 
         FF[FF<vmin] = vmin
         FF[FF>vmax] = vmax
         FF[FF==0] = np.median(FF)
@@ -989,7 +1024,7 @@ def preprocess_images(data,FF=1,nuc_FF=1):
                                             Channel=parameters['nucstain_channel'],
                                             acq=bkg_acq).max(axis=2).astype(float)))
             bkg_nuc = process_img(bkg_nuc,parameters,FF=nuc_FF)
-
+            # Check if beads work here
             shift, error = register(nuc, bkg_nuc,10)
             if error!=np.inf:
                 translation_x = int(shift[1])
@@ -1040,7 +1075,7 @@ def preprocess_images(data,FF=1,nuc_FF=1):
             """ Register to Correct Stage Error """
             mask = destination!=0
             overlap = mask.sum()/destination.ravel().shape[0]
-            if overlap>0.05: # atleast 5% of overlap???
+            if overlap>parameters['overlap']:
                 mask = destination!=0
                 mask_x = destination.max(1).values!=0
                 ref = destination[mask_x,:]
@@ -1049,6 +1084,7 @@ def preprocess_images(data,FF=1,nuc_FF=1):
                 ref = ref[:,mask_y]
                 non_ref = nuc[mask_x,:]
                 non_ref = non_ref[:,mask_y]
+                # Check if Beads work here
                 shift, error = register(ref.numpy(), non_ref.numpy(),10)
                 if (error!=np.inf)&(np.max(np.abs(shift))<=(parameters['border']/2)):
                     translation_y = int(shift[1])

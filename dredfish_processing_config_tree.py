@@ -82,6 +82,30 @@ encoding_weight_bias = { 'RS0095_cy5': 1061,
                              'hybe20': 3365}
 
 """
+smartseq_avg_signal = {'RS0095_cy5': 83897.30418786337,
+ 'RS0109_cy5': 178720.71219794694,
+ 'RS0175_cy5': 96528.39166969477,
+ 'RS0237_cy5': 72256.77433457486,
+ 'RS0332_cy5': 425101.6022892442,
+ 'RSN9927.0_cy5': 42991.88600336119,
+ 'RSN2336.0_cy5': 1493763.1729651163,
+ 'RSN1807.0_cy5': 790618.4193313953,
+ 'RS0384_cy5': 78371.6824582122,
+ 'RS0406_cy5': 54350.66128043241,
+ 'RS0451_cy5': 10816385.494186046,
+ 'RS0468_cy5': 91950.32360555959,
+ 'RS0548_cy5': 293490.35646802327,
+ 'RS64.0_cy5': 255177.45943859013,
+ 'RSN4287.0_cy5': 2020901.6235465116,
+ 'RSN1252.0_cy5': 144122.21402616278,
+ 'RSN9535.0_cy5': 1161627.5065406978,
+ 'RS156.0_cy5': 229653.3105014535,
+ 'RS643.0_cy5': 184689.00767623546,
+ 'RS740.0_cy5': 295275.06025163515,
+ 'RS810.0_cy5': 950810.4367732558,
+ 'RS458122_cy5': 303700.3316678779,
+ 'RS0083_SS_Cy5': 1258167.4207848837,
+ 'RS0255_SS_Cy5': 2193261.4854651163}
 
 nbits = len(bitmap)
 parameters = {}
@@ -94,7 +118,7 @@ parameters['stitch_fliplr'] = True# NEW True
 parameters['register_stitch_reference'] = True
 
 parameters['segment_gpu'] = False
-parameters['fishdata']='fishdata_2023Oct13'
+parameters['fishdata']='fishdata_2023Oct14'
 parameters['QC_pixel_size'] = 2 # um
 parameters['diameter'] = 8 #15 # um
 parameters['segment_diameter'] = parameters['diameter']/parameters['pixel_size']
@@ -122,3 +146,4 @@ parameters['background_estimate_iters'] = 0
 parameters['stain_correction'] = False
 parameters['stain_correction_downsample'] = 10
 parameters['stain_correction_kernel'] = 1000
+parameters['overlap'] = 0.02 # 2% overlap
