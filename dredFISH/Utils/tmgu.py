@@ -1,13 +1,21 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+from matplotlib.gridspec import GridSpec
+
+
 import seaborn as sns
+import os
 
 import igraph
 from scipy import sparse
 from sklearn.neighbors import NearestNeighbors
 
 import matplotlib.animation as animation
+from matplotlib.animation import FuncAnimation
+import matplotlib
+matplotlib.rcParams['animation.embed_limit'] = 512
+
 from IPython.display import HTML
 
 import sys
@@ -159,7 +167,9 @@ class GraphPercolation:
         self.N = XY.shape[0]
         self.XY = XY
         self.type_vec = type_vec
+        self.type_vec_perm = np.random.permutation(self.type_vec)
         self.maxK = maxK
+        self.unq_types = np.unique(type_vec)
         self.n_types = len(np.unique(type_vec))
 
         if maxK is None: 
@@ -168,6 +178,7 @@ class GraphPercolation:
     def save(self,filename): 
         np.savez(filename,XY = self.XY,
                          type_vec = self.type_vec,
+                         type_vec_perm = self.type_vec_perm,
                          Zones = self.Zones,
                          Zones_perm = self.Zones_perm,
                          ent_real = self.ent_real,
@@ -182,6 +193,7 @@ class GraphPercolation:
         dump = np.load(filename)
         self.XY = dump['XY']
         self.type_vec = dump['type_vec']
+        self.type_vec_perm = dump['type_vec_perm']
         self.Zones = dump['Zones']
         self.Zones_perm = dump['Zones_perm']
         self.ent_real = dump['ent_real']
@@ -190,13 +202,14 @@ class GraphPercolation:
         self.ent_type_real = dump['ent_type_real']
         self.ent_type_perm = dump['ent_type_perm']
         self.maxK = dump['maxK']
+        self.unq_types = np.unique(self.type_vec)
         self.n_types = len(np.unique(self.type_vec))
         self.N = len(self.type_vec)
 
     def calc_ELKexp(self, permute=False): 
         ELK = self.ELKfull
         if permute: 
-            type_vec = np.random.permutation(self.type_vec)
+            type_vec = self.type_vec_perm
         else: 
             type_vec = self.type_vec
 
@@ -279,14 +292,13 @@ class GraphPercolation:
         if verbose: 
             print(f"Done: Calc edges from XY - time: {time.time()-start:.0f}")
             print(f"Starting real percolation return_zones = {return_zones}")
-            print(f"Starting real percolation - return_zones = {return_zones}") 
-
-        self.bond_percolation(permute = False, return_zones= return_zones, verbose = verbose)
+  
+        self.bond_percolation(permute = False, return_zones = return_zones, verbose = verbose)
         if verbose:
             print(f"Done with real percolation - time: {time.time()-start:.0f}")
             print(f"Starting perm percolation - return_zones = {return_zones}")  
 
-        self.bond_percolation(permute = True, return_zones= return_zones, verbose = verbose)
+        self.bond_percolation(permute = True, return_zones = return_zones, verbose = verbose)
         if verbose:
             print(f"Done with perm percolation - time: {time.time()-start:.0f}")
 
@@ -296,10 +308,10 @@ class GraphPercolation:
             self.ent_type_real = np.zeros((self.Zones.shape[1],self.n_types))
             self.ent_type_perm = np.zeros((self.Zones_perm.shape[1],self.n_types))
 
-            for t in range(self.n_types): 
+            for t,typ in enumerate(self.unq_types): 
                 for i in range(self.Zones.shape[1]): 
-                    self.ent_type_real[i,t] = list_entropy(self.Zones[self.type_vec==t,i])
-                    self.ent_type_perm[i,t] = list_entropy(self.Zones_perm[self.type_vec==t,i])
+                    self.ent_type_real[i,t] = list_entropy(self.Zones[self.type_vec==typ,i])
+                    self.ent_type_perm[i,t] = list_entropy(self.Zones_perm[self.type_vec_perm==typ,i])
             if verbose:
                 print(f"Done with calc type entropy - time: {time.time()-start:.0f}")
 
@@ -343,7 +355,169 @@ class GraphPercolation:
         self.plot_entropy_vs_perm(ax=axs.flatten()[1])
         plt.show()
 
+    def create_animation_vs_perm(self,ani_pth,filename, save_gif = True):
+        # create colormap with a color per cells, random, and fixed
+        cmap = plt.get_cmap('nipy_spectral')
+        rgb_cells = cmap(np.linspace(0, 1, len(self.type_vec)))
+        rgb_cells = rgb_cells[np.random.permutation(len(self.type_vec)),:]
+        cmap = mcolors.ListedColormap(rgb_cells)
 
+        ani_pth = 'Animations'
+        os.makedirs(ani_pth, exist_ok=True)
+
+        fig = plt.figure(figsize=(30, 8))
+        gs = GridSpec(2, 3, figure=fig)
+        ax1 = fig.add_subplot(gs[: , 0])
+        ax2 = fig.add_subplot(gs[: , 1])
+        ax3 = fig.add_subplot(gs[0 , 2])
+        ax4 = fig.add_subplot(gs[1 , 2])
+
+        def animate(i):
+            ax1.clear()
+            ax2.clear()
+            ax3.clear()
+            ax4.clear()
+
+            ax1.scatter(self.XY[:,0],-self.XY[:,1],s=1,c=self.Zones[:,i],alpha=0.5,cmap=cmap)
+            ax2.scatter(self.XY[:,0],-self.XY[:,1],s=1,c=self.Zones_perm[:,i],alpha=0.5,cmap=cmap)
+            ax1.set_title('Percolation - real', color = 'blue')
+            ax2.set_title('Percolation - perm', color = 'orange')
+            
+            self.plot_entropy_by_type(ax = ax3)
+            ax3.axvline(x=self.pbond_vec[i], color='r', linestyle=':')
+            
+            self.plot_entropy_vs_perm(ax = ax4)
+            ax4.axvline(x=self.pbond_vec[i], color='r', linestyle=':')
+
+        ani = FuncAnimation(fig, animate, frames=self.Zones.shape[1], repeat=False)
+
+        html = HTML(ani.to_jshtml())
+        filename = f"{ani_pth}/division_isozones"
+        if filename is not None: 
+            with open(filename + '.html', 'w') as f:
+                f.write("<html>\n")
+                f.write("<head>\n")
+                f.write("<title>Animation</title>\n")
+                f.write("</head>\n")
+                f.write("<body>\n")
+                f.write(html.data)
+                f.write("</body>\n")
+                f.write("</html>")
+            if save_gif: 
+                ani.save(filename + '.gif', writer='imagemagick')
+
+
+def merge_nested_clusters(GPmat, top_down = True): 
+
+    Ncells = sum(GPmat[i,0].N for i in range(GPmat.shape[0]))
+
+    # create the type matrix from GP objects: 
+    type_vecs=list()
+    for row in GPmat: 
+        type_vecs.append(np.hstack([gp.type_vec[:,np.newaxis] for gp in row]).astype(int))
+    type_int_mat = np.vstack(type_vecs)
+    Ntypes_per_lvl = (type_int_mat.max(axis=0)+1).astype(int)
+
+    # now extract the type entropy from each GO object to create the overall type x entropy across all possible types (mutliple levels)
+    
+    # Init all empty matrices inside the list
+    delta_ent_per_pbond_type_lvl = [None] * GPmat.shape[1]
+    type_freq_lvl = [None] * GPmat.shape[1]
+
+    for lvl in range(len(delta_ent_per_pbond_type_lvl)):
+        delta_ent_per_pbond_type_lvl[lvl] = np.zeros((Ntypes_per_lvl[lvl],GPmat.shape[0],len(GPmat[0,0].pbond_vec)))
+        type_freq_lvl[lvl] = np.zeros((Ntypes_per_lvl[lvl],GPmat.shape[0]))
+
+    # extract the actual values
+    for lvl in range(GPmat.shape[1]):
+        for sec in range(GPmat.shape[0]): 
+            types_in_section,type_freq = np.unique(GPmat[sec,lvl].type_vec,return_counts=True)
+            type_freq_lvl[lvl][types_in_section.astype(int),sec] = type_freq/Ncells
+            dent = np.abs(GPmat[sec,lvl].ent_type_perm.T-GPmat[sec,lvl].ent_type_real.T) 
+            delta_ent_per_pbond_type_lvl[lvl][types_in_section.astype(int),sec,:] = dent
+
+
+    # update the type numbers (so they are continous and not restaring each lebvel)
+    # then concatenate the entropys x pbond and frequencies
+    # now each row of delta_ent_per_pbond correspond to a type from the continous numbering
+
+    cmsm_type_mat = type_int_mat.copy()
+    cmsm_type_mat[:,1:] = cmsm_type_mat[:,1:]+np.cumsum(Ntypes_per_lvl[np.newaxis,:-1])
+    cmsm_type_mat = cmsm_type_mat.astype(int)
+    delta_ent_per_pbond = np.concatenate(delta_ent_per_pbond_type_lvl,axis=0)
+    cmsm_type_freq = np.concatenate(type_freq_lvl,axis=0)
+
+    def score(curr_ix):
+        dent_by_type_by_section_for_curr_types = delta_ent_per_pbond[curr_ix,:,:]
+        freq_by_type_by_section_for_curr_types = cmsm_type_freq[curr_ix,:,np.newaxis]
+        dent_by_section_summed_over_types = (dent_by_type_by_section_for_curr_types * freq_by_type_by_section_for_curr_types).sum(axis=0)
+        dent_by_pbond = dent_by_section_summed_over_types.sum(axis=0)
+        # scr = np.trapz(dent_by_pbond,GPmat[0,0].pbond_vec)
+        scr = dent_by_pbond.mean()
+
+        return scr
+
+    # now create the mapping dict so that each type (key) has the list of subtype under it (values)
+    # Initialize an empty dictionary
+    adj_dict = {}
+
+    # Iterate over the rows of the matrix
+    for row in cmsm_type_mat:
+        # Iterate over each element in the row
+        for i in range(len(row) - 1):
+            # If the element is not already a key in the dictionary, add it with an empty list as its value
+            if row[i] not in adj_dict:
+                adj_dict[row[i]] = []
+            # If the next element is not already in the list of adjacent values for the current element, add it
+            if row[i+1] not in adj_dict[row[i]]:
+                adj_dict[row[i]].append(row[i+1])
+
+    # ok, now we have everything we need, we can loop over all types to see if it's worth expanding any of them: 
+    if top_down: 
+        curr_ix = list(np.unique(cmsm_type_mat[:,0]))
+    else: #i.e. bottom up
+        curr_ix = list(np.unique(cmsm_type_mat[:,-1]))
+
+    best_score = score(curr_ix)
+
+    improved = True
+    if top_down: 
+        while improved:
+            improved = False
+            for i in range(len(curr_ix)):
+                if curr_ix[i] in adj_dict:
+                    new_ix = curr_ix[:i] + curr_ix[i+1:] + adj_dict[curr_ix[i]]
+                    # new_score = np.sum(delta_ent_per_pbond[new_ix, :] * cmsm_type_freq[new_ix, :],axis=0).mean()
+                    new_score = score(new_ix)
+                    if new_score > best_score:
+                        curr_ix = new_ix
+                        best_score = new_score
+                        improved = True
+        type_vec = cmsm_type_mat[np.isin(cmsm_type_mat,curr_ix)]
+    else: #i.e. bottom up
+        keys_per_level = [np.unique(cmsm_type_mat[:, lvl]) for lvl in range(5)]
+
+        for lvl in range(3, -1, -1):
+            print(f"starting level: {lvl}")
+            improved = True
+            for key in keys_per_level[lvl]:  # Loop over keys at the current level
+                subtypes = adj_dict[key]
+                if all(subtype in curr_ix for subtype in subtypes): 
+                    new_ix = [ix for ix in curr_ix if ix not in subtypes] + [key]
+                    new_score = score(new_ix)
+                    if new_score > best_score:
+                        curr_ix = new_ix
+                        best_score = new_score
+                        improved = True
+        mask = np.isin(cmsm_type_mat,curr_ix)
+        new_mask = np.full(mask.shape, False)
+        last_true_indices = mask.shape[1] - np.argmax(mask[:, ::-1], axis=1) - 1
+        new_mask[np.arange(mask.shape[0]), last_true_indices] = True                        
+        type_vec = cmsm_type_mat[new_mask]
+
+    return curr_ix,best_score,type_vec
+
+    
 
 
 class ToyGraph:
