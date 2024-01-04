@@ -6,6 +6,8 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 from scipy import sparse
+from sklearn.linear_model import LinearRegression
+
 import logging
 
 def reset_logging(**kwargs):
@@ -415,6 +417,31 @@ def normalize_fishdata(X, norm_cell=True, norm_basis=True, allow_nan=False):
     # further normalize by bit
     if norm_basis:
         X = zscore(X, axis=0, allow_nan=allow_nan) # 0 - across rows (cells) for each col (bit) 
+
+    return X
+
+def normalize_fishdata_log_regress(X):
+    """
+    X -- cell by basis raw count matrix
+    
+    Advanced normalization using sum. Key idea is instead of divide by the sum
+    regress in log space and use the residual. 
+    """
+    # clip at 1
+    X = np.clip(X, 1, None).astype(float)
+    log_X = np.log10(X)
+    log_sm = np.log10(X.sum(axis=1))
+
+    # init empty residual
+    Res = np.zeros_like(X)
+
+    # normalize by cell 
+    for i in range(X.shape[1]):
+        model = LinearRegression().fit(log_sm.reshape(-1, 1), log_X[:, i])
+        Res[:,i] =  log_X[:,i] - model.predict(log_sm.reshape(-1, 1))
+
+    # go back from log to linear scale
+    X = 10**Res
 
     return X 
 

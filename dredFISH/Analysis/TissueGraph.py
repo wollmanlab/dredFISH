@@ -318,9 +318,9 @@ class TissueMultiGraph:
         
          
         """
-        allowed_options = ['default', 'logrowmedian','log','none']
+        allowed_options = ['default', 'logrowmedian','log','none','logregress']
         if norm not in allowed_options:
-            raise ValueError(f"Choose from {allowed_options}")
+            raise ValueError(f"Choose norm param from {allowed_options}")
         
         for TG in self.Layers:
             if TG.layer_type == "cell":
@@ -360,6 +360,8 @@ class TissueMultiGraph:
             FISHbasis_norm = basicu.normalize_fishdata_logrowmedian(FISHbasis, norm_basis=norm_basis)
         elif norm == 'log':
             FISHbasis_norm = basicu.normalize_fishdata_log(FISHbasis, norm_cell=norm_cell, norm_basis=norm_basis)
+        elif norm == 'logregress': 
+            FISHbasis_norm = basicu.normalize_fishdata_log_regress(FISHbasis)
         else:
             FISHbasis_norm = FISHbasis
         
@@ -619,7 +621,7 @@ class TissueMultiGraph:
         if unqS is None: 
             unqS = self.unqS
         for s in unqS:
-            XY_per_section.append(self.get_XY(section=s))
+            XY_per_section.append(self.Layers[0].get_XY(section=s))
 
         # if mask and/or voronoi are part of the geom_type, run those calculations in parallel
         geoms_requiering_voronoi = ['mask','voronoi','isozones','regions']
