@@ -21,7 +21,7 @@ from IPython.display import HTML
 import sys
 import time
 sys.path.append('/home/rwollman/MyProjects/AH/Repos/dredFISH')
-from dredFISH.Utils.ConnectedComponentEntropy import ConnectedComponentEntropy
+# from dredFISH.Utils.ConnectedComponentEntropy import ConnectedComponentEntropy
 
 def list_entropy(X):
         _, cnt = np.unique(X, return_counts=True)
