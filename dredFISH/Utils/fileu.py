@@ -41,7 +41,7 @@ def check_existance(path='',hybe='',channel='',file_type='',model_type='',datase
     filename = generate_filename(path,hybe,channel,file_type,model_type,dataset,section,logger=logger)
     return os.path.exists(filename)
 
-def generate_filename(path,hybe,channel,file_type,model_type,dataset,section,logger='FileU'):
+def generate_filename(path,hybe,channel,file_type,model_type,dataset='',section='',logger='FileU'):
     """
     fname Generate File Name 
 
@@ -93,6 +93,8 @@ def generate_filename(path,hybe,channel,file_type,model_type,dataset,section,log
     elif file_type == 'stitched':
         fname = dataset+'_'+section+'_'+hybe+'_'+channel+'_'+file_type+'.pt'
     elif file_type == 'FF':
+        fname = dataset+'_'+section+'_'+channel+'_'+file_type+'.pt'
+    elif file_type == 'constant':
         fname = dataset+'_'+section+'_'+channel+'_'+file_type+'.pt'
     elif file_type == 'Layer':
         fname = dataset+'_'+model_type+'_'+file_type+'.h5ad'
@@ -150,6 +152,8 @@ def save(data,path='',hybe='',channel='',file_type='',model_type='',dataset='',s
         torch.save(data,fname)
     elif file_type == 'FF':
         torch.save(data,fname)
+    elif file_type == 'constant':
+        torch.save(data,fname)
     elif file_type == 'Layer':
         data.write(fname)
     elif file_type == 'Taxonomy':
@@ -196,6 +200,8 @@ def load(path='',hybe='',channel='',file_type='anndata',model_type='',dataset=''
         elif file_type == 'stitched':
             data = torch.load(fname)
         elif file_type == 'FF':
+            data = torch.load(fname)
+        elif file_type == 'constant':
             data = torch.load(fname)
         elif file_type == 'Layer':
             data = anndata.read_h5ad(fname)
