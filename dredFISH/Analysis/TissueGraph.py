@@ -338,15 +338,18 @@ class TissueMultiGraph:
         x_max = 0
         y_max = 0
         for s in section_names:
-            section_path = os.path.join(self.inputpath,s)
-            meta = fileu.load(section_path,file_type='metadata',model_type=measurement_type)
-            matrix = fileu.load(section_path,file_type='matrix',model_type=measurement_type)
-            if np.array(hybes).shape[0]>0:
-                matrix = np.array(matrix[hybes])
-            meta['stage_x'] = meta['stage_x'] + x_max
-            x_max = meta['stage_x'].max()
-            dfall_meta.append(meta)
-            matrix_all.append(matrix)
+            try:
+                section_path = os.path.join(self.inputpath,s)
+                meta = fileu.load(section_path,file_type='metadata',model_type=measurement_type)
+                matrix = fileu.load(section_path,file_type='matrix',model_type=measurement_type)
+                if np.array(hybes).shape[0]>0:
+                    matrix = np.array(matrix[hybes])
+                meta['stage_x'] = meta['stage_x'] + x_max
+                x_max = meta['stage_x'].max()
+                dfall_meta.append(meta)
+                matrix_all.append(matrix)
+            except:
+                print('Unable to load '+str(section_path))
 
         dfall_meta = pd.concat(dfall_meta)
         FISHbasis = np.vstack(matrix_all)
