@@ -67,7 +67,7 @@ class Section_Class(object):
         self.reference_stitched=''
         self.FF=''
         self.nuc_FF=''
-        self.data = ''
+        self.data = None
         self.verbose=verbose
         for handler in logging.root.handlers[:]:
             logging.root.removeHandler(handler)
@@ -109,12 +109,30 @@ class Section_Class(object):
         """
         self.load_metadata()
         if len(self.posnames)>0:
-            self.stitch()
+            completed = True
             for model_type in self.config.parameters['model_types']:
-                self.segment(model_type=model_type)
-                if not self.any_incomplete_hybes:
-                    self.pull_vectors(model_type=model_type)
-
+                if (not self.config.parameters['vector_overwrite']):#&self.check_existance(file_type='anndata',model_type=model_type):
+                    self.data = self.load(file_type='anndata',model_type=model_type)
+                    if not isinstance(self.data,type(None)):
+                        self.update_user('Existing Data Found')
+                        continue
+                    self.update_user('No Data Found')
+                    completed = False
+            if not completed:
+                self.stitch()
+                for model_type in self.config.parameters['model_types']:
+                    if (not self.config.parameters['vector_overwrite']):#&self.check_existance(file_type='anndata',model_type=model_type):
+                        self.data = self.load(file_type='anndata',model_type=model_type)
+                        if not isinstance(self.data,type(None)):
+                            self.update_user('Existing Data Found')
+                            continue
+                        self.update_user('No Data Found')
+                    
+                    self.segment(model_type=model_type)
+                    if not self.any_incomplete_hybes:
+                        self.pull_vectors(model_type=model_type)
+            if not isinstance(self.data,type(None)):
+                self.remove_temporary_files()
         else:
             self.update_user('No positions found for this section',level=50)
     
@@ -128,7 +146,8 @@ class Section_Class(object):
         :type level: int, optional
         """
         if self.verbose:
-            fileu.update_user(message,level=level,logger=self.log)
+            print(message)
+        fileu.update_user(message,level=level,logger=self.log)
 
     def check_existance(self,hybe='',channel='',file_type='',model_type=''):
         """
@@ -162,7 +181,7 @@ class Section_Class(object):
         :return: File Path
         :rtype: str
         """
-        return fileu.fname(self.path,hybe=hybe,channel=channel,file_type=file_type,model_type=model_type,logger=self.log)
+        return fileu.generate_filename(self.path,hybe=hybe,channel=channel,file_type=file_type,model_type=model_type,logger=self.log)
 
     def save(self,data,hybe='',channel='',file_type='',model_type=''):
         """
@@ -241,6 +260,7 @@ class Section_Class(object):
 
         hybe = [i for i in self.image_metadata.acqnames if 'hybe' in i.lower()][0]
         posnames = np.unique(self.image_metadata.image_table[np.isin(self.image_metadata.image_table.acq,hybe)].Position)
+        self.update_user(str(posnames.shape[0])+' Positions Found')
         sections = np.unique([i.split('-Pos')[0] for i in posnames if '-Pos' in i])
 
         if sections.shape[0] == 0:
@@ -336,14 +356,19 @@ class Section_Class(object):
                         file_type='stitched'
                     )
                     stitched = torch.dstack([nuc,signal])
+
                 else:
                     stitched = 0
-                return stitched,0,0,0,0
+                return stitched
             else:
                 if isinstance(self.FF,str):
-                    self.FF=1
+                    self.FF = 1
                 if isinstance(self.nuc_FF,str):
                     self.nuc_FF = 1
+                if isinstance(self.constant,str):
+                    self.constant = 0
+                if isinstance(self.nuc_constant,str):
+                    self.nuc_constant = 0
                 xy = np.stack([pxy for i,pxy in self.coordinates.items()])
                 if (self.config.parameters['stitch_rotate'] % 2) == 0:
                     img_shape = np.flip(self.config.parameters['n_pixels'])
@@ -373,7 +398,7 @@ class Section_Class(object):
                         destination = self.reference_stitched[img_x_min:img_x_max,img_y_min:img_y_max,0]
                         data['destination'] = destination
                     Input.append(data)
-                pfunc = partial(preprocess_images,FF=self.FF,nuc_FF=self.nuc_FF)
+                pfunc = partial(preprocess_images,FF=self.FF,nuc_FF=self.nuc_FF,constant=self.constant,nuc_constant=self.nuc_constant)
                 translation_y_list = []
                 translation_x_list = []
                 redo_posnames = []
@@ -557,26 +582,36 @@ class Section_Class(object):
         """        
         channel = self.config.parameters['total_channel']
         acq = self.find_acq(self.config.parameters['nucstain_acq'],protocol='hybe')
-        if self.config.parameters['strip']:
-            bkg_acq = self.find_acq(self.config.parameters['nucstain_acq'],protocol='strip')
-        else:
-            bkg_acq = ''
-        if isinstance(self.FF,str) | isinstance(self.nuc_FF,str):
-            if self.check_existance(channel=self.config.parameters['total_channel'],file_type='FF'):
+        if self.config.parameters['use_FF']==False:
+            self.FF = 1
+            self.nuc_FF = 1
+        elif isinstance(self.FF,str) | isinstance(self.nuc_FF,str):
+            if self.check_existance(channel=self.config.parameters['total_channel'],file_type='constant')&self.check_existance(channel=self.config.parameters['total_channel'],file_type='FF'):
                 self.FF = self.load(channel=self.config.parameters['total_channel'],file_type='FF')
+                self.constant = self.load(channel=self.config.parameters['total_channel'],file_type='constant')
             else:
-                FF = generate_FF(self.image_metadata,acq,channel,bkg_acq='',posnames=self.posnames,parameters=self.config.parameters,verbose=self.verbose)
+                FF,constant = generate_FF(self.image_metadata,acq,channel,bkg_acq='',parameters=self.config.parameters,verbose=self.verbose)
                 self.FF = FF
                 self.save(FF,channel=channel,file_type='FF')
-                self.save(FF,hybe='FF',channel=channel,file_type='image_FF')
-            if self.check_existance(channel=self.config.parameters['nucstain_channel'],file_type='FF'):
+                self.save((FF*1000),hybe='FF',channel=channel,file_type='image_FF')
+                self.constant = constant
+                self.save(constant,channel=channel,file_type='constant')
+                self.save((constant),hybe='constant',channel=channel,file_type='image_constant')
+            if self.check_existance(channel=self.config.parameters['nucstain_channel'],file_type='FF')&self.check_existance(channel=self.config.parameters['nucstain_channel'],file_type='constant'):
                 self.nuc_FF = self.load(channel=self.config.parameters['nucstain_channel'],file_type='FF')
+                self.nuc_constant = self.load(channel=self.config.parameters['nucstain_channel'],file_type='constant')
             else:
-                nuc_FF = generate_FF(self.image_metadata,acq,self.config.parameters['nucstain_channel'],bkg_acq='',posnames=self.posnames,parameters=self.config.parameters,verbose=self.verbose)
+                nuc_FF,nuc_constant = generate_FF(self.image_metadata,acq,self.config.parameters['nucstain_channel'],bkg_acq='',parameters=self.config.parameters,verbose=self.verbose)
                 self.nuc_FF = nuc_FF
                 self.save(nuc_FF,channel=self.config.parameters['nucstain_channel'],file_type='FF')
-                self.save(FF,hybe='FF',channel=self.config.parameters['nucstain_channel'],file_type='image_FF')
-        """ Generate Refernce """
+                self.save((nuc_FF*1000),hybe='FF',channel=self.config.parameters['nucstain_channel'],file_type='image_FF')
+                self.nuc_constant = nuc_constant
+                self.save(nuc_constant,channel=channel,file_type='constant')
+                self.save((nuc_constant),hybe='constant',channel=self.config.parameters['nucstain_channel'],file_type='image_constant')
+        if self.config.parameters['use_constant']==False:
+            self.constant = 0
+            self.nuc_constant = 0
+        """ Generate Reference """
         self.any_incomplete_hybes = False
         self.reference_stitched = self.stitcher(self.config.parameters['nucstain_acq'],self.config.parameters['total_channel'])
         if isinstance(self.reference_stitched,type(None)):
@@ -779,18 +814,27 @@ class Section_Class(object):
             labels = self.mask[idxes]
 
             """ Load Vector for each pixel """
+            ### FIX MULTIPROCESS THIS FOR SPEED ###
             pixel_vectors = torch.zeros([idxes[0].shape[0],len(self.config.bitmap)+1],dtype=torch.int32)
             pixel_vectors_raw = torch.zeros([idxes[0].shape[0],len(self.config.bitmap)+1],dtype=torch.int32)
+            nuc_pixel_vectors = torch.zeros([idxes[0].shape[0],len(self.config.bitmap)+1],dtype=torch.int32)
+            nuc_pixel_vectors_raw = torch.zeros([idxes[0].shape[0],len(self.config.bitmap)+1],dtype=torch.int32)
             for i,(r,h,c) in self.generate_iterable(enumerate(self.config.bitmap),'Generating Pixel Vectors',length=len(self.config.bitmap)):
                 pixel_vectors[:,i] = self.load(hybe=h,channel=c,file_type='stitched')[idxes]
                 pixel_vectors_raw[:,i] = self.load(hybe=h,channel=c,file_type='stitched_raw')[idxes]
+                nuc_pixel_vectors[:,i] = self.load(hybe=h,channel=self.config.parameters['nucstain_channel'],file_type='stitched')[idxes]
+                nuc_pixel_vectors_raw[:,i] = self.load(hybe=h,channel=self.config.parameters['nucstain_channel'],file_type='stitched_raw')[idxes]
             # Nucstain Signal
             pixel_vectors[:,-1] = self.load(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='stitched')[idxes]
             pixel_vectors_raw[:,-1] = self.load(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='stitched_raw')[idxes]
+            nuc_pixel_vectors[:,-1] = self.load(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='stitched')[idxes]
+            nuc_pixel_vectors_raw[:,-1] = self.load(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='stitched_raw')[idxes]
 
             unique_labels = torch.unique(labels)
             self.vectors = torch.zeros([unique_labels.shape[0],pixel_vectors.shape[1]],dtype=torch.int32)
             self.vectors_raw = torch.zeros([unique_labels.shape[0],pixel_vectors_raw.shape[1]],dtype=torch.int32)
+            self.nuc_vectors = torch.zeros([unique_labels.shape[0],nuc_pixel_vectors.shape[1]],dtype=torch.int32)
+            self.nuc_vectors_raw = torch.zeros([unique_labels.shape[0],nuc_pixel_vectors_raw.shape[1]],dtype=torch.int32)
             pixel_xy = torch.zeros([idxes[0].shape[0],2])
             pixel_xy[:,0] = idxes[0]
             pixel_xy[:,1] = idxes[1]
@@ -803,6 +847,8 @@ class Section_Class(object):
                 m = converter[int(label)]
                 self.vectors[i,:] = torch.median(pixel_vectors[m,:],axis=0).values
                 self.vectors_raw[i,:] = torch.median(pixel_vectors_raw[m,:],axis=0).values
+                self.nuc_vectors[i,:] = torch.median(nuc_pixel_vectors[m,:],axis=0).values
+                self.nuc_vectors_raw[i,:] = torch.median(nuc_pixel_vectors_raw[m,:],axis=0).values
                 pxy = pixel_xy[m,:]
                 self.xy[i,:] = torch.median(pxy,axis=0).values
                 self.size[i] = pxy.shape[0]
@@ -816,12 +862,17 @@ class Section_Class(object):
             self.cell_metadata['dapi'] = self.vectors[:,-1].numpy()
             self.vectors = self.vectors[:,0:-1]
             self.vectors_raw = self.vectors_raw[:,0:-1]
+            self.nuc_vectors = self.nuc_vectors[:,0:-1]
+            self.nuc_vectors_raw = self.nuc_vectors_raw[:,0:-1]
             self.data = anndata.AnnData(X=self.vectors.numpy(),
                                 var=pd.DataFrame(index=np.array([r for r,h,c in self.config.bitmap])),
                                 obs=self.cell_metadata)
             self.data.layers['raw_vectors'] = self.vectors_raw.numpy()
             self.data.layers['processed_vectors'] = self.vectors.numpy()
+            self.data.layers['nuc_raw_vectors'] = self.nuc_vectors_raw.numpy()
+            self.data.layers['nuc_processed_vectors'] = self.nuc_vectors.numpy()
             self.data.layers['raw'] = self.vectors.numpy()
+            self.data.layers['nuc_raw'] = self.nuc_vectors.numpy()
             """ Make Compatable with Beads? """
             self.data.obs['polyt'] = self.data.layers['processed_vectors'][:,self.data.var.index=='PolyT']
             self.data.obs['polyt_raw'] = self.data.layers['raw_vectors'][:,self.data.var.index=='PolyT']
@@ -831,11 +882,38 @@ class Section_Class(object):
             self.data.obs['nonspecific_readout_raw'] = self.data.layers['raw_vectors'][:,self.data.var.index=='Nonspecific_Readout']
             self.data = self.data[:,self.data.var.index.isin(['PolyT','Nonspecific_Encoding','Nonspecific_Readout'])==False]
 
-            self.save(self.data.obs,file_type='metadata',model_type=model_type)
-            self.save(pd.DataFrame(self.data.layers['processed_vectors'],index=self.data.obs.index,columns=self.data.var.index),file_type='matrix',model_type=model_type)
-            self.save(pd.DataFrame(self.data.layers['raw_vectors'],index=self.data.obs.index,columns=self.data.var.index),file_type='matrix_raw',model_type=model_type)
-            self.save(self.data,file_type='anndata',model_type=model_type)
-            self.remove_temporary_files()
+            self.save(
+                self.data.obs,
+                file_type='metadata',
+                model_type=model_type)
+            self.save(pd.DataFrame(
+                self.data.layers['processed_vectors'],
+                index=self.data.obs.index,
+                columns=self.data.var.index),
+                file_type='matrix',
+                model_type=model_type)
+            self.save(pd.DataFrame(
+                self.data.layers['raw_vectors'],
+                index=self.data.obs.index,
+                columns=self.data.var.index),
+                file_type='matrix_raw',
+                model_type=model_type)
+            self.save(pd.DataFrame(
+                self.data.layers['nuc_processed_vectors'],
+                index=self.data.obs.index,
+                columns=self.data.var.index),
+                file_type='matrix_nuc',
+                model_type=model_type)
+            self.save(pd.DataFrame(
+                self.data.layers['nuc_raw_vectors'],
+                index=self.data.obs.index,
+                columns=self.data.var.index),
+                file_type='matrix_raw_nuc',
+                model_type=model_type)
+            self.save(
+                self.data,
+                file_type='anndata',
+                model_type=model_type)
 
     def remove_temporary_files(self,data_types = ['stitched','stitched_raw','FF']):
         """
@@ -875,79 +953,37 @@ def generate_FF(image_metadata,acq,channel,posnames=[],bkg_acq='',parameters={},
             iterable = posnames
         for posname in iterable:
             try:
-                img = torch.tensor(image_metadata.stkread(Position=posname,Channel=channel,acq=acq).min(2).astype(float))
+                img = image_metadata.stkread(Position=posname,Channel=channel,acq=acq).min(2).astype(float)
+                img = median_filter(img,2)
+                img = torch.tensor(img)
                 if bkg_acq!='':
-                    bkg = torch.tensor(image_metadata.stkread(Position=posname,Channel=channel,acq=bkg_acq).mean(2).astype(float))
+                    bkg = image_metadata.stkread(Position=posname,Channel=channel,acq=bkg_acq).mean(2).astype(float)
+                    # bkg = median_filter(bkg,2)
+                    bkg = torch.tensor(bkg)
                     img = img-bkg
                 FF.append(img)
             except Exception as e:
                 print(posname,acq,bkg_acq)
                 print(e)
                 continue
-        FF = torch.quantile(torch.dstack(FF),0.5,dim=2).numpy() # Assumption is that for each pixel half of the images wont have a cell there
-        vmin,vmax = np.percentile(FF[np.isnan(FF)==False],[0.1,99.9]) 
+        # FF = torch.quantile(torch.dstack(FF),0.5,dim=2).numpy() # Assumption is that for each pixel half of the images wont have a cell there
+        FF = torch.dstack(FF)
+        bkg = torch.min(FF,dim=2).values # There may be a more robust way 
+        bkg = gaussian_filter(bkg,50,mode='nearest')  # causes issues with corners
+        FF = FF-bkg[:,:,None]
+        FF = torch.mean(FF,dim=2).numpy() # There may be a more robust way in case of debris 
+        # bkg = bkg.numpy()
+        # FF = median_filter(FF,10)
+        FF = gaussian_filter(FF,50,mode='nearest') # causes issues with corners
+        vmin,vmid,vmax = np.percentile(FF[np.isnan(FF)==False],[0.1,50,99.9]) 
         # Maybe add median filter to FF 
         FF[FF<vmin] = vmin
         FF[FF>vmax] = vmax
-        FF[FF==0] = np.median(FF)
-        FF = np.median(FF)/FF
-        return FF
+        FF[FF==0] = vmid
+        FF = vmid/FF
+        return FF,bkg
 
-def generate_FFs(image_metadata,acq,channel,posnames=[],bkg_acq='',parameters={},verbose=False):
-    """
-    generate_FF Generate flat field to correct uneven illumination
-
-    :param image_metadata: Data Loader Class
-    :type image_metadata: Metadata Class
-    :param acq: name of acquisition
-    :type acq: str
-    :param channel: name of channel
-    :type channel: str
-    :return: flat field image
-    :rtype: np.array
-    """
-    if len(posnames)==0:
-        posnames = image_metadata.image_table[image_metadata.image_table.acq==acq].Position.unique()
-    Input = []
-    for posname in posnames:
-        data = {}
-        data['acq'] = acq
-        data['bkg_acq'] = bkg_acq
-        data['posname'] = posname
-        data['image_metadata'] = image_metadata
-        data['channel'] = channel
-        data['parameters'] = parameters
-        Input.append(data)
-    pfunc = partial(preprocess_images,FF=1,nuc_FF=1)
-    results = {}
-    with multiprocessing.Pool(60) as p:
-        if verbose:
-            iterable = tqdm(p.imap(pfunc,Input),total=len(Input),desc=str(datetime.now().strftime("%H:%M:%S"))+' '+'Calculating Flat Fields')
-        else:
-            iterable = p.imap(pfunc,Input)
-        for posname,nuc,signal,translation_x,translation_y in iterable:
-            results[posname] = {}
-            results[posname]['nuc'] = nuc
-            results[posname]['signal'] = signal
-
-    nuc_FF = torch.stack([results[posname]['nuc'].float() for posname in results.keys()])
-    nuc_FF = torch.quantile(nuc_FF,0.5,dim=0).numpy()
-    vmin,vmax = np.percentile(nuc_FF[np.isnan(nuc_FF)==False],[0.1,99.9])
-    nuc_FF[nuc_FF<vmin] = vmin
-    nuc_FF[nuc_FF>vmax] = vmax
-    nuc_FF[nuc_FF==0] = np.median(nuc_FF)
-    nuc_FF = np.median(nuc_FF)/nuc_FF
-
-    FF = torch.stack([results[posname]['signal'].float() for posname in results.keys()])
-    FF = torch.quantile(FF,0.5,dim=0).numpy()
-    vmin,vmax = np.percentile(FF[np.isnan(FF)==False],[0.1,99.9])
-    FF[FF<vmin] = vmin
-    FF[FF>vmax] = vmax
-    FF[FF==0] = np.median(FF)
-    FF = np.median(FF)/FF
-    return nuc_FF,FF
-
-def process_img(img,parameters,FF=1):
+def process_img(img,parameters,nuc=None,FF=1,constant=0):
     """
     process_img _summary_
 
@@ -957,33 +993,48 @@ def process_img(img,parameters,FF=1):
     :type parameters: _type_
     :param FF: _description_, defaults to 1
     :type FF: int, optional
+    :param constant: _description_, defaults to 0
+    :type constant: int, optional
     :return: _description_
     :rtype: _type_
-    """    
+    """
+    # Remove Constant
+    img = img-constant
     # FlatField 
     img = img*FF
     # Remove Dead Pixels
     img = median_filter(img,2) 
     # Smooth
     if parameters['highpass_smooth']>0:
-        img = gaussian_filter(img,parameters['highpass_smooth'])
+        if parameters['highpass_smooth_function'] == 'gaussian':
+            img = gaussian_filter(img,parameters['highpass_smooth']) 
+        elif parameters['highpass_smooth_function'] == 'median':
+            img = median_filter(img,parameters['highpass_smooth']) 
+        elif parameters['highpass_smooth_function'] == 'minimum':
+            img = minimum_filter(img,size=parameters['highpass_smooth']) 
+        elif 'percentile' in parameters['highpass_smooth_function']:
+            img = percentile_filter(img,int(parameters['highpass_function'].split('_')[-1]),size=parameters['highpass_smooth'])
+        elif 'rolling_ball' in parameters['highpass_smooth_function']:
+            img = gaussian_filter(restoration.rolling_ball(gaussian_filter(img,parameters['highpass_smooth']/5),radius=parameters['highpass_smooth'],num_threads=30),parameters['highpass_smooth'])
+        
     # Background Subtract
-    if parameters['highpass_function'] == 'gaussian':
-        bkg = gaussian_filter(img,parameters['highpass_sigma']) 
-    elif parameters['highpass_function'] == 'median':
-        bkg = median_filter(img,parameters['highpass_sigma']) 
-    elif parameters['highpass_function'] == 'minimum':
-        bkg = minimum_filter(img,size=parameters['highpass_sigma']) 
-    elif 'percentile' in parameters['highpass_function']:
-        bkg = percentile_filter(img,int(parameters['highpass_function'].split('_')[-1]),size=parameters['highpass_sigma'])
-    elif 'rolling_ball' in parameters['highpass_function']:
-        bkg = gaussian_filter(restoration.rolling_ball(gaussian_filter(img,parameters['highpass_sigma']/5),radius=parameters['highpass_sigma'],num_threads=30),parameters['highpass_sigma'])
-    else:
-        bkg = 0
-    img = img-bkg
+    if parameters['highpass_sigma']>0:
+        if parameters['highpass_function'] == 'gaussian':
+            bkg = gaussian_filter(img,parameters['highpass_sigma']) 
+        elif parameters['highpass_function'] == 'median':
+            bkg = median_filter(img,parameters['highpass_sigma']) 
+        elif parameters['highpass_function'] == 'minimum':
+            bkg = minimum_filter(img,size=parameters['highpass_sigma']) 
+        elif 'percentile' in parameters['highpass_function']:
+            bkg = percentile_filter(img,int(parameters['highpass_function'].split('_')[-1]),size=parameters['highpass_sigma'])
+        elif 'rolling_ball' in parameters['highpass_function']:
+            bkg = gaussian_filter(restoration.rolling_ball(gaussian_filter(img,parameters['highpass_sigma']/5),radius=parameters['highpass_sigma'],num_threads=30),parameters['highpass_sigma'])
+        else:
+            bkg = 0
+        img = img-bkg
     return img
 
-def preprocess_images(data,FF=1,nuc_FF=1):
+def preprocess_images(data,FF=1,nuc_FF=1,constant=0,nuc_constant=0):
     """
     preprocess_images _summary_
 
@@ -993,6 +1044,10 @@ def preprocess_images(data,FF=1,nuc_FF=1):
     :type FF: int, optional
     :param nuc_FF: _description_, defaults to 1
     :type nuc_FF: int, optional
+    :param constant: _description_, defaults to 0
+    :type constant: int, optional
+    :param nuc_constant: _description_, defaults to 0
+    :type nuc_constant: int, optional
     :return: _description_
     :rtype: _type_
     """    
@@ -1008,22 +1063,22 @@ def preprocess_images(data,FF=1,nuc_FF=1):
                                         Channel=parameters['nucstain_channel'],
                                         acq=acq).max(axis=2).astype(float)))
         nuc_raw = nuc.copy()
-        nuc = process_img(nuc,parameters,FF=nuc_FF)
+        nuc = process_img(nuc,parameters,FF=nuc_FF,constant=nuc_constant)
         img = ((image_metadata.stkread(Position=posname,
                                         Channel=channel,
                                         acq=acq).max(axis=2).astype(float)))
         img_raw = img.copy()
-        img = process_img(img,parameters,FF=FF)
+        img = process_img(img,parameters,FF=FF,constant=constant)
         if not bkg_acq=='':
             bkg = ((image_metadata.stkread(Position=posname,
                                             Channel=channel,
                                             acq=bkg_acq).max(axis=2).astype(float)))
             bkg_raw = bkg.copy()
-            bkg = process_img(bkg,parameters,FF=FF)
+            bkg = process_img(bkg,parameters,FF=FF,constant=constant)
             bkg_nuc = ((image_metadata.stkread(Position=posname,
                                             Channel=parameters['nucstain_channel'],
                                             acq=bkg_acq).max(axis=2).astype(float)))
-            bkg_nuc = process_img(bkg_nuc,parameters,FF=nuc_FF)
+            bkg_nuc = process_img(bkg_nuc,parameters,FF=nuc_FF,constant=nuc_constant)
             # Check if beads work here
             shift, error = register(nuc, bkg_nuc,10)
             if error!=np.inf:
@@ -1038,8 +1093,20 @@ def preprocess_images(data,FF=1,nuc_FF=1):
             img = img-bkg
             img_raw = img_raw.astype(float)-bkg_raw
         for iter in range(parameters['background_estimate_iters']):
-            img = img-gaussian_filter(restoration.rolling_ball(gaussian_filter(img,parameters['highpass_sigma']/5),radius=parameters['highpass_sigma'],num_threads=30),parameters['highpass_sigma'])
-            nuc = nuc-gaussian_filter(restoration.rolling_ball(gaussian_filter(nuc,parameters['highpass_sigma']/5),radius=parameters['highpass_sigma'],num_threads=30),parameters['highpass_sigma'])
+            img = img-gaussian_filter(
+                restoration.rolling_ball(
+                gaussian_filter(img,
+                                parameters['highpass_sigma']/5),
+                                radius=parameters['highpass_sigma'],
+                                num_threads=30),
+                parameters['highpass_sigma'])
+            nuc = nuc-gaussian_filter(
+                restoration.rolling_ball(
+                gaussian_filter(nuc,
+                                parameters['highpass_sigma']/5),
+                                radius=parameters['highpass_sigma'],
+                                num_threads=30),
+                parameters['highpass_sigma'])
         dtype = 'int32'
         nuc[nuc<np.iinfo(dtype).min] = np.iinfo(dtype).min
         img[img<np.iinfo(dtype).min] = np.iinfo(dtype).min
@@ -1103,7 +1170,7 @@ def preprocess_images(data,FF=1,nuc_FF=1):
         return posname,nuc,img,translation_x,translation_y,nuc_raw,img_raw
     except Exception as e:
         print(e,posname)
-        return posname,0,0,0,0
+        return posname,0,0,0,0,0,0
 
     
 def visualize_merge(img1,img2,color1=np.array([1,0,1]),color2=np.array([0,1,1]),figsize=[20,20],pvmin=5,pvmax=95,title=''):
