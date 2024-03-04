@@ -10,7 +10,8 @@ import sys
 import glob
 
 import numpy as np
-import cv2
+# import cv2 #opencv-python-headless
+import tifffile
 import pandas as pd
 import torch
 
@@ -102,6 +103,8 @@ def generate_filename(path,hybe,channel,file_type,model_type,dataset='',section=
         fname = dataset+'_'+model_type+'_'+file_type+'.csv'
     elif file_type == 'Geom':
         fname = dataset+'_'+section+'_'+model_type+'_'+file_type+'.wkt'
+    elif file_type == 'Figure':
+        fname = dataset+'_'+section+'_'+model_type+'_'+hybe+'_'+channel+'_'+file_type+'.png'
     else:
         update_user('Unsupported File Type '+backup_file_type+'->'+file_type,level=40,logger=logger)
         fname = dataset+'_'+section+'_'+hybe+'_'+channel+'_'+file_type
@@ -146,7 +149,10 @@ def save(data,path='',hybe='',channel='',file_type='',model_type='',dataset='',s
         data[data<np.iinfo('uint16').min] = np.iinfo('uint16').min
         data[data>np.iinfo('uint16').max] = np.iinfo('uint16').max
         # pylint: disable=no-member
-        cv2.imwrite(fname, data.astype('uint16'))
+        try:
+            cv2.imwrite(fname, data.astype('uint16'))
+        except:
+            tifffile.imwrite(fname, data.astype('uint16'))
         # pylint: enable=no-member
     elif file_type == 'stitched':
         torch.save(data,fname)
@@ -195,7 +201,10 @@ def load(path='',hybe='',channel='',file_type='anndata',model_type='',dataset=''
         elif file_type == 'mask':
             data = torch.load(fname)
         elif file_type == 'image':
-            data = cv2.imread(fname,cv2.IMREAD_UNCHANGED)
+            try:
+                data = cv2.imread(fname,cv2.IMREAD_UNCHANGED)
+            except:
+                data = tifffile.imread(fname)
             data = data.astype('uint16')
         elif file_type == 'stitched':
             data = torch.load(fname)
@@ -238,19 +247,19 @@ def update_user(message,level=20,logger=None):
         log = logging.getLogger('Unknown Logger')
     if level<=10:
         # pylint: disable=logging-not-lazy
-        log.debug(str(datetime.now().strftime("%H:%M:%S"))+' '+str(message))
+        log.debug(str(datetime.now().strftime("%Y %B %d %H:%M:%S"))+' '+str(message))
     elif level==20:
         # pylint: disable=logging-not-lazy
-        log.info(str(datetime.now().strftime("%H:%M:%S"))+' '+str(message))
+        log.info(str(datetime.now().strftime("%Y %B %d %H:%M:%S"))+' '+str(message))
     elif level==30:
         # pylint: disable=logging-not-lazy
-        log.warning(str(datetime.now().strftime("%H:%M:%S"))+' '+str(message))
+        log.warning(str(datetime.now().strftime("%Y %B %d %H:%M:%S"))+' '+str(message))
     elif level==40:
         # pylint: disable=logging-not-lazy
-        log.error(str(datetime.now().strftime("%H:%M:%S"))+' '+str(message))
+        log.error(str(datetime.now().strftime("%Y %B %d %H:%M:%S"))+' '+str(message))
     elif level>=50:
         # pylint: disable=logging-not-lazy
-        log.critical(str(datetime.now().strftime("%H:%M:%S"))+' '+str(message))
+        log.critical(str(datetime.now().strftime("%Y %B %d %H:%M:%S"))+' '+str(message))
 
 def save_polygon_list(polys,fname):
     """
