@@ -128,3 +128,4 @@ parameters['stain_correction'] = False
 parameters['stain_correction_downsample'] = 10
 parameters['stain_correction_kernel'] = 1000
 parameters['overlap'] = 0.02 # 2% overlap
+parameters['segment_min_size'] = parameters['segment_diameter']*10
