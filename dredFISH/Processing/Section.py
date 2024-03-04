@@ -94,7 +94,7 @@ class Section_Class(object):
         logging.basicConfig(
                     filename=os.path.join(self.path,'processing_log.txt'),filemode='a',
                     format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
-                    datefmt='%H:%M:%S',level=self.config.parameters['processing_log_level'], force=True)
+                    datefmt='%Y %B %d %H:%M:%S',level=self.config.parameters['processing_log_level'], force=True)
         self.log = logging.getLogger("Processing")
 
         src = os.path.join(Processing.__file__.split('dredFISH/P')[0],self.cword_config+'.py')
@@ -233,9 +233,9 @@ class Section_Class(object):
         if self.verbose:
             self.update_user(message,level=10)
             if length==0:
-                return tqdm(iterable,desc=str(datetime.now().strftime("%H:%M:%S"))+' '+message)
+                return tqdm(iterable,desc=str(datetime.now().strftime("%Y %B %d %H:%M:%S"))+' '+message)
             else:
-                return tqdm(iterable,total=length,desc=str(datetime.now().strftime("%H:%M:%S"))+' '+message)
+                return tqdm(iterable,total=length,desc=str(datetime.now().strftime("%Y %B %d %H:%M:%S"))+' '+message)
         else:
             return iterable
 
@@ -292,10 +292,30 @@ class Section_Class(object):
         if 'hybe' in hybe.lower():
             hybe = hybe.lower().split('hybe')[-1]
         acqs = [i for i in self.acqs if protocol+hybe+'_' in i.lower()]
+        if len(acqs)>1:
+            new_acqs = []
+            acq_times = []
+            """ Remove Partially Imaged Hybes """
+            for acq in acqs:
+                acq_metadata = self.image_metadata[self.image_metadata.acq==acq]
+                posnames = acq_metadata.Position.unique()
+                if len(posnames)<self.posnames.shape[0]:
+                    self.update_user('Ignoring Partially Imaged Acq '+acq,level=30)
+                else:
+                    avg_time = acq_metadata.TimestampImage.mean()
+                    acq_times.append(avg_time)
+            if len(new_acqs)>1:
+                acqs = [np.array(new_acqs)[np.argmax(np.array(acq_times))]]
+                self.update_user('Multiple Completed Acqs found choosing most recent '+str(acqs[0]),level=30)
+            elif len(new_acqs)==0:
+                self.update_user(f"No Complete Acqs found for {str(protocol)} {str(hybe)}",level=50)
+            else:
+                acqs = new_acqs
         if len(acqs)==0:
+            self.update_user(f"No Acqs found for {str(protocol)} {str(hybe)}",level=50)
             raise ValueError(protocol+hybe+' not found in acqs')
         else:
-            return acqs[-1]
+            return acqs[0]
 
     def stitcher(self,hybe,channel,acq='',bkg_acq=''):
         """
@@ -590,7 +610,8 @@ class Section_Class(object):
                 self.FF = self.load(channel=self.config.parameters['total_channel'],file_type='FF')
                 self.constant = self.load(channel=self.config.parameters['total_channel'],file_type='constant')
             else:
-                FF,constant = generate_FF(self.image_metadata,acq,channel,bkg_acq='',parameters=self.config.parameters,verbose=self.verbose)
+                # FF,constant = generate_FF(self.image_metadata,acq,channel,bkg_acq='',parameters=self.config.parameters,verbose=self.verbose)
+                FF,constant = generate_FF_constant(self.image_metadata,channel,posnames=self.posnames,bkg_acq='',parameters=self.config.parameters,verbose=self.verbose)
                 self.FF = FF
                 self.save(FF,channel=channel,file_type='FF')
                 self.save((FF*1000),hybe='FF',channel=channel,file_type='image_FF')
@@ -601,7 +622,8 @@ class Section_Class(object):
                 self.nuc_FF = self.load(channel=self.config.parameters['nucstain_channel'],file_type='FF')
                 self.nuc_constant = self.load(channel=self.config.parameters['nucstain_channel'],file_type='constant')
             else:
-                nuc_FF,nuc_constant = generate_FF(self.image_metadata,acq,self.config.parameters['nucstain_channel'],bkg_acq='',parameters=self.config.parameters,verbose=self.verbose)
+                # nuc_FF,nuc_constant = generate_FF(self.image_metadata,acq,self.config.parameters['nucstain_channel'],bkg_acq='',parameters=self.config.parameters,verbose=self.verbose)
+                nuc_FF,nuc_constant = generate_FF_constant(self.image_metadata,self.config.parameters['nucstain_channel'],posnames=self.posnames,bkg_acq='',parameters=self.config.parameters,verbose=self.verbose)
                 self.nuc_FF = nuc_FF
                 self.save(nuc_FF,channel=self.config.parameters['nucstain_channel'],file_type='FF')
                 self.save((nuc_FF*1000),hybe='FF',channel=self.config.parameters['nucstain_channel'],file_type='image_FF')
@@ -663,6 +685,8 @@ class Section_Class(object):
                 """ Total & Nuclei"""
                 if self.check_existance(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='stitched'):
                     nucstain = self.load(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='stitched')
+                    dapi_mask = nucstain<self.config.parameters['dapi_thresh']
+                    nucstain[dapi_mask] = 0
                     model = models.Cellpose(model_type='nuclei',gpu=self.config.parameters['segment_gpu'])
                     self.mask = torch.zeros_like(nucstain)
                 else:
@@ -681,9 +705,11 @@ class Section_Class(object):
                                     total = total+self.load(hybe=h,channel=c,file_type='stitched')
                             else:
                                 total=None
+                        total[dapi_mask] = 0
                     else:
                         if self.check_existance(hybe=self.config.parameters['total_acq'],channel=self.config.parameters['total_channel'],file_type='stitched'):
                             total = self.load(hybe=self.config.parameters['total_acq'],channel=self.config.parameters['total_channel'],file_type='stitched')
+                            total[dapi_mask] = 0
                             model = models.Cellpose(model_type='cyto2',gpu=self.config.parameters['segment_gpu'])
                             self.mask = torch.zeros_like(total)
                             if isinstance(nucstain,type(None)):
@@ -841,7 +867,7 @@ class Section_Class(object):
             self.xy = torch.zeros([unique_labels.shape[0],2],dtype=torch.int32)
             self.size = torch.zeros([unique_labels.shape[0],1],dtype=torch.int32)
             converter = {int(label):[] for label in unique_labels}
-            for i in tqdm(range(labels.shape[0]),desc=str(datetime.now().strftime("%H:%M:%S"))+' Generating Label Converter'):
+            for i in tqdm(range(labels.shape[0]),desc=str(datetime.now().strftime("%Y %B %d %H:%M:%S"))+' Generating Label Converter'):
                 converter[int(labels[i])].append(i)
             for i,label in tqdm(enumerate(unique_labels),total=unique_labels.shape[0],desc=str(datetime.now().strftime("%H:%M:%S"))+' Generating Cell Vectors and Metadata'):
                 m = converter[int(label)]
@@ -927,6 +953,134 @@ class Section_Class(object):
             dirname = os.path.dirname(fname)
             shutil.rmtree(dirname)
 
+def generate_constant_only(acq,image_metadata=None,channel=None,posnames=[],bkg_acq='',parameters={},verbose=False):
+    if 'mask' in channel:
+        return ''
+    else:
+        if len(posnames)==0:
+            posnames = image_metadata.image_table[image_metadata.image_table.acq==acq].Position.unique()
+        FF = []
+        if verbose:
+            iterable = tqdm(posnames,desc=str(datetime.now().strftime("%Y %B %d %H:%M:%S"))+' Generating FlatField '+acq+' '+channel)
+        else:
+            iterable = posnames
+        for posname in iterable:
+            try:
+                img = image_metadata.stkread(Position=posname,Channel=channel,acq=acq).min(2).astype(float)
+                img = median_filter(img,2)
+                img = torch.tensor(img)
+                if bkg_acq!='':
+                    bkg = image_metadata.stkread(Position=posname,Channel=channel,acq=bkg_acq).mean(2).astype(float)
+                    # bkg = median_filter(bkg,2)
+                    bkg = torch.tensor(bkg)
+                    img = img-bkg
+                FF.append(img)
+            except Exception as e:
+                print(posname,acq,bkg_acq)
+                print(e)
+                continue
+        # FF = torch.quantile(torch.dstack(FF),0.5,dim=2).numpy() # Assumption is that for each pixel half of the images wont have a cell there
+        FF = torch.dstack(FF)
+        constant = torch.min(FF,dim=2).values # There may be a more robust way 
+        constant = gaussian_filter(constant,50,mode='nearest')  # causes issues with corners
+        return constant
+
+
+def generate_FF_only(acq,image_metadata=None,channel=None,constant=0,posnames=[],bkg_acq='',parameters={},verbose=False):
+    """
+    generate_FF Generate flat field to correct uneven illumination
+
+    :param image_metadata: Data Loader Class
+    :type image_metadata: Metadata Class
+    :param acq: name of acquisition
+    :type acq: str
+    :param channel: name of channel
+    :type channel: str
+    :return: flat field image
+    :rtype: np.array
+    """
+    if 'mask' in channel:
+        return ''
+    else:
+        if len(posnames)==0:
+            posnames = image_metadata.image_table[image_metadata.image_table.acq==acq].Position.unique()
+        FF = []
+        if verbose:
+            iterable = tqdm(posnames,desc=str(datetime.now().strftime("%Y %B %d %H:%M:%S"))+' Generating FlatField '+acq+' '+channel)
+        else:
+            iterable = posnames
+        for posname in iterable:
+            try:
+                img = image_metadata.stkread(Position=posname,Channel=channel,acq=acq).min(2).astype(float)
+                img = median_filter(img,2)
+                img = torch.tensor(img)
+                if bkg_acq!='':
+                    bkg = image_metadata.stkread(Position=posname,Channel=channel,acq=bkg_acq).mean(2).astype(float)
+                    # bkg = median_filter(bkg,2)
+                    bkg = torch.tensor(bkg)
+                    img = img-bkg
+                FF.append(img)
+            except Exception as e:
+                print(posname,acq,bkg_acq)
+                print(e)
+                continue
+        # FF = torch.quantile(torch.dstack(FF),0.5,dim=2).numpy() # Assumption is that for each pixel half of the images wont have a cell there
+        FF = torch.dstack(FF)
+        FF = torch.mean(FF,dim=2).numpy() # There may be a more robust way in case of debris 
+        if np.max(constant.ravel())>0:
+            if isinstance(constant, torch.Tensor):
+                constant = constant.numpy().copy()
+            FF = FF-constant
+        FF = gaussian_filter(FF,50,mode='nearest') # causes issues with corners
+        vmin,vmid,vmax = np.percentile(FF[np.isnan(FF)==False],[0.1,50,99.9]) 
+        # Maybe add median filter to FF 
+        FF[FF<vmin] = vmin
+        FF[FF>vmax] = vmax
+        FF[FF==0] = vmid
+        FF = vmid/FF
+        return FF
+
+def optional_tqdm(iterable,verbose=True,desc='',total=0):
+    if verbose:
+        return tqdm(iterable,desc=str(datetime.now().strftime("%Y %B %d %H:%M:%S"))+' '+desc,total=total)
+    else:
+        return iterable
+
+def generate_FF_constant(image_metadata,channel,posnames=[],bkg_acq='',parameters={},verbose=False,ncpu=6):
+    """
+    generate_FF Generate flat field to correct uneven illumination
+
+    :param image_metadata: Data Loader Class
+    :type image_metadata: Metadata Class
+    :param acq: name of acquisition
+    :type acq: str
+    :param channel: name of channel
+    :type channel: str
+    :return: flat field image
+    :rtype: np.array
+    """
+    if 'mask' in channel:
+        return ''
+    if len(posnames)>0:
+        image_metadata_table = image_metadata.image_table[image_metadata.image_table.Position.isin(posnames)]
+    acqs = image_metadata_table.acq.unique()
+    strip_acqs = [i for i in acqs if 'strip' in i.lower()]
+    hybe_acqs = [i for i in acqs if 'hybe' in i.lower()]
+    pfunc = partial(generate_constant_only,image_metadata=image_metadata,channel=channel,posnames=posnames,bkg_acq='',parameters=parameters,verbose=False)
+    constants = []
+    with multiprocessing.Pool(ncpu) as p:
+        for constant in optional_tqdm(p.map(pfunc,strip_acqs),desc='Generating Image Constant',total=len(strip_acqs),verbose=verbose):
+            constants.append(constant)
+    constant = np.dstack(constants)
+    constant = np.mean(constant,axis=2)
+    pfunc = partial(generate_FF_only,constant=constant,image_metadata=image_metadata,channel=channel,posnames=posnames,bkg_acq='',parameters=parameters,verbose=False)
+    FFs = []
+    with multiprocessing.Pool(ncpu) as p:
+        for FF in optional_tqdm(p.map(pfunc,hybe_acqs),desc='Generating Flat Field',total=len(hybe_acqs),verbose=verbose):
+            FFs.append(FF)
+    FF = np.dstack(FFs)
+    FF = np.mean(FF,axis=2)
+    return FF,constant
 
 def generate_FF(image_metadata,acq,channel,posnames=[],bkg_acq='',parameters={},verbose=False):
     """
@@ -948,7 +1102,7 @@ def generate_FF(image_metadata,acq,channel,posnames=[],bkg_acq='',parameters={},
             posnames = image_metadata.image_table[image_metadata.image_table.acq==acq].Position.unique()
         FF = []
         if verbose:
-            iterable = tqdm(posnames,desc=str(datetime.now().strftime("%H:%M:%S"))+' Generating FlatField '+acq+' '+channel)
+            iterable = tqdm(posnames,desc=str(datetime.now().strftime("%Y %B %d %H:%M:%S"))+' Generating FlatField '+acq+' '+channel)
         else:
             iterable = posnames
         for posname in iterable:
