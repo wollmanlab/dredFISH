@@ -610,8 +610,8 @@ class Section_Class(object):
                 self.FF = self.load(channel=self.config.parameters['total_channel'],file_type='FF')
                 self.constant = self.load(channel=self.config.parameters['total_channel'],file_type='constant')
             else:
-                # FF,constant = generate_FF(self.image_metadata,acq,channel,bkg_acq='',parameters=self.config.parameters,verbose=self.verbose)
-                FF,constant = generate_FF_constant(self.image_metadata,channel,posnames=self.posnames,bkg_acq='',parameters=self.config.parameters,verbose=self.verbose)
+                FF,constant = generate_FF(self.image_metadata,acq,channel,bkg_acq='',parameters=self.config.parameters,verbose=self.verbose)
+                # FF,constant = generate_FF_constant(self.image_metadata,channel,posnames=self.posnames,bkg_acq='',parameters=self.config.parameters,verbose=self.verbose)
                 self.FF = FF
                 self.save(FF,channel=channel,file_type='FF')
                 self.save((FF*1000),hybe='FF',channel=channel,file_type='image_FF')
@@ -622,8 +622,8 @@ class Section_Class(object):
                 self.nuc_FF = self.load(channel=self.config.parameters['nucstain_channel'],file_type='FF')
                 self.nuc_constant = self.load(channel=self.config.parameters['nucstain_channel'],file_type='constant')
             else:
-                # nuc_FF,nuc_constant = generate_FF(self.image_metadata,acq,self.config.parameters['nucstain_channel'],bkg_acq='',parameters=self.config.parameters,verbose=self.verbose)
-                nuc_FF,nuc_constant = generate_FF_constant(self.image_metadata,self.config.parameters['nucstain_channel'],posnames=self.posnames,bkg_acq='',parameters=self.config.parameters,verbose=self.verbose)
+                nuc_FF,nuc_constant = generate_FF(self.image_metadata,acq,self.config.parameters['nucstain_channel'],bkg_acq='',parameters=self.config.parameters,verbose=self.verbose)
+                # nuc_FF,nuc_constant = generate_FF_constant(self.image_metadata,self.config.parameters['nucstain_channel'],posnames=self.posnames,bkg_acq='',parameters=self.config.parameters,verbose=self.verbose)
                 self.nuc_FF = nuc_FF
                 self.save(nuc_FF,channel=self.config.parameters['nucstain_channel'],file_type='FF')
                 self.save((nuc_FF*1000),hybe='FF',channel=self.config.parameters['nucstain_channel'],file_type='image_FF')
