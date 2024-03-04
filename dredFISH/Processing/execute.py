@@ -11,7 +11,7 @@ conda activate dredfish_3.9; nohup python -W ignore /home/zach/PythonRepos/dredF
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("metadata_path", type=str, help="Path to folder containing Raw Data /bigstore/Images20XX/User/Project/Dataset/")
-    parser.add_argument("-c","--cword_config", type=str,dest="cword_config",default='dredfish_processing_config', action='store',help="Name of Config File for analysis ie. dredfish_processing_config")
+    parser.add_argument("-c","--cword_config", type=str,dest="cword_config",default='dredfish_processing_config_tree', action='store',help="Name of Config File for analysis ie. dredfish_processing_config")
     parser.add_argument("-s","--section", type=str,dest="section",default='all', action='store',help="keyword in posnames to identify which section to process")
     parser.add_argument("-w","--well", type=str,dest="well",default='', action='store',help="keyword in well to identify which section to process")
     # parser.add_argument("-f","--fishdata", type=str,dest="fishdata",default='fishdata', action='store',help="fishdata name for save directory")
