@@ -333,29 +333,38 @@ class TissueMultiGraph:
 
         # find list of sections
         section_names = os.listdir(self.inputpath)
-        dfall_meta = []
-        matrix_all = []
+        # dfall_meta = []
+        # matrix_all = []
+        adatas = []
         x_max = 0
-        y_max = 0
         for s in section_names:
             try:
+                print(f"attempting to load {s}")
                 section_path = os.path.join(self.inputpath,s)
-                meta = fileu.load(section_path,file_type='metadata',model_type=measurement_type)
-                matrix = fileu.load(section_path,file_type='matrix',model_type=measurement_type)
+                # meta = fileu.load(section_path,file_type='metadata',model_type=measurement_type)
+                # matrix = fileu.load(section_path,file_type='matrix',model_type=measurement_type)
+                adata = fileu.load(section_path,file_type='anndata',model_type=measurement_type)
                 if np.array(hybes).shape[0]>0:
-                    matrix = np.array(matrix[hybes])
-                meta['stage_x'] = meta['stage_x'] + x_max
-                x_max = meta['stage_x'].max()
-                dfall_meta.append(meta)
-                matrix_all.append(matrix)
+                #     matrix = np.array(matrix[hybes])
+                    adata[adata.var.index.isin(hybes)]
+                # meta['stage_x'] = meta['stage_x'] + x_max
+                # x_max = meta['stage_x'].max()
+                adata.obs['stage_x'] = adata.obs['stage_x'] + x_max
+                x_max = adata.obs['stage_x'].max()
+                # dfall_meta.append(meta)
+                # matrix_all.append(matrix)
+                adatas.append(adata)
             except:
-                print('Unable to load '+str(section_path))
+                print('Unable to load '+str(s))
 
-        dfall_meta = pd.concat(dfall_meta)
-        FISHbasis = np.vstack(matrix_all)
-        XY = np.array(dfall_meta[["stage_x","stage_y"]])
-        S =  np.array(dfall_meta[["section_index"]])[:,0]
-
+        # dfall_meta = pd.concat(dfall_meta)
+        # FISHbasis = np.vstack(matrix_all)
+        adata = anndata.concat(adatas)
+        print(f"{adata.shape[0]} cells across {adata.obs['section_index'].unique().shape[0]} sections")
+        XY = np.array(adata.obs[["stage_x","stage_y"]])
+        S =  np.array(adata.obs[["section_index"]])[:,0]
+        FISHbasis = adata.X.copy()
+        adata.layers['raw'] = FISHbasis.copy()
         if norm == 'default':
             # FISH basis is the raw count matrices from imaging; normalize data
             FISHbasis_norm = basicu.normalize_fishdata(FISHbasis, norm_cell=norm_cell, norm_basis=norm_basis)
@@ -367,16 +376,22 @@ class TissueMultiGraph:
             FISHbasis_norm = basicu.normalize_fishdata_log_regress(FISHbasis)
         else:
             FISHbasis_norm = FISHbasis
-        
+        adata.X = FISHbasis_norm
         # creating first layer - cell tissue graph
-        TG = TissueGraph(feature_mat=FISHbasis_norm,
-                         feature_mat_raw=FISHbasis,
+        # TG = TissueGraph(feature_mat=FISHbasis_norm,
+        #                  feature_mat_raw=FISHbasis,
+        #                  basepath=self.basepath,
+        #                  dataset = self.dataset,
+        #                  layer_type="cell", 
+        #                  obs=dfall_meta, # metadata carries over
+        #                  layers=data.layers, # layers from anndata
+        #                  redo=True)
+        TG = TissueGraph(adata=adata,
                          basepath=self.basepath,
                          dataset = self.dataset,
-                         layer_type="cell", 
-                         obs=dfall_meta, # metadata carries over
+                         layer_type="cell",
                          redo=True)
-        
+
         # add observations and init size to 1 for all cells
         TG.node_size = np.ones((FISHbasis_norm.shape[0],))
 
@@ -748,8 +763,8 @@ class TissueGraph:
     """
     def __init__(self, basepath=None, layer_type=None, dataset=None,
                        feature_mat=None, feature_mat_raw=None,
-                       redo=False, obs=None,
-                       quick_load_cell_obs=False
+                       redo=False, obs=None,layers=None,
+                       quick_load_cell_obs=False,adata=None
         ):
         """Create a TissueGraph object
         
@@ -838,8 +853,10 @@ class TissueGraph:
             if isinstance(feature_mat,tuple): 
                 feature_mat = scipy.sparse.csr_matrix(feature_mat)
 
-            # The main data container is an anndata, initalize with feature_mat  
-            if feature_mat is None: 
+            # The main data container is an anndata, initalize with feature_mat
+            if adata is not None:
+                self.adata = adata.copy()
+            elif feature_mat is None: 
                 self.adata = anndata.AnnData(feature_mat, obs=obs)
             else: 
                 self.adata = anndata.AnnData(feature_mat, obs=obs,dtype=feature_mat.dtype) # the tissuegraph AnnData object
@@ -847,7 +864,9 @@ class TissueGraph:
             if feature_mat_raw is not None:
                 self.adata.layers['raw'] = feature_mat_raw
 
-            
+        if layers!=None:
+            self.adata.layers = layers
+
         return None
     
     def is_empty(self):
