@@ -6,7 +6,7 @@ import dredFISH.Processing as Processing
 from dredFISH.Processing.Section import *
 import time
 """
-conda activate dredfish_3.9; python -W ignore /home/zach/PythonRepos/dredFISH/dredFISH/Processing/execute.py /orangedata/Images2023/Gaby/dredFISH/Acrydite_77.5.A_DPNMF_97.5.B_2023Feb16/ -c dredfish_processing_config_v1; conda deactivate
+conda activate dredfish_3.9; nohup python -W ignore /home/zach/PythonRepos/dredFISH/dredFISH/Processing/execute.py /orangedata/Images2023/Gaby/dredFISH/Acrydite_77.5.A_DPNMF_97.5.B_2023Feb16/ -c dredfish_processing_config_v1 -w A; conda deactivate
 """
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -37,11 +37,11 @@ if __name__ == '__main__':
         posnames = np.unique(image_metadata.image_table[np.isin(image_metadata.image_table.acq,hybe)].Position)
         sections = np.unique([i.split('-Pos')[0] for i in posnames if '-Pos' in i])
     else:
-        sections = [args.section]
+        sections = np.array([args.section])
     if sections.shape[0]==0:
-        sections = ['Section1']
+        sections = np.array(['Section1'])
     if args.well!='':
-        sections = [i for i in sections if args.well in i]
+        sections = np.array([i for i in sections if args.well in i])
     # np.random.shuffle(sections)
     print(sections)
     completion_array = np.array([False for i in sections])
