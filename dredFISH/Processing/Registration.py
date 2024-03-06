@@ -59,7 +59,8 @@ class Registration_Class(object):
         self.image_metadata = ''
         self.verbose=verbose
         self.side = ''
-        self.epochs = 10000
+        self.epochs = 5000
+        self.hidden_size = 8
 
         for handler in logging.root.handlers[:]:
             logging.root.removeHandler(handler)
@@ -118,9 +119,7 @@ class Registration_Class(object):
                 continue
             self.set_section_index()
             self.set_registration_points()
-            self.calculate_transformation()
-            self.apply_transformation()
-            self.view_transformation()
+            self.register()
             completed = False
             while not completed:
                 message = str(robust_input(" Ready To Save?",dtype='str')).lower()
@@ -532,16 +531,18 @@ class Registration_Class(object):
             np.random.shuffle(x)
             np.random.shuffle(y)
             axs[0].set_title('Pick Left Side First')
-            axs[0].scatter(x,y,s=5,c='w',picker=True)
+            axs[0].scatter(x,y,s=25,c='w',picker=True)
             idxs = np.random.choice(np.array(range(ref_X.shape[0])),100000)
-            axs[0].scatter(ref_X[idxs],ref_Y[idxs],s=1,c=ref_C[idxs])
+            axs[0].scatter(ref_X[idxs],ref_Y[idxs],s=5,c=ref_C[idxs])
+            axs[0].grid()
             x = np.linspace(X.min(),X.max(),100000)
             y = np.linspace(Y.min(),Y.max(),100000)
             np.random.shuffle(x)
             np.random.shuffle(y)
-            axs[1].scatter(x,y,s=5,c='w',picker=True)
+            axs[1].scatter(x,y,s=25,c='w',picker=True)
             idxs = np.random.choice(np.array(range(X.shape[0])),100000)
-            axs[1].scatter(X[idxs],Y[idxs],s=1,c=C[idxs],cmap='jet')
+            axs[1].scatter(X[idxs],Y[idxs],s=5,c=C[idxs],cmap='jet')
+            axs[1].grid()
             fig.canvas.mpl_connect('pick_event', onpick)
             plt.show()
 
@@ -605,6 +606,20 @@ class Registration_Class(object):
         self.data.uns['registration_points'] = df_points
         self.data.uns['reference_data'] = temp
 
+    def register(self):
+        completed = False
+        while not completed:
+            plt.close('all')
+            self.calculate_transformation()
+            self.apply_transformation()
+            self.view_transformation()
+            out = str(robust_input("Satisfied? (Y/hidden_size): ",dtype='str'))
+            if 'y' in out.lower():
+                completed = True
+            else:
+                self.hidden_size  = int(out)
+
+
     def calculate_transformation(self):
         """ Use Points to calculate transformation"""
         self.update_user('Calculating Transformation',level=20)
@@ -621,8 +636,8 @@ class Registration_Class(object):
 
         # Create the neural network model
         model = Sequential([
-            Dense(16, activation='relu', input_shape=(2,)),  # Hidden layer with ReLU activation
-            Dense(16, activation='relu'),  # Hidden layer with ReLU activation
+            Dense(self.hidden_size , activation='relu', input_shape=(2,)),  # Hidden layer with ReLU activation
+            Dense(self.hidden_size , activation='relu'),  # Hidden layer with ReLU activation
             Dense(2)  # Output layer with 2 neurons for predicted coordinates
         ])
 
@@ -689,10 +704,10 @@ class Registration_Class(object):
         plt.savefig(path,dpi=200)
         plt.show(block=False)
 
-        fig = plt.figure(figsize=[5,5])
+        fig = plt.figure(figsize=[10,10])
         fig.suptitle('Pred vs Ref')
-        plt.scatter(data.uns['reference_data'].loc[:,'ccf_z'],data.uns['reference_data'].loc[:,'ccf_y'],s=0.1,c='k',alpha=0.5)
-        plt.scatter(data.obs['ccf_z'],data.obs['ccf_y'],s=0.1,c='r',alpha=0.5)
+        plt.scatter(data.uns['reference_data'].loc[:,'ccf_z'],data.uns['reference_data'].loc[:,'ccf_y'],s=5,c='k',alpha=0.5)
+        plt.scatter(data.obs['ccf_z'],data.obs['ccf_y'],s=5,c='r',alpha=0.5)
         path = self.generate_filename('Registration','Aligned','Figure',model_type=self.model_type)
         plt.savefig(path,dpi=200)
         plt.show(block=False)
