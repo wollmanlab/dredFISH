@@ -398,7 +398,10 @@ class Section_Class(object):
                 y_max,x_max = xy.max(0)+img_shape+self.config.parameters['border']
                 x_range = np.array(range(x_min,x_max+1))
                 y_range = np.array(range(y_min,y_max+1))
-                stitched = torch.zeros([len(x_range),len(y_range),4],dtype=torch.int32)
+                if self.config.parameters['stitch_raw']:
+                    stitched = torch.zeros([len(x_range),len(y_range),4],dtype=torch.int32)
+                else:
+                    stitched = torch.zeros([len(x_range),len(y_range),2],dtype=torch.int32)
                 Input = []
                 for posname in self.posnames:
                     data = {}
@@ -435,13 +438,15 @@ class Section_Class(object):
                         results[posname]['signal'] = signal
                         results[posname]['translation_x'] = translation_x
                         results[posname]['translation_y'] = translation_y
-                        results[posname]['nuc_raw'] = nuc_raw
-                        results[posname]['signal_raw'] = signal_raw
+                        if self.config.parameters['stitch_raw']:
+                            results[posname]['nuc_raw'] = nuc_raw
+                            results[posname]['signal_raw'] = signal_raw
                 for posname in self.generate_iterable(results.keys(),'Stitching '+acq+'_'+channel,length=len(results.keys())):
                     nuc = results[posname]['nuc']
                     signal = results[posname]['signal']
-                    nuc_raw = results[posname]['nuc_raw']
-                    signal_raw = results[posname]['signal_raw']
+                    if self.config.parameters['stitch_raw']:
+                        nuc_raw = results[posname]['nuc_raw']
+                        signal_raw = results[posname]['signal_raw']
                     translation_x = results[posname]['translation_x']
                     translation_y = results[posname]['translation_y']
                     if isinstance(translation_x,str):
@@ -482,8 +487,9 @@ class Section_Class(object):
                     try:
                         stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),0] = nuc
                         stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),1] = signal
-                        stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),2] = nuc_raw
-                        stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),3] = signal_raw
+                        if self.config.parameters['stitch_raw']:
+                            stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),2] = nuc_raw
+                            stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),3] = signal_raw
                     except Exception as e:
                         print(posname,'Placing Image in Stitch with registration failed')
                         print(e)
@@ -491,15 +497,17 @@ class Section_Class(object):
                         translation_y = 0
                         stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),0] = nuc
                         stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),1] = signal
-                        stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),2] = nuc_raw
-                        stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),3] = signal_raw
+                        if self.config.parameters['stitch_raw']:
+                            stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),2] = nuc_raw
+                            stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),3] = signal_raw
 
                 if len(redo_posnames)>0:
                     for posname in self.generate_iterable(redo_posnames,'Redoing Failed Positions '+acq+'_'+channel,length=len(redo_posnames)):
                         nuc = results[posname]['nuc']
                         signal = results[posname]['signal']
-                        nuc_raw = results[posname]['nuc_raw']
-                        signal_raw = results[posname]['signal_raw']
+                        if self.config.parameters['stitch_raw']:
+                            nuc_raw = results[posname]['nuc_raw']
+                            signal_raw = results[posname]['signal_raw']
 
                         translation_x = results[posname]['translation_x']
                         translation_y = results[posname]['translation_y']
@@ -520,54 +528,9 @@ class Section_Class(object):
 
                         stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),0] = nuc
                         stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),1] = signal
-                        stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),2] = nuc_raw
-                        stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),3] = signal_raw
-                # if self.config.parameters['stain_correction']:
-                #     image = torch.clone(stitched[:,:,1]).float()
-                #     downsample_factor = self.config.parameters['stain_correction_downsample']
-                #     offsets = range(downsample_factor)  # Different offsets for subsampling
-
-                #     # Calculate the dimensions after padding
-                #     padded_height = (image.shape[0] + downsample_factor - 1) // downsample_factor * downsample_factor
-                #     padded_width = (image.shape[1] + downsample_factor - 1) // downsample_factor * downsample_factor
-
-                #     # Create a new image with zeros and copy the original image into it
-                #     padded_image = torch.zeros((padded_height, padded_width)).float()
-                #     padded_image[:image.shape[0], :image.shape[1]] = torch.clone(image).float()
-
-                #     # Initialize a tensor to store the subsampled images
-                #     subsampled_images = []
-
-                #     for offset_x in offsets:
-                #         for offset_y in offsets:
-                #             # Select pixels with the given offset and subsample factor
-                #             subsampled_region = padded_image[offset_x::downsample_factor, offset_y::downsample_factor]
-
-                #             # Convert the region to a tensor and append it to the list
-                #             subsampled_images.append(subsampled_region)
-
-                #     # Stack the subsampled images along a new axis
-                #     subsampled_stack = torch.stack(subsampled_images, dim=0)
-
-                #     # Calculate the mean along the new axis
-                #     downsampled_image = torch.mean(subsampled_stack, dim=0)
-
-                #     # blurred_image = gaussian_filter(downsampled_image.numpy(), sigma=500/downsample_factor)
-                #     blurred_image = gaussian_filter(median_filter(downsampled_image.numpy(), 
-                #                                                   size=int(self.config.parameters['stain_correction_kernel']/downsample_factor)),
-                #                                                   sigma=self.config.parameters['stain_correction_kernel']/(10*downsample_factor)) 
-                #     def upsample_tensor(tensor, target_size):
-                #         import torch.nn.functional as F
-                #         return F.interpolate(tensor.unsqueeze(0).unsqueeze(0), size=target_size, mode='bilinear', align_corners=False).squeeze().numpy()
-
-                #     upsampled_blurred_image = upsample_tensor(torch.tensor(blurred_image), image.shape)
-
-                #     out_image_tensor = torch.tensor(upsampled_blurred_image)
-                #     correction_image = image * (out_image_tensor.float().mean()/out_image_tensor.float())
-                #     correction_image[np.isnan(correction_image)] = 0
-                #     correction_image[image==0] = 0
-
-                #     stitched[:,:,1] = correction_image
+                        if self.config.parameters['stitch_raw']:
+                            stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),2] = nuc_raw
+                            stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),3] = signal_raw
 
                 self.save(stitched[:,:,0],hybe=hybe,channel=self.config.parameters['nucstain_channel'],file_type='stitched')
                 self.save(stitched[:,:,1],hybe=hybe,channel=channel,file_type='stitched')
@@ -581,19 +544,19 @@ class Section_Class(object):
                 scale = (np.array(signal.shape)*self.config.parameters['ratio']).astype(int)
                 signal_down = np.array(Image.fromarray(signal.astype(float)).resize((scale[1],scale[0]), Image.BICUBIC))
                 self.save(signal_down,hybe=hybe,channel=channel,file_type='image')
-
-                self.save(stitched[:,:,2],hybe=hybe,channel=self.config.parameters['nucstain_channel'],file_type='stitched_raw')
-                self.save(stitched[:,:,3],hybe=hybe,channel=channel,file_type='stitched_raw')
-                nuclei_raw = stitched[self.config.parameters['border']:-self.config.parameters['border'],
-                                self.config.parameters['border']:-self.config.parameters['border'],2].numpy()
-                scale_raw = (np.array(nuclei_raw.shape)*self.config.parameters['ratio']).astype(int)
-                nuclei_raw_down = np.array(Image.fromarray(nuclei_raw.astype(float)).resize((scale_raw[1],scale_raw[0]), Image.BICUBIC))
-                self.save(nuclei_raw_down,hybe=hybe,channel=self.config.parameters['nucstain_channel'],file_type='image_raw')
-                signal_raw = stitched[self.config.parameters['border']:-self.config.parameters['border'],
-                                self.config.parameters['border']:-self.config.parameters['border'],3].numpy()
-                scale_raw = (np.array(signal_raw.shape)*self.config.parameters['ratio']).astype(int)
-                signal_raw_down = np.array(Image.fromarray(signal_raw.astype(float)).resize((scale_raw[1],scale_raw[0]), Image.BICUBIC))
-                self.save(signal_raw_down,hybe=hybe,channel=channel,file_type='image_raw')
+                if self.config.parameters['stitch_raw']:
+                    self.save(stitched[:,:,2],hybe=hybe,channel=self.config.parameters['nucstain_channel'],file_type='stitched_raw')
+                    self.save(stitched[:,:,3],hybe=hybe,channel=channel,file_type='stitched_raw')
+                    nuclei_raw = stitched[self.config.parameters['border']:-self.config.parameters['border'],
+                                    self.config.parameters['border']:-self.config.parameters['border'],2].numpy()
+                    scale_raw = (np.array(nuclei_raw.shape)*self.config.parameters['ratio']).astype(int)
+                    nuclei_raw_down = np.array(Image.fromarray(nuclei_raw.astype(float)).resize((scale_raw[1],scale_raw[0]), Image.BICUBIC))
+                    self.save(nuclei_raw_down,hybe=hybe,channel=self.config.parameters['nucstain_channel'],file_type='image_raw')
+                    signal_raw = stitched[self.config.parameters['border']:-self.config.parameters['border'],
+                                    self.config.parameters['border']:-self.config.parameters['border'],3].numpy()
+                    scale_raw = (np.array(signal_raw.shape)*self.config.parameters['ratio']).astype(int)
+                    signal_raw_down = np.array(Image.fromarray(signal_raw.astype(float)).resize((scale_raw[1],scale_raw[0]), Image.BICUBIC))
+                    self.save(signal_raw_down,hybe=hybe,channel=channel,file_type='image_raw')
                 return stitched
 
     def stitch(self):
@@ -1211,23 +1174,27 @@ def preprocess_images(data,FF=1,nuc_FF=1,constant=0,nuc_constant=0):
     image_metadata = data['image_metadata']
     channel = data['channel']
     parameters = data['parameters']
-
+    img_raw = None
+    nuc_raw = None
     try:
         nuc = ((image_metadata.stkread(Position=posname,
                                         Channel=parameters['nucstain_channel'],
                                         acq=acq).max(axis=2).astype(float)))
-        nuc_raw = nuc.copy()
+        if parameters['stitch_raw']:
+            nuc_raw = nuc.copy()
         nuc = process_img(nuc,parameters,FF=nuc_FF,constant=nuc_constant)
         img = ((image_metadata.stkread(Position=posname,
                                         Channel=channel,
                                         acq=acq).max(axis=2).astype(float)))
-        img_raw = img.copy()
+        if parameters['stitch_raw']:
+            img_raw = img.copy()
         img = process_img(img,parameters,FF=FF,constant=constant)
         if not bkg_acq=='':
             bkg = ((image_metadata.stkread(Position=posname,
                                             Channel=channel,
                                             acq=bkg_acq).max(axis=2).astype(float)))
-            bkg_raw = bkg.copy()
+            if parameters['stitch_raw']:
+                bkg_raw = bkg.copy()
             bkg = process_img(bkg,parameters,FF=FF,constant=constant)
             bkg_nuc = ((image_metadata.stkread(Position=posname,
                                             Channel=parameters['nucstain_channel'],
@@ -1242,10 +1209,12 @@ def preprocess_images(data,FF=1,nuc_FF=1,constant=0,nuc_constant=0):
                 y_correction = np.array(range(bkg.shape[0]))+translation_y
                 i2 = interpolate.interp2d(x_correction,y_correction,bkg,fill_value=None)
                 bkg = i2(range(bkg.shape[1]), range(bkg.shape[0]))
-                i2 = interpolate.interp2d(x_correction,y_correction,bkg_raw,fill_value=None)
-                bkg_raw = i2(range(bkg_raw.shape[1]), range(bkg_raw.shape[0]))
+                if parameters['stitch_raw']:
+                    i2 = interpolate.interp2d(x_correction,y_correction,bkg_raw,fill_value=None)
+                    bkg_raw = i2(range(bkg_raw.shape[1]), range(bkg_raw.shape[0]))
             img = img-bkg
-            img_raw = img_raw.astype(float)-bkg_raw
+            if parameters['stitch_raw']:
+                img_raw = img_raw.astype(float)-bkg_raw
         for iter in range(parameters['background_estimate_iters']):
             img = img-gaussian_filter(
                 restoration.rolling_ball(
@@ -1264,33 +1233,39 @@ def preprocess_images(data,FF=1,nuc_FF=1,constant=0,nuc_constant=0):
         dtype = 'int32'
         nuc[nuc<np.iinfo(dtype).min] = np.iinfo(dtype).min
         img[img<np.iinfo(dtype).min] = np.iinfo(dtype).min
-        img_raw[img_raw<np.iinfo(dtype).min] = np.iinfo(dtype).min
-        nuc_raw[nuc_raw<np.iinfo(dtype).min] = np.iinfo(dtype).min
+        if parameters['stitch_raw']:
+            img_raw[img_raw<np.iinfo(dtype).min] = np.iinfo(dtype).min
+            nuc_raw[nuc_raw<np.iinfo(dtype).min] = np.iinfo(dtype).min
         nuc[nuc>np.iinfo(dtype).max] = np.iinfo(dtype).max
         img[img>np.iinfo(dtype).max] = np.iinfo(dtype).max
-        img_raw[img_raw>np.iinfo(dtype).max] = np.iinfo(dtype).max
-        nuc_raw[nuc_raw>np.iinfo(dtype).max] = np.iinfo(dtype).max
+        if parameters['stitch_raw']:
+            img_raw[img_raw>np.iinfo(dtype).max] = np.iinfo(dtype).max
+            nuc_raw[nuc_raw>np.iinfo(dtype).max] = np.iinfo(dtype).max
         
         img = torch.tensor(img,dtype=torch.int32)#+np.iinfo('int16').min
         nuc = torch.tensor(nuc,dtype=torch.int32)#+np.iinfo('int16').min
-        img_raw = torch.tensor(img_raw,dtype=torch.int32)#+np.iinfo('int16').min
-        nuc_raw = torch.tensor(nuc_raw,dtype=torch.int32)#+np.iinfo('int16').min
+        if parameters['stitch_raw']:
+            img_raw = torch.tensor(img_raw,dtype=torch.int32)#+np.iinfo('int16').min
+            nuc_raw = torch.tensor(nuc_raw,dtype=torch.int32)#+np.iinfo('int16').min
         
         if parameters['stitch_rotate']!=0:
             img = torch.rot90(img,parameters['stitch_rotate'])
             nuc = torch.rot90(nuc,parameters['stitch_rotate'])
-            img_raw = torch.rot90(img_raw,parameters['stitch_rotate'])
-            nuc_raw = torch.rot90(nuc_raw,parameters['stitch_rotate'])
+            if parameters['stitch_raw']:
+                img_raw = torch.rot90(img_raw,parameters['stitch_rotate'])
+                nuc_raw = torch.rot90(nuc_raw,parameters['stitch_rotate'])
         if parameters['stitch_flipud']:
             img = torch.flipud(img)
             nuc = torch.flipud(nuc)
-            img_raw = torch.flipud(img_raw)
-            nuc_raw = torch.flipud(nuc_raw)
+            if parameters['stitch_raw']:
+                img_raw = torch.flipud(img_raw)
+                nuc_raw = torch.flipud(nuc_raw)
         if parameters['stitch_fliplr']:
             img = torch.fliplr(img)
             nuc = torch.fliplr(nuc)
-            img_raw = torch.fliplr(img_raw)
-            nuc_raw = torch.fliplr(nuc_raw)
+            if parameters['stitch_raw']:
+                img_raw = torch.fliplr(img_raw)
+                nuc_raw = torch.fliplr(nuc_raw)
         if 'destination' in data.keys():
             destination = data['destination']
             """ Register to Correct Stage Error """
