@@ -27,7 +27,8 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
 from collections import Counter
 
-
+import matplotlib as mpl
+mpl.rcParams['figure.dpi'] = 50
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -94,7 +95,7 @@ class Registration_Class(object):
         self.load_reference_data()
         self.model_type = 'total' #FIX
         self.load_data()
-        self.preview()
+        # self.preview()
         self.filter_cells()
         self.center_rotate()
         self.split()
@@ -263,9 +264,6 @@ class Registration_Class(object):
         reference_data['ccf_x'] = reference_data['ccf_x'].astype(float)
         reference_data['ccf_y'] = reference_data['ccf_y'].astype(float)
         reference_data['ccf_z'] = reference_data['ccf_z'].astype(float)
-        # reference_data['x'] = reference_data['x'].astype(float)
-        # reference_data['y'] = reference_data['y'].astype(float)
-        # reference_data['z'] = reference_data['z'].astype(float)
         self.reference_data = reference_data
 
     def load_data(self):
@@ -300,67 +298,46 @@ class Registration_Class(object):
         # y = np.log10(np.clip(y,1,None))
         vmin,vmax = np.percentile(c,[5,95])
         c = np.clip(c,vmin,vmax)
-        plt.figure(figsize=[5,5])
-        plt.title('Filter Cells')
-        idx = np.random.choice(np.array(range(x.shape[0])),100000)
-        plt.scatter(x[idx],y[idx],s=0.1,c=c[idx],cmap='jet')
-        plt.xlabel('Log '+x_column)
-        plt.ylabel(y_column)
-        plt.grid()
-        cbar = plt.colorbar()
-        cbar.ax.set_title('Log Sum')
-        plt.show(block=False)
-        time.sleep(2)
+
+        self.x_min = 3
+        self.x_max = 4.5
+        self.y_min = 4
+        self.y_max = 25
+        completed = False
         print(' ')
-        print(' Set Filter Gates ')
-        x_min = float(robust_input("Enter min dapi value: ",dtype='float'))
-        x_max = float(robust_input("Enter max dapi value: ",dtype='float'))
+        while not completed:
+            plt.close('all')
+            m = (x>self.x_min)&(x<self.x_max)&(y>self.y_min)&(y<self.y_max)
+            plt.figure(figsize=[5,5])
+            plt.title('Filter Gates')
+            plt.plot([self.x_min,self.x_max],[self.y_min,self.y_min],c='k')
+            plt.plot([self.x_min,self.x_max],[self.y_max,self.y_max],c='k')
+            plt.plot([self.x_min,self.x_min],[self.y_min,self.y_max],c='k')
+            plt.plot([self.x_max,self.x_max],[self.y_min,self.y_max],c='k')
+            idx = np.random.choice(np.array(range(x.shape[0])),100000)
+            plt.scatter(x[idx],y[idx],s=0.1,c=c[idx],cmap='jet')
+            plt.grid()
+            plt.xlabel('Log '+x_column)
+            plt.ylabel('Log '+y_column)
+            cbar = plt.colorbar()
+            cbar.ax.set_title('Log Sum')
+            path = self.generate_filename('Registration','FilterGates','Figure',model_type=self.model_type)
+            plt.savefig(path,dpi=200)
+            plt.show(block=False)
+            out = str(robust_input("Satisfied with these gates? (Y/N): ",dtype='str'))
+            if 'y' in out.lower():
+                completed = True
+            else:
+                print(' Set Filter Gates ')
+                self.x_min = float(robust_input("Enter min dapi value: ",dtype='float'))
+                self.x_max = float(robust_input("Enter max dapi value: ",dtype='float'))
 
-        y_min = float(robust_input("Enter min size value: ",dtype='float'))
-        y_max = float(robust_input("Enter max size value: ",dtype='float'))
-
-        plt.close('all')
-        m = (x>x_min)&(x<x_max)&(y>y_min)&(y<y_max)
-
-        plt.figure(figsize=[5,5])
-        plt.title('Filter Gates')
-        plt.plot([x_min,x_max],[y_min,y_min],c='k')
-        plt.plot([x_min,x_max],[y_max,y_max],c='k')
-        plt.plot([x_min,x_min],[y_min,y_max],c='k')
-        plt.plot([x_max,x_max],[y_min,y_max],c='k')
-        idx = np.random.choice(np.array(range(x.shape[0])),100000)
-        plt.scatter(x[idx],y[idx],s=0.1,c=c[idx],cmap='jet')
-        plt.grid()
-        plt.xlabel('Log '+x_column)
-        plt.ylabel('Log '+y_column)
-        cbar = plt.colorbar()
-        cbar.ax.set_title('Log Sum')
-        path = self.generate_filename('Registration','FilterGates','Figure',model_type=self.model_type)
-        plt.savefig(path)
-        plt.show(block=False)
+                self.y_min = float(robust_input("Enter min size value: ",dtype='float'))
+                self.y_max = float(robust_input("Enter max size value: ",dtype='float'))
 
         self.data = self.data[m,:]
 
-        X = np.array(self.data.obs['x'].values).ravel()
-        Y = np.array(self.data.obs['y'].values).ravel()
-        C = self.data.X.sum(1)
-        C = np.log10(np.clip(C,1,None))
-        vmin,vmax = np.percentile(C,[5,95])
-        C = np.clip(C,vmin,vmax)
-        x = X
-        y = Y
-        c = C.copy()
-        plt.figure(figsize=[5,5])
-        plt.title('Filtered Cells Preview')
-        idx = np.random.choice(np.array(range(x.shape[0])),100000)
-        plt.scatter(x[idx],y[idx],s=0.1,c=c[idx],cmap='jet')
-        cbar = plt.colorbar()
-        cbar.ax.set_title('Log Sum')
-        path = self.generate_filename('Registration','FilteredCells','Figure',model_type=self.model_type)
-        plt.savefig(path)
-        plt.show(block=False)
-
-
+        # self.preview(path = self.generate_filename('Registration','Preview','Figure',model_type=self.model_type))
 
     def fix_tears(self):
         """ Sew together tears in sections """
@@ -409,7 +386,7 @@ class Registration_Class(object):
             cbar = plt.colorbar()
             cbar.ax.set_title('Log Sum')
             path = self.generate_filename('Registration','RoughRegistration','Figure',model_type=self.model_type)
-            plt.savefig(path)
+            plt.savefig(path,dpi=200)
             plt.show(block=False)
             print(' ')
             out = str(robust_input("Satisfied? (Y/ Set Angle): ",dtype='str'))
@@ -440,7 +417,7 @@ class Registration_Class(object):
             plt.scatter(self.data.obs['ref_z'][m],self.data.obs['ref_y'][m],s=0.1,c='m')
             plt.scatter(self.data.obs['ref_z'][m==False],self.data.obs['ref_y'][m==False],s=0.1,c='c')
             path = self.generate_filename('Registration','LeftRightSplit','Figure',model_type=self.model_type)
-            plt.savefig(path)
+            plt.savefig(path,dpi=200)
             plt.show(block=False)
 
             print(' ')
@@ -462,7 +439,6 @@ class Registration_Class(object):
 
         for side,cc in Counter(self.data.obs.loc[:,'side'].values).items():
             self.update_user(f"{str(cc)} cells found in {side} side")
-
 
     def set_section_index(self):
         """ Choose with of the reference sections matches zone best"""
@@ -491,7 +467,7 @@ class Registration_Class(object):
             axs[0].scatter(self.ref_z[self.ref_m],self.ref_y[self.ref_m],s=0.1,c=self.ref_c[self.ref_m],cmap='jet')
             axs[1].scatter(self.data.obs['ref_z'],self.data.obs['ref_y'],s=0.1,c=C,cmap='jet')
             path = self.generate_filename('Registration','ReferenceMatching','Figure',model_type=self.model_type)
-            plt.savefig(path)
+            plt.savefig(path,dpi=200)
             plt.show(block=False)
 
             print(' ')
@@ -518,14 +494,17 @@ class Registration_Class(object):
                 points_cor_y.append(ymouse)
                 if len(points_cor_x)%2!=0:
                     # print('Fixed',round(xmouse,3),round(ymouse,3))
-                    axs[0].scatter(xmouse, ymouse , marker = 'x', color = 'k', s = 100, linewidth = 1)
-                    axs[0].annotate(str(math.ceil(len(points_cor_x)/2)), 
-                                    xy = [xmouse, ymouse], color = 'k', fontsize = 12)
+                    axs[0].set_title('Pick Right Side: '+str(math.ceil(len(points_cor_x)/2)))
+                    # axs[0].scatter(xmouse, ymouse , marker = 'x', color = 'k', s = 100, linewidth = 3, edgecolor='w')
+                    axs[0].scatter(xmouse, ymouse , marker = '.', color = 'k', s = 500)
+                    axs[0].scatter(xmouse, ymouse , marker = '.', color = 'r', s = 300)
+                    # axs[0].annotate(str(math.ceil(len(points_cor_x)/2)), xy = [xmouse, ymouse], color = 'k', fontsize = 14, linewidth = 2)
                 else:
                     # print('Moving',round(xmouse,3),round(ymouse,3))
-                    axs[1].scatter(xmouse, ymouse , marker = 'x', color = 'k', s = 100, linewidth = 1)
-                    axs[1].annotate(str(math.ceil(len(points_cor_x)/2)), 
-                            xy = [xmouse, ymouse], color = 'k', fontsize = 12)
+                    axs[0].set_title('Pick Left Side: '+str(math.ceil(len(points_cor_x)/2)))
+                    axs[0].scatter(points_cor_x[-2], points_cor_y[-2] , marker = '.', color = 'k', s = 500)
+                    axs[1].scatter(xmouse, ymouse , marker = '.', color = 'k', s = 300)
+                    # axs[1].annotate(str(math.ceil(len(points_cor_x)/2)), xy = [xmouse, ymouse], color = 'k', fontsize = 14, linewidth = 2)
                 plt.draw()
 
             points_cor_x = []
@@ -534,54 +513,43 @@ class Registration_Class(object):
             fig,axs = plt.subplots(1,2,figsize=[10,5])
             fig.suptitle(side+': Pick Registration Points')
             axs = axs.ravel()
-            # img = np.histogram2d(ref_X,ref_Y,bins=1000)[0]
-            # vmin,vmax = np.percentile(img.ravel(),[5,95])
-            # img = np.clip(img,vmin,vmax)
-            # axs[0].imshow(img,cmap='Greys')
             x = np.linspace(ref_X.min(),ref_X.max(),100000)
             y = np.linspace(ref_Y.min(),ref_Y.max(),100000)
             np.random.shuffle(x)
             np.random.shuffle(y)
+            axs[0].set_title('Pick Left Side First')
             axs[0].scatter(x,y,s=5,c='w',picker=True)
             idxs = np.random.choice(np.array(range(ref_X.shape[0])),100000)
-            axs[0].scatter(ref_X[idxs],ref_Y[idxs],s=0.1,c=ref_C[idxs],cmap='jet')#,picker=True)
-
-            # img = np.histogram2d(X,Y,bins=1000)[0]
-            # vmin,vmax = np.percentile(img.ravel(),[5,95])
-            # img = np.clip(img,vmin,vmax)
-            # axs[1].imshow(img,cmap='Greys')
+            axs[0].scatter(ref_X[idxs],ref_Y[idxs],s=0.1,c=ref_C[idxs],cmap='jet')
             x = np.linspace(X.min(),X.max(),100000)
             y = np.linspace(Y.min(),Y.max(),100000)
             np.random.shuffle(x)
             np.random.shuffle(y)
             axs[1].scatter(x,y,s=5,c='w',picker=True)
             idxs = np.random.choice(np.array(range(X.shape[0])),100000)
-            axs[1].scatter(X[idxs],Y[idxs],s=0.1,c=C[idxs],cmap='jet')#,picker=True)
+            axs[1].scatter(X[idxs],Y[idxs],s=0.1,c=C[idxs],cmap='jet')
             fig.canvas.mpl_connect('pick_event', onpick)
-            # plt.savefig(path)
             plt.show()
 
 
             fig,axs = plt.subplots(1,2,figsize=[10,5])
-            fig.suptitle(side+': Pick Registration Points')
+            fig.suptitle(side+': Registration Points')
             axs = axs.ravel()
             idxs = np.random.choice(np.array(range(ref_X.shape[0])),100000)
-            axs[0].scatter(ref_X[idxs],ref_Y[idxs],s=0.1,c=ref_C[idxs],cmap='jet')
+            axs[0].scatter(ref_X[idxs],ref_Y[idxs],s=0.05,c=ref_C[idxs],cmap='jet')
             idxs = np.random.choice(np.array(range(X.shape[0])),100000)
-            axs[1].scatter(X[idxs],Y[idxs],s=0.1,c=C[idxs],cmap='jet')
+            axs[1].scatter(X[idxs],Y[idxs],s=0.05,c=C[idxs],cmap='jet')
             x = np.array(points_cor_x)
             y = np.array(points_cor_y)
             for i in range(x.shape[0]):
-                if len(i)%2!=0:
-                    axs[0].scatter(x[i], y[i] , marker = 'x', color = 'k', s = 100, linewidth = 1)
-                    axs[0].annotate(str(math.ceil(i/2)), 
-                                    xy = [x[i], y[i]], color = 'k', fontsize = 12)
+                if i%2!=0:
+                    axs[1].scatter(x[i], y[i] , marker = 'x', color = 'k', s = 100, linewidth = 2,edgecolor='w')
+                    axs[1].annotate(str(math.ceil(i/2)), xy = [x[i], y[i]], color = 'k', fontsize = 14)
                 else:
-                    axs[1].scatter(x[i], y[i] , marker = 'x', color = 'k', s = 100, linewidth = 1)
-                    axs[1].annotate(str(math.ceil(i/2)), 
-                            xy = [x[i], y[i]], color = 'k', fontsize = 12)
-            plt.savefig(path)
-            plt.show()
+                    axs[0].scatter(x[i], y[i] , marker = 'x', color = 'k', s = 100, linewidth = 2,edgecolor='w')
+                    axs[0].annotate(str(math.ceil(i/2)+1), xy = [x[i], y[i]], color = 'k', fontsize = 14)
+            plt.savefig(path,dpi=200)
+            plt.show(block=False)
 
             return points_cor_x,points_cor_y
 
@@ -600,6 +568,22 @@ class Registration_Class(object):
         df_points['mov_z'] = np.array(points_cor_x)[1::2]
         df_points['mov_y'] = np.array(points_cor_y)[1::2]
         df_points['side'] = self.side
+
+        # print(' ')
+        # completed = False
+        # points_to_remove = []
+        # while not completed:
+        #     out = str(robust_input("Satisfied? (Y/Points to Remove): ",dtype='str'))
+        #     if 'y' in out.lower():
+        #         completed = True
+        #     else:
+        #         points_to_remove.append(int(out))
+        # self.update_user(f"Removing These Points {''.join([str(i)+',' for i in points_to_remove])}")
+        # points_to_remove = np.array(points_to_remove)-1
+        # points_to_keep = [i for i in range(df_points.shape[0]) if not i in points_to_remove]
+        # df_points = df_points.iloc[points_to_keep,:]
+        # print(df_points.shape)
+
         self.df_points_list.append(df_points)
         temp = self.reference_data[self.ref_m].copy()
         temp['side'] = self.side
@@ -656,7 +640,7 @@ class Registration_Class(object):
         for i in range(len(data.uns['registration_points'])):
             plt.plot([data.uns['registration_points']['fix_z'][i], data.uns['registration_points']['mov_z'][i]], [data.uns['registration_points']['fix_y'][i], data.uns['registration_points']['mov_y'][i]], c='b')
         path = self.generate_filename('Registration','RegPointsRaw','Figure',model_type=self.model_type)
-        plt.savefig(path)
+        plt.savefig(path,dpi=200)
         plt.show(block=False)
 
         predicted = model.predict(np.array(data.uns['registration_points'][['mov_z','mov_y']]))
@@ -668,7 +652,7 @@ class Registration_Class(object):
         for i in range(len(data.uns['registration_points'])):
             plt.plot([data.uns['registration_points']['fix_z'][i], data.uns['registration_points']['pred_x'][i]], [data.uns['registration_points']['fix_y'][i], data.uns['registration_points']['pred_y'][i]], c='b')
         path = self.generate_filename('Registration','RegPointsAligned','Figure',model_type=self.model_type)
-        plt.savefig(path)
+        plt.savefig(path,dpi=200)
         plt.show(block=False)
 
         predicted = model.predict(np.array(data.uns['registration_points'][['mov_z','mov_y']]))
@@ -680,43 +664,35 @@ class Registration_Class(object):
         for i in range(len(data.uns['registration_points'])):
             plt.plot([data.uns['registration_points']['mov_z'][i], data.uns['registration_points']['pred_x'][i]], [data.uns['registration_points']['mov_y'][i], data.uns['registration_points']['pred_y'][i]], c='b')
         path = self.generate_filename('Registration','RegPointsDistanceMoved','Figure',model_type=self.model_type)
-        plt.savefig(path)
+        plt.savefig(path,dpi=200)
         plt.show(block=False)
 
-        # predicted = np.array(data.obs[['ref_z','ref_y']])
-        # x = predicted[:,0]
-        # y = predicted[:,1]
-        fig = plt.figure(figsize=[10,10])
+        fig = plt.figure(figsize=[5,5])
         fig.suptitle('Raw vs Ref')
-        plt.scatter(data.uns['reference_data'].loc[:,'ccf_z'],data.uns['reference_data'].loc[:,'ccf_y'],s=0.1,c='k')
-        plt.scatter(data.obs['ref_z'],data.obs['ref_y'],s=0.1,c='r')
+        plt.scatter(data.uns['reference_data'].loc[:,'ccf_z'],data.uns['reference_data'].loc[:,'ccf_y'],s=0.1,c='k',alpha=0.5)
+        plt.scatter(data.obs['ref_z'],data.obs['ref_y'],s=0.1,c='r',alpha=0.5)
         path = self.generate_filename('Registration','RoughAlignment','Figure',model_type=self.model_type)
-        plt.savefig(path)
+        plt.savefig(path,dpi=200)
         plt.show(block=False)
 
-        # predicted = model.predict(np.array(data.obs[['ref_z','ref_y']]))
-        # x = predicted[:,0]
-        # y = predicted[:,1]
-        fig = plt.figure(figsize=[10,10])
+        fig = plt.figure(figsize=[5,5])
         fig.suptitle('Pred vs Ref')
-        plt.scatter(data.uns['reference_data'].loc[:,'ccf_z'],data.uns['reference_data'].loc[:,'ccf_y'],s=0.1,c='k')
-        plt.scatter(data.obs['ccf_z'],data.obs['ccf_y'],s=0.1,c='r')
+        plt.scatter(data.uns['reference_data'].loc[:,'ccf_z'],data.uns['reference_data'].loc[:,'ccf_y'],s=0.1,c='k',alpha=0.5)
+        plt.scatter(data.obs['ccf_z'],data.obs['ccf_y'],s=0.1,c='r',alpha=0.5)
         path = self.generate_filename('Registration','Aligned','Figure',model_type=self.model_type)
-        plt.savefig(path)
+        plt.savefig(path,dpi=200)
         plt.show(block=False)
 
-        fig = plt.figure(figsize=[10,10])
+        fig = plt.figure(figsize=[5,5])
         fig.suptitle('Distance Moved')
-        # predicted = model.predict(np.array(data.obs[['ref_z','ref_y']]))
-        # x = predicted[:,0]
-        # y = predicted[:,1]
+
         c = np.sqrt(np.sum((np.array(data.obs[['ccf_z','ccf_y']])-np.array(data.obs[['ref_z','ref_y']]))**2,1))
         vmin,vmax = np.percentile(c,[1,99])
         c = np.clip(c,vmin,vmax)
         plt.scatter(data.obs['ccf_z'],data.obs['ccf_y'],s=0.1,c=c,cmap='jet')
         plt.colorbar()
         path = self.generate_filename('Registration','DistanceMoved','Figure',model_type=self.model_type)
-        plt.savefig(path)
+        plt.savefig(path,dpi=200)
         plt.show(block=False)
 
     def save_data(self):
@@ -733,7 +709,7 @@ class Registration_Class(object):
             file_type='anndata',
             model_type=self.model_type)
 
-    def preview(self,prefix=''):
+    def preview(self,prefix='',path = ''):
         """ Preview """
         if ('ref' in prefix)|('ccf' in prefix):
             X = np.array(self.data.obs[prefix+'z'].values).ravel()
@@ -753,10 +729,10 @@ class Registration_Class(object):
         plt.scatter(x[idx],y[idx],s=0.1,c=c[idx],cmap='jet')
         cbar = plt.colorbar()
         cbar.ax.set_title('Log Sum')
-        path = self.generate_filename('Registration','Preview','Figure',model_type=self.model_type)
-        plt.savefig(path)
+        if path == '':
+            path = self.generate_filename('Registration','Preview','Figure',model_type=self.model_type)
+        plt.savefig(path,dpi=200)
         plt.show(block=False)
-
 # for interactively selecting corresponding points
 
 import math
