@@ -805,25 +805,33 @@ class Section_Class(object):
             """ Load Vector for each pixel """
             ### FIX MULTIPROCESS THIS FOR SPEED ###
             pixel_vectors = torch.zeros([idxes[0].shape[0],len(self.config.bitmap)+1],dtype=torch.int32)
-            pixel_vectors_raw = torch.zeros([idxes[0].shape[0],len(self.config.bitmap)+1],dtype=torch.int32)
+            if self.config.parameters['stitch_raw']:
+                pixel_vectors_raw = torch.zeros([idxes[0].shape[0],len(self.config.bitmap)+1],dtype=torch.int32)
             nuc_pixel_vectors = torch.zeros([idxes[0].shape[0],len(self.config.bitmap)+1],dtype=torch.int32)
-            nuc_pixel_vectors_raw = torch.zeros([idxes[0].shape[0],len(self.config.bitmap)+1],dtype=torch.int32)
+            if self.config.parameters['stitch_raw']:
+                nuc_pixel_vectors_raw = torch.zeros([idxes[0].shape[0],len(self.config.bitmap)+1],dtype=torch.int32)
             for i,(r,h,c) in self.generate_iterable(enumerate(self.config.bitmap),'Generating Pixel Vectors',length=len(self.config.bitmap)):
                 pixel_vectors[:,i] = self.load(hybe=h,channel=c,file_type='stitched')[idxes]
-                pixel_vectors_raw[:,i] = self.load(hybe=h,channel=c,file_type='stitched_raw')[idxes]
+                if self.config.parameters['stitch_raw']:
+                    pixel_vectors_raw[:,i] = self.load(hybe=h,channel=c,file_type='stitched_raw')[idxes]
                 nuc_pixel_vectors[:,i] = self.load(hybe=h,channel=self.config.parameters['nucstain_channel'],file_type='stitched')[idxes]
-                nuc_pixel_vectors_raw[:,i] = self.load(hybe=h,channel=self.config.parameters['nucstain_channel'],file_type='stitched_raw')[idxes]
+                if self.config.parameters['stitch_raw']:
+                    nuc_pixel_vectors_raw[:,i] = self.load(hybe=h,channel=self.config.parameters['nucstain_channel'],file_type='stitched_raw')[idxes]
             # Nucstain Signal
             pixel_vectors[:,-1] = self.load(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='stitched')[idxes]
-            pixel_vectors_raw[:,-1] = self.load(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='stitched_raw')[idxes]
+            if self.config.parameters['stitch_raw']:
+                pixel_vectors_raw[:,-1] = self.load(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='stitched_raw')[idxes]
             nuc_pixel_vectors[:,-1] = self.load(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='stitched')[idxes]
-            nuc_pixel_vectors_raw[:,-1] = self.load(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='stitched_raw')[idxes]
+            if self.config.parameters['stitch_raw']:
+                nuc_pixel_vectors_raw[:,-1] = self.load(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='stitched_raw')[idxes]
 
             unique_labels = torch.unique(labels)
             self.vectors = torch.zeros([unique_labels.shape[0],pixel_vectors.shape[1]],dtype=torch.int32)
-            self.vectors_raw = torch.zeros([unique_labels.shape[0],pixel_vectors_raw.shape[1]],dtype=torch.int32)
+            if self.config.parameters['stitch_raw']:
+                self.vectors_raw = torch.zeros([unique_labels.shape[0],pixel_vectors_raw.shape[1]],dtype=torch.int32)
             self.nuc_vectors = torch.zeros([unique_labels.shape[0],nuc_pixel_vectors.shape[1]],dtype=torch.int32)
-            self.nuc_vectors_raw = torch.zeros([unique_labels.shape[0],nuc_pixel_vectors_raw.shape[1]],dtype=torch.int32)
+            if self.config.parameters['stitch_raw']:
+                self.nuc_vectors_raw = torch.zeros([unique_labels.shape[0],nuc_pixel_vectors_raw.shape[1]],dtype=torch.int32)
             pixel_xy = torch.zeros([idxes[0].shape[0],2])
             pixel_xy[:,0] = idxes[0]
             pixel_xy[:,1] = idxes[1]
@@ -835,9 +843,11 @@ class Section_Class(object):
             for i,label in tqdm(enumerate(unique_labels),total=unique_labels.shape[0],desc=str(datetime.now().strftime("%H:%M:%S"))+' Generating Cell Vectors and Metadata'):
                 m = converter[int(label)]
                 self.vectors[i,:] = torch.median(pixel_vectors[m,:],axis=0).values
-                self.vectors_raw[i,:] = torch.median(pixel_vectors_raw[m,:],axis=0).values
+                if self.config.parameters['stitch_raw']:
+                    self.vectors_raw[i,:] = torch.median(pixel_vectors_raw[m,:],axis=0).values
                 self.nuc_vectors[i,:] = torch.median(nuc_pixel_vectors[m,:],axis=0).values
-                self.nuc_vectors_raw[i,:] = torch.median(nuc_pixel_vectors_raw[m,:],axis=0).values
+                if self.config.parameters['stitch_raw']:
+                    self.nuc_vectors_raw[i,:] = torch.median(nuc_pixel_vectors_raw[m,:],axis=0).values
                 pxy = pixel_xy[m,:]
                 self.xy[i,:] = torch.median(pxy,axis=0).values
                 self.size[i] = pxy.shape[0]
@@ -850,58 +860,48 @@ class Section_Class(object):
             self.cell_metadata['section_index'] = self.section
             self.cell_metadata['dapi'] = self.vectors[:,-1].numpy()
             self.vectors = self.vectors[:,0:-1]
-            self.vectors_raw = self.vectors_raw[:,0:-1]
+            if self.config.parameters['stitch_raw']:
+                self.vectors_raw = self.vectors_raw[:,0:-1]
             self.nuc_vectors = self.nuc_vectors[:,0:-1]
-            self.nuc_vectors_raw = self.nuc_vectors_raw[:,0:-1]
+            if self.config.parameters['stitch_raw']:
+                self.nuc_vectors_raw = self.nuc_vectors_raw[:,0:-1]
             self.data = anndata.AnnData(X=self.vectors.numpy(),
                                 var=pd.DataFrame(index=np.array([r for r,h,c in self.config.bitmap])),
                                 obs=self.cell_metadata)
-            self.data.layers['raw_vectors'] = self.vectors_raw.numpy()
+            if self.config.parameters['stitch_raw']:
+                self.data.layers['raw_vectors'] = self.vectors_raw.numpy()
             self.data.layers['processed_vectors'] = self.vectors.numpy()
-            self.data.layers['nuc_raw_vectors'] = self.nuc_vectors_raw.numpy()
+            if self.config.parameters['stitch_raw']:
+                self.data.layers['nuc_raw_vectors'] = self.nuc_vectors_raw.numpy()
             self.data.layers['nuc_processed_vectors'] = self.nuc_vectors.numpy()
-            self.data.layers['raw'] = self.vectors.numpy()
-            self.data.layers['nuc_raw'] = self.nuc_vectors.numpy()
+            if self.config.parameters['stitch_raw']:
+                self.data.layers['raw'] = self.vectors.numpy()
+                self.data.layers['nuc_raw'] = self.nuc_vectors.numpy()
             """ Make Compatable with Beads? """
             self.data.obs['polyt'] = self.data.layers['processed_vectors'][:,self.data.var.index=='PolyT']
-            self.data.obs['polyt_raw'] = self.data.layers['raw_vectors'][:,self.data.var.index=='PolyT']
+            if self.config.parameters['stitch_raw']:
+                self.data.obs['polyt_raw'] = self.data.layers['raw_vectors'][:,self.data.var.index=='PolyT']
             self.data.obs['nonspecific_encoding'] = self.data.layers['processed_vectors'][:,self.data.var.index=='Nonspecific_Encoding']
-            self.data.obs['nonspecific_encoding_raw'] = self.data.layers['raw_vectors'][:,self.data.var.index=='Nonspecific_Encoding']
+            if self.config.parameters['stitch_raw']:
+                self.data.obs['nonspecific_encoding_raw'] = self.data.layers['raw_vectors'][:,self.data.var.index=='Nonspecific_Encoding']
             self.data.obs['nonspecific_readout'] = self.data.layers['processed_vectors'][:,self.data.var.index=='Nonspecific_Readout']
-            self.data.obs['nonspecific_readout_raw'] = self.data.layers['raw_vectors'][:,self.data.var.index=='Nonspecific_Readout']
+            if self.config.parameters['stitch_raw']:
+                self.data.obs['nonspecific_readout_raw'] = self.data.layers['raw_vectors'][:,self.data.var.index=='Nonspecific_Readout']
             self.data = self.data[:,self.data.var.index.isin(['PolyT','Nonspecific_Encoding','Nonspecific_Readout'])==False]
 
             self.save(
                 self.data.obs,
                 file_type='metadata',
                 model_type=model_type)
+            self.save(
+                self.data,
+                file_type='anndata',
+                model_type=model_type)
             self.save(pd.DataFrame(
                 self.data.layers['processed_vectors'],
                 index=self.data.obs.index,
                 columns=self.data.var.index),
                 file_type='matrix',
-                model_type=model_type)
-            self.save(pd.DataFrame(
-                self.data.layers['raw_vectors'],
-                index=self.data.obs.index,
-                columns=self.data.var.index),
-                file_type='matrix_raw',
-                model_type=model_type)
-            self.save(pd.DataFrame(
-                self.data.layers['nuc_processed_vectors'],
-                index=self.data.obs.index,
-                columns=self.data.var.index),
-                file_type='matrix_nuc',
-                model_type=model_type)
-            self.save(pd.DataFrame(
-                self.data.layers['nuc_raw_vectors'],
-                index=self.data.obs.index,
-                columns=self.data.var.index),
-                file_type='matrix_raw_nuc',
-                model_type=model_type)
-            self.save(
-                self.data,
-                file_type='anndata',
                 model_type=model_type)
 
     def remove_temporary_files(self,data_types = ['stitched','stitched_raw','FF']):
