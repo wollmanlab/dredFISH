@@ -26,6 +26,7 @@ import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
 from collections import Counter
+import torch
 
 import matplotlib as mpl
 mpl.rcParams['figure.dpi'] = 50
@@ -131,22 +132,22 @@ class Registration_Class(object):
                     completed = True
 
         plt.close('all')
-        self.side = ''
-        self.data = self.all_data.copy()
-        del self.all_data
-        self.data.obs['ref_z'] = np.abs(self.data.obs['ref_z'])
-        self.data.uns['registration_points'] = pd.concat(self.df_points_list)
-        self.data.uns['reference_data'] = pd.concat(self.reference_data_list)
-        completed = False
-        while not completed:
-            message = str(robust_input(" Ready To Save All Data ?",dtype='str')).lower()
-            if message=='y':
-                print('saving')
-                self.save_data()
-                completed = True
-            elif message =='n':
-                completed = True
-        self.completed = True
+        # self.side = ''
+        # self.data = self.all_data.copy()
+        # del self.all_data
+        # self.data.obs['ref_z'] = np.abs(self.data.obs['ref_z'])
+        # self.data.uns['registration_points'] = pd.concat(self.df_points_list)
+        # self.data.uns['reference_data'] = pd.concat(self.reference_data_list)
+        # completed = False
+        # while not completed:
+        #     message = str(robust_input(" Ready To Save All Data ?",dtype='str')).lower()
+        #     if message=='y':
+        #         print('saving')
+        #         self.save_data()
+        #         completed = True
+        #     elif message =='n':
+        #         completed = True
+        # self.completed = True
     
     def update_user(self,message,level=20):
         """
@@ -257,14 +258,27 @@ class Registration_Class(object):
         """ Load Reference Coordinates"""
         self.update_user('Loading Reference Data',level=20)
 
-        """ Update to use config file """
-        """ /orangedata/Images2024/Zach/dredFISH/Tree20um37C500M1H3A2SDS24H100ug47C50F18H50F1H2SDS37C1H-FF.A_FF.B_FF.C_PFA.D_PFA.E_PFA.F_2024Feb15/fishdata_2024Feb01/Notebooks/reference_sections.ipynb"""
-        reference_data = pd.read_csv('/orangedata/ExternalData/WMB_Spatial_Data_ZH2024Feb22.csv',index_col=0,low_memory=False)
-        reference_data = reference_data.astype(str)
-        reference_data['ccf_x'] = reference_data['ccf_x'].astype(float)
-        reference_data['ccf_y'] = reference_data['ccf_y'].astype(float)
-        reference_data['ccf_z'] = reference_data['ccf_z'].astype(float)
+        # """ Update to use config file """
+        # """ /orangedata/Images2024/Zach/dredFISH/Tree20um37C500M1H3A2SDS24H100ug47C50F18H50F1H2SDS37C1H-FF.A_FF.B_FF.C_PFA.D_PFA.E_PFA.F_2024Feb15/fishdata_2024Feb01/Notebooks/reference_sections.ipynb"""
+        # reference_data = pd.read_csv('/orangedata/ExternalData/WMB_Spatial_Data_ZH2024Feb22.csv',index_col=0,low_memory=False)
+        # reference_data = reference_data.astype(str)
+        # reference_data['ccf_x'] = reference_data['ccf_x'].astype(float)
+        # reference_data['ccf_y'] = reference_data['ccf_y'].astype(float)
+        # reference_data['ccf_z'] = reference_data['ccf_z'].astype(float)
+
+        """ /orangedata/Images2024/Zach/dredFISH/Notebooks/reference_sections_2024Mar06.ipynb"""
+        download_base = '/orangedata/ExternalData/Allen_WMB_2024Mar06'
+        reference_data = torch.load(os.path.join(download_base,'minimal_spatial_data.pt'))
+        reference_data = pd.DataFrame(reference_data.numpy(),columns=['ccf_x','ccf_y','ccf_z','cluster_alias'])
+        reference_data['cluster_alias'] = reference_data['cluster_alias'].astype(int)
         self.reference_data = reference_data
+
+        self.pivot_table = pd.read_csv(os.path.join(download_base,'pivot_table.csv'))
+
+        colormap = dict(zip(self.pivot_table['cluster_alias'],self.pivot_table['subclass_color']))
+        self.reference_data['color'] = self.reference_data['cluster_alias'].map(colormap)
+
+        print(self.reference_data.head())
 
     def load_data(self):
         """ Load processed anndata object from Section_Class """
@@ -382,6 +396,7 @@ class Registration_Class(object):
             fig = plt.figure(figsize=[5,5])
             fig.suptitle('Centered and Rotated?')
             plt.scatter(self.reference_data.loc[idx,'ccf_z'],self.reference_data.loc[idx,'ccf_y'],s=0.1,c='k')
+            # plt.scatter(-self.reference_data.loc[idx,'ccf_z'],self.reference_data.loc[idx,'ccf_y'],s=0.1,c='k')
             plt.scatter(x,y,s=0.1,c=c,cmap='jet')
             cbar = plt.colorbar()
             cbar.ax.set_title('Log Sum')
@@ -446,7 +461,7 @@ class Registration_Class(object):
         """ Set Reference Section """
         self.ref_z  = np.array(self.reference_data['ccf_z'])
         self.ref_y = np.array(self.reference_data['ccf_y'])
-        self.ref_c = np.array(self.reference_data['c'])
+        self.ref_c = np.array(self.reference_data['color'])
         x = np.array(self.reference_data['ccf_x'])
         # unique_x = np.array(sorted(np.unique(x)))
         completed = False
@@ -455,7 +470,6 @@ class Registration_Class(object):
             if isinstance(self.ref_x,type(None)):
                 self.ref_x = float(robust_input("Enter Reference Section: ",dtype='float'))
             self.ref_m = (x>self.ref_x-self.window)&(x<self.ref_x+self.window)
-            self.ref_c = np.array(pd.Categorical(self.ref_c).codes)
             C = self.data.X.sum(1)
             C = np.log10(np.clip(C,1,None))
             vmin,vmax = np.percentile(C,[5,95])
@@ -464,7 +478,7 @@ class Registration_Class(object):
             fig,axs = plt.subplots(1,2,figsize=[10,5])
             fig.suptitle(self.side+': Set Reference Section: '+str(self.ref_x))
             axs = axs.ravel()
-            axs[0].scatter(self.ref_z[self.ref_m],self.ref_y[self.ref_m],s=0.1,c=self.ref_c[self.ref_m],cmap='jet')
+            axs[0].scatter(self.ref_z[self.ref_m],self.ref_y[self.ref_m],s=0.1,c=self.ref_c[self.ref_m])
             axs[1].scatter(self.data.obs['ref_z'],self.data.obs['ref_y'],s=0.1,c=C,cmap='jet')
             path = self.generate_filename('Registration','ReferenceMatching','Figure',model_type=self.model_type)
             plt.savefig(path,dpi=200)
@@ -520,14 +534,14 @@ class Registration_Class(object):
             axs[0].set_title('Pick Left Side First')
             axs[0].scatter(x,y,s=5,c='w',picker=True)
             idxs = np.random.choice(np.array(range(ref_X.shape[0])),100000)
-            axs[0].scatter(ref_X[idxs],ref_Y[idxs],s=0.1,c=ref_C[idxs],cmap='jet')
+            axs[0].scatter(ref_X[idxs],ref_Y[idxs],s=1,c=ref_C[idxs])
             x = np.linspace(X.min(),X.max(),100000)
             y = np.linspace(Y.min(),Y.max(),100000)
             np.random.shuffle(x)
             np.random.shuffle(y)
             axs[1].scatter(x,y,s=5,c='w',picker=True)
             idxs = np.random.choice(np.array(range(X.shape[0])),100000)
-            axs[1].scatter(X[idxs],Y[idxs],s=0.1,c=C[idxs],cmap='jet')
+            axs[1].scatter(X[idxs],Y[idxs],s=1,c=C[idxs],cmap='jet')
             fig.canvas.mpl_connect('pick_event', onpick)
             plt.show()
 
@@ -536,7 +550,7 @@ class Registration_Class(object):
             fig.suptitle(side+': Registration Points')
             axs = axs.ravel()
             idxs = np.random.choice(np.array(range(ref_X.shape[0])),100000)
-            axs[0].scatter(ref_X[idxs],ref_Y[idxs],s=0.05,c=ref_C[idxs],cmap='jet')
+            axs[0].scatter(ref_X[idxs],ref_Y[idxs],s=0.05,c=ref_C[idxs])
             idxs = np.random.choice(np.array(range(X.shape[0])),100000)
             axs[1].scatter(X[idxs],Y[idxs],s=0.05,c=C[idxs],cmap='jet')
             x = np.array(points_cor_x)
@@ -698,12 +712,7 @@ class Registration_Class(object):
     def save_data(self):
         self.update_user('Saving Data',level=20)
         data = self.data.copy()
-        # """ Cleaning"""
-        # for column in ['x','y','z','ref_x','ref_y','ref_z']:
-        #     try:
-        #         data.obs.drop(column,axis=1,inplace=True)
-        #     except Exception as e:
-        #         self.update_user(str(e))
+        del data.uns['reference_data']
         self.save(
             data,
             file_type='anndata',
