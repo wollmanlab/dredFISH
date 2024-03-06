@@ -868,26 +868,39 @@ class Section_Class(object):
             self.data = anndata.AnnData(X=self.vectors.numpy(),
                                 var=pd.DataFrame(index=np.array([r for r,h,c in self.config.bitmap])),
                                 obs=self.cell_metadata)
+            self.data.var['readout'] = [r for r,h,c in self.config.bitmap]
+            self.data.var['hybe'] = [h for r,h,c in self.config.bitmap]
+            self.data.var['channel'] = [c for r,h,c in self.config.bitmap]
+            
             if self.config.parameters['stitch_raw']:
                 self.data.layers['raw_vectors'] = self.vectors_raw.numpy()
+
             self.data.layers['processed_vectors'] = self.vectors.numpy()
             if self.config.parameters['stitch_raw']:
                 self.data.layers['nuc_raw_vectors'] = self.nuc_vectors_raw.numpy()
+
             self.data.layers['nuc_processed_vectors'] = self.nuc_vectors.numpy()
             if self.config.parameters['stitch_raw']:
                 self.data.layers['raw'] = self.vectors.numpy()
                 self.data.layers['nuc_raw'] = self.nuc_vectors.numpy()
-            """ Make Compatable with Beads? """
+
             self.data.obs['polyt'] = self.data.layers['processed_vectors'][:,self.data.var.index=='PolyT']
             if self.config.parameters['stitch_raw']:
                 self.data.obs['polyt_raw'] = self.data.layers['raw_vectors'][:,self.data.var.index=='PolyT']
+
+            self.data.obs['library_size'] = self.data.layers['processed_vectors'][:,self.data.var.index=='library_size']
+            if self.config.parameters['stitch_raw']:
+                self.data.obs['library_size_raw'] = self.data.layers['raw_vectors'][:,self.data.var.index=='library_size']
+            
             self.data.obs['nonspecific_encoding'] = self.data.layers['processed_vectors'][:,self.data.var.index=='Nonspecific_Encoding']
             if self.config.parameters['stitch_raw']:
                 self.data.obs['nonspecific_encoding_raw'] = self.data.layers['raw_vectors'][:,self.data.var.index=='Nonspecific_Encoding']
+            
             self.data.obs['nonspecific_readout'] = self.data.layers['processed_vectors'][:,self.data.var.index=='Nonspecific_Readout']
             if self.config.parameters['stitch_raw']:
                 self.data.obs['nonspecific_readout_raw'] = self.data.layers['raw_vectors'][:,self.data.var.index=='Nonspecific_Readout']
-            self.data = self.data[:,self.data.var.index.isin(['PolyT','Nonspecific_Encoding','Nonspecific_Readout'])==False]
+            
+            self.data = self.data[:,self.data.var.index.isin(['library_size','PolyT','Nonspecific_Encoding','Nonspecific_Readout'])==False]
 
             self.save(
                 self.data.obs,
