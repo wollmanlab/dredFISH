@@ -668,7 +668,7 @@ class SpatialPriorAssistedClassifier(Classifier):
             for i in range(iter):
                 logging.info(f"Iteration: {str(i)}")
                 self.likelihoods[level] = pd.DataFrame(self.likelihood_model[level].predict_proba(self.measured.layers['harmonized']),
-                                                            index = self.priors[level],columns=self.likelihood_model[level].classes_)
+                                                            index = self.priors[level].index,columns=self.likelihood_model[level].classes_)
                 self.likelihoods[level][self.likelihoods[level].isna()] = 0
                 self.priors[level][self.priors[level].isna()] = 0
                 self.posteriors[level] = self.likelihoods[level] * self.priors[level]
