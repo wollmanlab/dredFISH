@@ -420,6 +420,29 @@ def normalize_fishdata(X, norm_cell=True, norm_basis=True, allow_nan=False):
 
     return X
 
+def normalize_fishdata_to_mean(X, norm_cell=True, norm_basis=True, allow_nan=False):
+    """
+    X -- cell by basis raw count matrix
+    
+    0 clipping; cell normalization; bit normalization
+    """
+    # clip at 0
+    X = np.clip(X, 0, None)
+    # total counts per cell
+    bitssum = X.sum(axis=1)
+    bitssum_mean = bitssum.mean()
+    logging.info(f"{bitssum.shape[0]} cells, minimum counts = {bitssum.min()}")
+
+    # normalize by cell 
+    if norm_cell:
+        X = X/np.clip(bitssum.reshape(-1,1), 1e-10, None)
+
+    # further normalize by bit
+    if norm_basis:
+        X = zscore(X, axis=0, allow_nan=allow_nan) # 0 - across rows (cells) for each col (bit) 
+
+    return X*bitssum_mean
+
 def normalize_fishdata_log_regress(X):
     """
     X -- cell by basis raw count matrix
@@ -444,6 +467,46 @@ def normalize_fishdata_log_regress(X):
     X = 10**Res
 
     return X 
+
+def normalize_fishdata_log_regress_to_mean(X):
+    """
+    X -- cell by basis raw count matrix
+    
+    Advanced normalization using sum. Key idea is instead of divide by the sum
+    regress in log space and use the residual. 
+    """
+    # clip at 1
+    X = np.clip(X, 1, None).astype(float)
+    log_X = np.log10(X)
+    log_sm = np.log10(X.sum(axis=1))
+
+    # init empty residual
+    Res = np.zeros_like(X)
+
+    # normalize by cell 
+    for i in range(X.shape[1]):
+        model = LinearRegression().fit(log_sm.reshape(-1, 1), log_X[:, i])
+        Res[:,i] =  (log_X[:,i] - model.predict(log_sm.reshape(-1, 1)))+model.predict(log_sm.reshape(-1, 1)).mean()
+
+    # go back from log to linear scale
+    X = 10**Res
+
+    return X 
+
+def normalize_fishdata_regress_to_mean(X):
+    """
+    X -- cell by basis raw count matrix
+    
+    Advanced normalization using sum. Key idea is instead of divide by the sum
+    regress in log space and use the residual. 
+    """
+    # normalize by cell 
+    newX = np.zeros_like(X)
+    for i in range(X.shape[1]):
+        model = LinearRegression().fit(X.sum(1).reshape(-1, 1), X[:, i])
+        newX [:,i] =  (X[:,i] / model.predict(X.sum(1).reshape(-1, 1)))*model.predict(X.sum(1).reshape(-1, 1)).mean()
+
+    return newX
 
 def normalize_fishdata_logrowmedian(X, norm_basis=True, allow_nan=False):
     """
@@ -505,3 +568,117 @@ def swap_mask(mat, lookup_o2n):
     newmat = mat.copy()
     newmat[i,j] = lookup_o2n.loc[unq].values[inv]
     return newmat
+
+from sklearn.linear_model import LinearRegression
+from tqdm import trange
+
+def normalize_fishdata_regress(X,value='sum',leave_log=False,log=True,bitwise=False,labels=False,n_cells=100):
+    """
+    X -- cell by basis raw count matrix
+    
+    Advanced normalization using sum. Key idea is instead of divide by the sum
+    regress in log space and use the residual. 
+    """
+    X = X.copy()
+    if isinstance(labels,bool):
+        BalancedX = X.copy()
+    else:
+        _df = pd.Series(labels).to_frame('label')
+        idx = stratified_sample(_df, 'label', n_cells, random_state=None).sort_index().index.values
+        BalancedX = X[idx,:].copy()
+    if isinstance(value,str):
+        if value == 'sum':
+            Y = X.sum(axis=1)
+        elif value =='mean':
+            Y = X.mean(axis=1)
+        elif value =='min':
+            Y = X.min(axis=1)
+        elif value =='max':
+            Y = X.max(axis=1)
+        elif value =='median':
+            Y = np.median(X,axis=1)
+        elif value == 'none':
+            Y = ''
+        else:
+            raise ValueError('Incorrect value type '+str(value))
+    else:
+        Y = value
+
+    if log:
+        X = np.log10(np.clip(X,1,None))
+        BalancedX = np.log10(np.clip(BalancedX,1,None))
+        if not isinstance(Y,str):
+            Y = np.log10(np.clip(Y,1,None))
+    if not isinstance(Y,str):
+        if isinstance(labels,bool):
+            BalancedY = Y.copy()
+        else:
+            BalancedY = Y[idx].copy()
+
+  
+
+    # init empty residual
+    Res = np.zeros_like(X)
+
+    # normalize by cell 
+    for i in range(X.shape[1]):
+        if isinstance(Y,str):
+            Res[:,i] =  X[:,i]
+        else:
+            model = LinearRegression().fit(BalancedY.reshape(-1, 1), BalancedX[:, i])
+            if log:
+                Res[:,i] =  (X[:,i] - model.predict(Y.reshape(-1, 1)))+model.predict(Y.reshape(-1, 1)).mean()
+            else:
+                Res[:,i] =  (X[:,i] / model.predict(X.sum(1).reshape(-1, 1)))*model.predict(X.sum(1).reshape(-1, 1)).mean()
+    if log:
+        if leave_log:
+            X = Res
+        else:
+            X  = 10**Res
+            BalancedX = 10**BalancedX
+    else:
+        if leave_log:
+            X = np.log10(np.clip(X,1,None))
+        else:
+            X = Res
+
+    if bitwise:
+        if isinstance(labels,bool):
+            X = zscore(X, axis=0, allow_nan=False,balancedX=False) # 0 - across rows (cells) for each col (bit)
+        else:
+            X = zscore(X, axis=0, allow_nan=False,balancedX=BalancedX) # 0 - across rows (cells) for each col (bit)
+    return X
+    
+
+def zscore(X,allow_nan=False, ignore_zero=False, zero_threshold=1e-10,balancedX=False, **kwargs):
+    """
+    X is an numpy array (any dimensional)
+
+    **kwargs are arguments of np.mean and np.std, such as
+
+
+    axis=0 # zscore across rows for each column (if v is 2-dimensional)
+    axis=1 # zscore across cols for each row  (if v is 2-dimensional)
+    """
+    if isinstance(balancedX,bool):
+        balancedX = X.copy()
+    if 'axis' in kwargs.items():
+        if kwargs['axis'] ==1:
+            X = X.T
+    mu = np.zeros(X.shape[1])
+    std = np.zeros(X.shape[1])
+    outX = X.copy()
+    for i in range(X.shape[1]):
+        c = balancedX[:,i].copy()
+        if ignore_zero:
+            c[c<zero_threshold] = np.nan 
+        if not allow_nan:
+            c=c[np.isnan(c)==False]
+        mu[i] = np.median(c)
+        std[i] = np.std(c)
+        outX[:,i] = (X[:,i]-mu[i])/std[i]
+    if 'axis' in kwargs.items():
+        if kwargs['axis'] ==1:
+            outX = outX.T
+    return outX
+

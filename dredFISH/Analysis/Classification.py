@@ -5,6 +5,13 @@ The module is composed of a class hierarchy of classifiers. The "root" of this h
 abstract methods (train and classify) that any subclass will have to implement. 
 
 """
+
+from sklearn.neural_network import MLPClassifier
+from sklearn.naive_bayes import GaussianNB
+from pynndescent import NNDescent
+from tqdm import tqdm
+import pandas as pd
+from collections import Counter
 import logging
 import abc
 from signal import valid_signals
@@ -472,3 +479,215 @@ class KnownCellTypeClassifier(Classifier):
         
     def classify(self):
         return self.TypeVec
+    
+
+class SpatialPriorAssistedClassifier(Classifier): 
+    """
+    """
+    def __init__(self, TG, 
+        tax_name='spatial_prior_assited',
+        ref='allen_wmb_tree', 
+        spatial_ref='spatial_reference',
+        ref_levels=['class', 'subclass','supertype','cluster'], 
+        model='nb',
+        ):
+        """
+        Parameters
+        ----------
+        TG : TissueGraph
+            Required parameter - the TissueGraph object we're going to use for unsupervised clustering. 
+            The TG is required to have a `TG.adata.layers['raw']` matrix
+        ref : 
+            tag of a reference dataset, or path to a reference dataset (.h5ad)
+        spatial_ref : 
+            tag of a spatial reference dataset, or path to a spatial reference dataset (.h5ad)
+        """
+        # specific packages to this task
+
+        if not isinstance(TG, TissueGraph.TissueGraph): 
+            raise ValueError("This Classifier requires a (cell level) TissueGraph object as input")
+
+        super().__init__(tax=None)
+        self.tax.name = tax_name
+        self._TG = TG # data
+        self.ref_path = pathu.get_path(ref, check=True) # refdata
+        self.spatial_ref_path = pathu.get_path(spatial_ref, check=True) # refdata
+        self.ref_levels = ref_levels 
+
+        # model could be a string or simply sklearn classifier (many kinds)
+        if isinstance(model, str):
+            if model == 'nb':
+                self.model = GaussianNB()
+            elif model == 'mlp':
+                self.model = MLPClassifier(
+                            hidden_layer_sizes=(50,),  # Adjust number and size of hidden layers as needed
+                            activation='relu',  # Choose a suitable activation function
+                            max_iter=500,  # Set maximum iterations for training
+                            verbose=False,
+                            )
+            else:
+                raise ValueError("Need to choose from: `nb`, `mlp`")
+        else:
+            self.model = model
+
+        #### preproc data
+        logging.info("Loading and preprocessing data")
+
+        base_level = self.ref_levels[-1]
+
+        # get ref data features
+        self.reference = anndata.read(self.ref_path)
+        self.reference.layers['raw'] = self.reference.X.copy()
+        self.spatial_reference = anndata.read(self.spatial_ref_path)
+        self.measured = self._TG.adata.copy()
+
+        """ Trim Spatial Reference """
+        logging.info("Trimming Spatial Reference")
+        window = 0.25
+        section = np.mean(self.measured.obs['ccf_x'])
+        m = (self.spatial_reference.obs['ccf_x']>(section-window))&(self.spatial_reference.obs['ccf_x']<(section+window))
+        self.spatial_reference = self.spatial_reference[m].copy()
+
+        """ Build Section Balanced """
+        logging.info("Building Section Balanced ")
+        cts = []
+        ccs = []
+        for ct,cc in Counter(self.spatial_reference.obs[base_level]).items():
+            cts.append(ct)
+            ccs.append(cc)
+        proportions = pd.DataFrame(ccs,index=cts,columns=['counts'])
+        proportions['percentage'] = proportions['counts']/proportions['counts'].sum()
+        proportions = proportions.sort_values(by='percentage', ascending=False)
+
+        idxes = []
+        total_cells = 1000000
+        for idx,row in proportions.iterrows():
+            n_cells = int(row['percentage']*total_cells)
+            if n_cells>1:
+                temp = np.array(self.reference.obs[self.reference.obs[base_level]==idx].index)
+                if temp.shape[0]>0:
+                    idxes.extend(list(np.random.choice(temp,n_cells)))
+        self.section_balanced_reference = self.reference[idxes].copy()
+
+        """ Initial Normalization""" # Add in Library Size Normalization
+        logging.info("Performing Initial Normalization")
+        self.measured.layers['harmonized'] = basicu.normalize_fishdata_regress(self.measured.layers['raw'].copy(),value='sum',leave_log=True,log=True,bitwise=True)
+        self.reference.layers['harmonized']  = basicu.normalize_fishdata_regress(self.reference.layers['raw'].copy(),value='sum',leave_log=True,log=True,bitwise=False)
+        self.section_balanced_reference.layers['harmonized'] = basicu.normalize_fishdata_regress(self.section_balanced_reference.layers['raw'].copy(),value='sum',leave_log=True,log=True,bitwise=False)
+        mu_section = np.median(self.section_balanced_reference.layers['harmonized'],axis=0)
+        std_section = np.std(self.section_balanced_reference.layers['harmonized'],axis=0)
+        mu = np.median(self.reference.layers['harmonized'],axis=0)
+        std = np.std(self.reference.layers['harmonized'],axis=0)
+        X = self.reference.layers['harmonized'].copy()
+        """ account for scaling due to different avg mu """
+        X = X/mu.mean()
+        X = X*mu_section.mean()
+        """ use section mu and std for norm"""
+        for i in range(X.shape[1]):
+            X[:,i] = X[:,i] - mu_section[i]
+            X[:,i] = X[:,i] / std_section[i]
+        self.reference.layers['harmonized'] = X.copy()
+        X = self.section_balanced_reference.layers['harmonized'].copy()
+        """ use section mu and std for norm"""
+        for i in range(X.shape[1]):
+            X[:,i] = X[:,i] - mu_section[i]
+            X[:,i] = X[:,i] / std_section[i]
+        self.section_balanced_reference.layers['harmonized'] = X.copy()
+
+        """ Build Class Balanced """
+        logging.info("Building Class Balanced")
+        idxes = []
+        total_cells = 1000000
+        cts = np.unique(self.reference.obs[base_level])
+        for idx in cts:
+            n_cells = int(total_cells/cts.shape[0])
+            if n_cells>1:
+                temp = np.where(self.reference.obs[base_level]==idx)[0]
+                if temp.shape[0]>0:
+                    idxes.extend(list(np.random.choice(temp,n_cells)))
+        self.class_balanced_reference = self.reference.obs[base_level][idxes].copy()
+
+
+        """ Calculate Spatial Priors """
+        logging.info("Calculating Spatial Priors")
+        max_distance = 0.1
+        reference_coordinates = np.array(self.spatial_reference.obs[['ccf_z','ccf_y','ccf_z']])
+        self.tree = NNDescent(reference_coordinates, metric='euclidean', n_neighbors=100, n_trees=10)
+        measured_coordinates = np.array(self.measured.obs[['ccf_z','ccf_y','ccf_z']])
+        c = np.array(self.spatial_reference.obs[base_level])
+        cts = np.unique(self.reference.obs[base_level])
+        priors = pd.DataFrame(np.zeros([self.measured.shape[0],cts.shape[0]]),index=self.measured.obs.index,columns=cts)
+        for i,idx in tqdm(enumerate(priors.index),total=priors.shape[0]):
+            neighbors,distances = self.tree.query(measured_coordinates[i:i+1,:],k=1000)
+            neighbors = neighbors[distances<max_distance]
+            for ct,cc in Counter(c[neighbors].ravel()).items():
+                priors.loc[idx,ct] = cc
+        priors = priors.fillna(0)
+        priors = (priors/np.array(priors.sum(1))[:,None])
+
+        self.priors = {}
+        self.class_converters = {}
+        for level in self.ref_levels:
+            class_converter = self.class_balanced_reference.obs.loc[:,[base_level,level]]
+            class_converter = class_converter.drop_duplicates()
+            unique_labels = self.class_converter.obs[level].unique()
+            prior = pd.DataFrame(np.zeros([priors.shape[0],unique_labels.shape[0]]),index=priors.index,columns=unique_labels)
+            self.class_converters[level] = dict(zip(class_converter[base_level],class_converter[level]))
+            for column in priors.columns:
+                prior.loc[:,self.class_converters[level][column]] = prior.loc[:,self.class_converters[level][column]] + priors.loc[:,column]
+            self.priors[level] = prior
+
+        """ Calculate Centers """
+        logging.info("Calculating Reference Centers")
+        self.reference_centers = {}
+        for level in self.ref_levels:
+            unique_labels = self.class_balanced_reference.obs[level].unique()
+            reference_centers = pd.DataFrame(index=unique_labels.shape[0],columns=self.class_balanced_reference.var.index)
+            reference_centers[reference_centers.isna()] = 0
+            for label in unique_labels:
+                m = self.class_balanced_reference.obs[level]==label
+                reference_centers.loc[label,:] = np.mean(self.class_balanced_reference.layers['harmonized'][m,:],axis=0)
+            self.reference_centers[level] = reference_centers
+
+    def train(self):
+        logging.info("Training")
+        self.likelihood_model = {}
+        X = np.array(self.class_balanced_reference.layers['harmonized'])
+        for level in self.ref_levels:
+            Y = np.array(self.class_balanced_reference.obs[level].copy())
+            self.likelihood_model[level] = self.model.fit(X, Y)
+                
+    def classify(self,iter=5):
+        logging.info("Classifying")
+        self.likelihoods = {}
+        self.posteriors = {}
+        self.measured_centers = {}
+        self.measured.layers["initial_harmonized"]  = self.measured.layers['harmonized'].copy()
+        for level in self.ref_levels:
+            logging.info(level)
+            for i in range(iter):
+                logging.info(f"Iteration: {str(i)}")
+                self.likelihoods[level] = pd.DataFrame(self.likelihood_model[level].predict_proba(self.measured.layers['harmonized']),
+                                                            index = self.priors[level].index,columns=self.likelihood_model[level].classes_)
+                self.likelihoods[level][self.likelihoods[level].isna()] = 0
+                self.priors[level][self.priors[level].isna()] = 0
+                self.posteriors[level] = self.likelihoods[level] * self.priors[level]
+
+                nrm_vec = self.posteriors[level].sum(axis=1, keepdims=True)
+                nrm_vec[nrm_vec==0]=1
+                self.posteriors[level] = self.posteriors[level] / nrm_vec
+
+                self.measured.obs[level] = self.likelihood_model[level].classes_[np.argmax(self.posteriors[level],axis=1)]
+
+                unique_labels = self.likelihood_model[level].classes_
+                measured_centers = pd.DataFrame(index=unique_labels.shape[0],columns=self.class_balanced_reference.var.index)
+                measured_centers[measured_centers.isna()] = 0
+                for label in unique_labels:
+                    m = self.measured.obs[level]==label
+                    measured_centers.loc[label,:] = np.mean(self.measured.layers['harmonized'][m,:],axis=0)
+                self.measured_centers[level] = measured_centers
+                center_shifts = self.measured_centers[level]-self.reference_centers[level]
+                cell_shifts = np.dot(self.posteriors[level],center_shifts)
+                self.measured.layers['harmonized'] = self.measured.layers['harmonized'] - cell_shifts
+            self.measured.layers[f"{level}_harmonized"]  = self.measured.layers['harmonized'].copy()
+        return self.measured

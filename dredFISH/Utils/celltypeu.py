@@ -62,7 +62,7 @@ class CellTypeClassify(object):
                 norm = 'per_bit' # norm=True -> norm = 'per_bit'
             else:
                 norm = 'per_cell'
-        assert norm in ['per_cell', 'per_bit_equalscale', 'per_bit_refscale', 'per_bit_fscale']
+        assert norm in ['per_cell', 'per_bit_equalscale', 'per_bit_refscale', 'per_bit_fscale','none']
 
         if norm == 'per_cell':
             # each row sums to 1
@@ -243,7 +243,7 @@ class CellTypeClassify(object):
             _types, _counts = np.unique(self.y_refdata, return_counts=True)
             logging.info(f"Reference (scRNA-seq) sampled: {_types} \n {_counts}")
             _types, _counts = np.unique(self.y_data, return_counts=True)
-            logging.debug(f"Prediction (dredFISH) sampled: {_types} \n {_counts}")
+            logging.info(f"Prediction (dredFISH) sampled: {_types} \n {_counts}")
 
             # retrieve cluster sizses
             types_new, sizes = np.unique(self.y_data, return_counts=True)
@@ -253,6 +253,7 @@ class CellTypeClassify(object):
             size_vec_next = (1-p)*size_vec_next + p*size_vec # momentum term
             n_cells = pd.Series(np.clip((total_cells*size_vec_next).astype(int), min_cells, None), 
                                 index=types).to_dict()
+            
 
             # update and reset
             diff = np.abs(size_vec_next - size_vec).sum()
@@ -300,7 +301,7 @@ class CellTypeClassify(object):
             _types, _counts = np.unique(self.y_refdata, return_counts=True)
             logging.info(f"Reference (scRNA-seq) sampled: {_types} \n {_counts}")
             _types, _counts = np.unique(self.y_data, return_counts=True)
-            logging.debug(f"Prediction (dredFISH) sampled: {_types} \n {_counts}")
+            logging.info(f"Prediction (dredFISH) sampled: {_types} \n {_counts}")
 
             # retrieve cluster sizses
             types_new, sizes = np.unique(self.y_data, return_counts=True)
