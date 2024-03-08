@@ -303,6 +303,7 @@ class TissueMultiGraph:
                           norm_cell=True, norm_basis=True,
                           measurement_type = "total", 
                           hybes = [],
+                          section_names = None,
                           build_spatial_graph = True,build_feature_graph = True): 
         """Creating cell layer from raw data. 
         TODO: Fix documentaion after finishing Taxonomy class. 
@@ -332,7 +333,8 @@ class TissueMultiGraph:
         #         hybes.append(f"hybe{i:.0f}")
 
         # find list of sections
-        section_names = os.listdir(self.inputpath)
+        if section_names is None:
+            section_names = os.listdir(self.inputpath)
         dfall_meta = []
         matrix_all = []
         x_max = 0
