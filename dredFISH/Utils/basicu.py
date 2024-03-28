@@ -555,6 +555,54 @@ def normalize_fishdata_log(X, norm_cell=True, norm_basis=True, allow_nan=False):
 
     return X
 
+def normalize_fishdata_robust_regression(X):
+    """
+    Regression of the "sum" out of each basis using a robust estimate of the sum 
+    so that "high" cells in a few bits won't skew that sum estimate too mucn
+
+    Approach works in following steps: 
+    1. Use n-1 other basis to predict each basis
+    2. Do a RANSAC regression for each bit vs the other estimate to identify "outlier" cells, i.e. cells whos response
+        is more extreme than expected based on the other basis sum. 
+    3. Replace the values for the outlier cells/basis with the predictions from other basis to calcualte the sum. 
+    4. Divide by sum and adjust for scale. 
+    """
+
+    # step 1: cross prediction matrix P
+    P = np.zeros_like(X)
+    
+    for target_col in range(X.shape[1]):
+        # Prepare the features (X) and target (y) for the current target column
+        F = np.delete(X, target_col, axis=1)
+        y = X[:, target_col]
+        linear_model = LinearRegression().fit(F,y)
+        
+        # Predict the target column using the trained model
+        P[:, target_col] = linear_model.predict(F)
+
+    # Step 2: fit RANSAC regression to find outliers
+    inliners = np.zeros_like(X)
+    common = P.mean(axis=1).reshape(-1,1)
+    for i in range(X.shape[1]):
+        f = X[:,i]
+        # Step 1: Initial Linear Regression to estimate residuals
+        init_reg = LinearRegression().fit(common,f)
+        std_residuals = np.std(f - init_reg.predict(common))
+        ransac = RANSACRegressor(LinearRegression(), 
+                                residual_threshold = std_residuals, 
+                                random_state=42)
+        ransac.fit(common, f)
+        inliners[:,i] = ransac.inlier_mask_
+
+    # Step 3: replace outliers with cross-predictions
+    Xrobust = X*inliners + P*(1-inliners)
+
+    # Step 4: Normalize by dividing by sum and rescaling
+    Nrm = X/Xrobust.mean(axis=1).reshape(-1,1)*Xrobust.mean()
+
+    return Nrm
+
+
 def swap_mask(mat, lookup_o2n):
     """create from the old mask matrix a new matrix with the swapped labels according to the lookup table (pd.Series) 
     lookup_o2n = pd.Series(lbl, index=unq)
