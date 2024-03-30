@@ -229,8 +229,12 @@ def create_mask_from_raster(lbl,scl = 0.1,rds = 150,flip = False):
     # rescale down to ease computation
     msk_sml = rescale(msk,scl)
     k = skimage.morphology.disk(rds*scl)
-    msk_dil = convolve2d(msk_sml, k, mode='same', boundary='symm')
-    msk_dil = msk_dil>0
+    # the following line is the acruate closing
+    msk_dil = skimage.morphology.closing(msk_sml, k)
+    # it is faster to just dilate (and not properly close) with convolution
+    # but it creates artifacts that boundary cells are really large. 
+    # msk_dil = convolve2d(msk_sml, k, mode='same', boundary='symm')
+    # msk_dil = msk_dil>0
     lbl_dil = scipy.ndimage.measurements.label(msk_dil)
     lbl_dil = lbl_dil[0]
     # rescale up using nearest neighbors (order = 0) to preserve labels
