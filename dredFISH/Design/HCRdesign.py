@@ -60,7 +60,7 @@ strnds = [H2_org_tail,H2_org_tail,I_org,H1_org_tail,H1_org_tail]
 mfe_structures = nupack.mfe(strands=strnds, model=my_model)
 opt_structure_matrix = mfe_structures[0].structure.matrix()
 
-def score_hcr(seqs,tail_length = 20):
+def score_hcr(seqs,nupack_model = None, tail_length = 20):
     if len(seqs)==4:
         r1,r2,s1,s2 = seqs
         I1,H1,H2 = BuildtailedHCR(r1,r2,s1,s2)
@@ -75,11 +75,17 @@ def score_hcr(seqs,tail_length = 20):
     # 1. The interactions between the molecuels is not as expected. 
     # 2. There are interactins within the molecules when they are in strcture that shouldn't be there
 
-    # Score interactions between strands: 
-    strnd_bindings_I1,I1_matrix = count_strand_interactions([H2,I1,H1],return_matrix=True)
+    # Score interactions between strands:
+    if nupack_model is None:  
+        strnd_bindings_I1,I1_matrix = count_strand_interactions([H2,I1,H1],return_matrix=True)
+    else: 
+        strnd_bindings_I1,I1_matrix = count_strand_interactions([H2,I1,H1],nupack_model=nupack_model,return_matrix=True)
     strnd_bindings_I1[0,0] -= tail_length
     strnd_bindings_I1[2,2] -= tail_length
-    strnd_bindings_I2,I2_matrix = count_strand_interactions([I2,H1,H2],return_matrix=True)
+    if nupack_model is None:  
+        strnd_bindings_I2,I2_matrix = count_strand_interactions([I2,H1,H2],return_matrix=True)
+    else: 
+        strnd_bindings_I2,I2_matrix = count_strand_interactions([I2,H1,H2],nupack_model=nupack_model,return_matrix=True)
     strnd_bindings_I2[1,1] -= tail_length
     strnd_bindings_I2[2,2] -= tail_length
     I1_opt = [[36,0,36],
@@ -126,7 +132,7 @@ def count_strand_interactions(strnds,nupack_model = my_model,return_matrix = Fal
         return result,structure_mat
     return result
 
-def score_two_hcrs(HCR1,HCR2,plot_flag=False):
+def score_two_hcrs(HCR1,HCR2,nupack_model = None, plot_flag=False):
     HCR1=HCR1 + (HCR1[1][-36:],)
     HCR2=HCR2 + (HCR2[1][-36:],)
     cross_interactions = 0
@@ -137,7 +143,10 @@ def score_two_hcrs(HCR1,HCR2,plot_flag=False):
                     [HCR1[2],HCR1[0],HCR1[1],HCR2[3],HCR2[1],HCR2[2]]]
 
     for inter_strnds in poss_strand_int:
-        strnd_cross_bindings = count_strand_interactions(inter_strnds)
+        if nupack_model is None: 
+            strnd_cross_bindings = count_strand_interactions(inter_strnds)
+        else: 
+            strnd_cross_bindings = count_strand_interactions(inter_strnds,nupack_model=nupack_model)
         cross_interactions += np.sum(strnd_cross_bindings[0:3,3:])
         if plot_flag: 
             plot_strand_mfe_structure(inter_strnds)
