@@ -672,17 +672,18 @@ class SpatialPriorAssistedClassifier(Classifier):
                 self.likelihoods[level][self.likelihoods[level].isna()] = 0
                 self.priors[level][self.priors[level].isna()] = 0
                 self.posteriors[level] = self.likelihoods[level] * self.priors[level]
+                self.posteriors[level][self.posteriors[level].isna()] = 0
 
-                nrm_vec = self.posteriors[level].sum(axis=1, keepdims=True)
-                nrm_vec[nrm_vec==0]=1
-                self.posteriors[level] = self.posteriors[level] / nrm_vec
+                # nrm_vec = self.posteriors[level].sum(axis=1, keepdims=True)
+                # nrm_vec[nrm_vec==0]=1
+                # self.posteriors[level] = self.posteriors[level] / nrm_vec
 
                 self.measured.obs[level] = self.likelihood_model[level].classes_[np.argmax(self.posteriors[level],axis=1)]
 
-                unique_labels = self.likelihood_model[level].classes_
-                measured_centers = pd.DataFrame(index=unique_labels.shape[0],columns=self.class_balanced_reference.var.index)
+                measured_centers = pd.DataFrame(index=self.likelihood_model[level].classes_.shape[0],columns=self.class_balanced_reference.var.index)
                 measured_centers[measured_centers.isna()] = 0
-                for label in unique_labels:
+                """ Add Posterior weighting """
+                for label in self.likelihood_model[level].classes_:
                     m = self.measured.obs[level]==label
                     measured_centers.loc[label,:] = np.mean(self.measured.layers['harmonized'][m,:],axis=0)
                 self.measured_centers[level] = measured_centers
