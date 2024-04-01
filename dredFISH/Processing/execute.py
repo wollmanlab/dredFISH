@@ -45,8 +45,12 @@ if __name__ == '__main__':
     # np.random.shuffle(sections)
     print(sections)
     completion_array = np.array([False for i in sections])
+    max_attempts = 1
+    attempt = 1
     while np.sum(completion_array==False)>0:
-        
+        if attempt>max_attempts:
+            raise(ValueError('Max Attempts Reached'))
+        attempt+=1
         for idx,section in enumerate(sections):
             # print('Processing Section ',section)
             self = Section_Class(metadata_path,section,cword_config,verbose=True)
@@ -71,3 +75,5 @@ if __name__ == '__main__':
                 continue
             completion_array[idx] = True
         time.sleep(60)
+    self.update_user('Completed')
+
