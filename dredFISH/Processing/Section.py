@@ -25,7 +25,10 @@ from skimage.segmentation  import watershed
 from skimage import morphology
 import dredFISH.Processing as Processing
 from skimage.feature import peak_local_max
-
+import math
+from dredFISH.Utils import basicu
+import scanpy as sc
+import matplotlib.colors as mcolors
 from skimage import (
     data, restoration, util
 )
@@ -71,7 +74,7 @@ class Section_Class(object):
         self.verbose=verbose
         for handler in logging.root.handlers[:]:
             logging.root.removeHandler(handler)
-        logging.basicConfig(level=self.config.parameters['processing_log_level'])
+        logging.basicConfig(level=logging.INFO)
         self.log = logging.getLogger("Processing")
 
         if self.config.parameters['fishdata'] == 'fishdata':
@@ -80,15 +83,15 @@ class Section_Class(object):
             fishdata = self.config.parameters['fishdata']
         self.path = os.path.join(self.metadata_path,fishdata)
         if not os.path.exists(self.path):
-            self.update_user('Making fishdata Path',level=10)
+            self.update_user('Making fishdata Path',level=20)
             os.mkdir(self.path)
-        self.path = os.path.join(self.path,self.dataset)
+        self.path = os.path.join(self.path,'Processing')
         if not os.path.exists(self.path):
-            self.update_user('Making Dataset Path',level=10)
+            self.update_user('Making Processing Path',level=20)
             os.mkdir(self.path)
         self.path = os.path.join(self.path,self.section)
         if not os.path.exists(self.path):
-            self.update_user('Making Section Path',level=10)
+            self.update_user('Making Section Path',level=20)
             os.mkdir(self.path)
 
         logging.basicConfig(
@@ -96,12 +99,15 @@ class Section_Class(object):
                     format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
                     datefmt='%Y %B %d %H:%M:%S',level=self.config.parameters['processing_log_level'], force=True)
         self.log = logging.getLogger("Processing")
-
         src = os.path.join(Processing.__file__.split('dredFISH/P')[0],self.cword_config+'.py')
         dst = os.path.join(self.path,self.cword_config+'.py')
         if os.path.exists(dst):
             os.remove(dst)
         shutil.copyfile(src, dst)
+
+        fileu_config = fileu.interact_config(self.path,return_config=True)
+        if not 'version' in fileu_config.keys():
+            fileu_config = fileu.interact_config(self.path,key='version',data=self.config.parameters['fileu_version'],return_config=True)
 
     def run(self):
         """
@@ -109,30 +115,35 @@ class Section_Class(object):
         """
         self.load_metadata()
         if len(self.posnames)>0:
-            completed = True
+            completed = False
             for model_type in self.config.parameters['model_types']:
-                if (not self.config.parameters['vector_overwrite']):#&self.check_existance(file_type='anndata',model_type=model_type):
-                    self.data = self.load(file_type='anndata',model_type=model_type)
+                self.model_type = model_type
+                if (not self.config.parameters['vector_overwrite']):
+                    self.update_user('Attempting To Load Data',level=20)
+                    self.data = self.load(file_type='anndata',model_type=self.model_type)
                     if not isinstance(self.data,type(None)):
                         self.update_user('Existing Data Found')
+                        completed = True
                         continue
                     self.update_user('No Data Found')
                     completed = False
             if not completed:
                 self.stitch()
                 for model_type in self.config.parameters['model_types']:
-                    if (not self.config.parameters['vector_overwrite']):#&self.check_existance(file_type='anndata',model_type=model_type):
-                        self.data = self.load(file_type='anndata',model_type=model_type)
+                    self.model_type = model_type
+                    if (not self.config.parameters['vector_overwrite']):
+                        self.update_user('Attempting To Load Data',level=20)
+                        self.data = self.load(file_type='anndata',model_type=self.model_type)
                         if not isinstance(self.data,type(None)):
                             self.update_user('Existing Data Found')
                             continue
                         self.update_user('No Data Found')
-                    
-                    self.segment(model_type=model_type)
+                    self.segment()
                     if not self.any_incomplete_hybes:
-                        self.pull_vectors(model_type=model_type)
+                        self.pull_vectors()
             if not isinstance(self.data,type(None)):
-                self.remove_temporary_files()
+                # self.remove_temporary_files()
+                self.generate_report()
         else:
             self.update_user('No positions found for this section',level=50)
     
@@ -181,6 +192,8 @@ class Section_Class(object):
         :return: File Path
         :rtype: str
         """
+        if len(self.config.parameters['model_types'])==1:
+            model_type = ''
         return fileu.generate_filename(self.path,hybe=hybe,channel=channel,file_type=file_type,model_type=model_type,logger=self.log)
 
     def save(self,data,hybe='',channel='',file_type='',model_type=''):
@@ -198,6 +211,8 @@ class Section_Class(object):
         :param model_type: segmentation Type ('total','nuclei','cytoplasm')
         :type model_type: str, optional
         """
+        if len(self.config.parameters['model_types'])==1:
+            model_type = ''
         fileu.save(data,path=self.path,hybe=hybe,channel=channel,file_type=file_type,model_type=model_type,logger=self.log)
 
     def load(self,hybe='',channel='',file_type='anndata',model_type=''):
@@ -215,6 +230,8 @@ class Section_Class(object):
         :return : Desired Data Object or None if not found
         :rtype : object
         """
+        if len(self.config.parameters['model_types'])==1:
+            model_type = ''
         return fileu.load(path=self.path,hybe=hybe,channel=channel,file_type=file_type,model_type=model_type,logger=self.log)
 
     def generate_iterable(self,iterable,message,length=0):
@@ -231,16 +248,10 @@ class Section_Class(object):
         :rtype: list,ProgressDialog?
         """
         if self.verbose:
-            self.update_user(message,level=10)
-            if length==0:
-                return tqdm(iterable,desc=str(datetime.now().strftime("%Y %B %d %H:%M:%S"))+' '+message)
-            else:
-                return tqdm(iterable,total=length,desc=str(datetime.now().strftime("%Y %B %d %H:%M:%S"))+' '+message)
-        else:
-            return iterable
+            self.update_user(message,level=20)
+        return iterable
 
-    def filter_data(self,model_type='nuclei'):
-
+    def filter_data(self):
         self.update_user('Filtering Out Non Cells')
         mask = self.data.obs['dapi']>self.config.parameters['dapi_thresh'] 
         bad_labels = self.data[mask==False].obs['label'].unique()
@@ -349,7 +360,7 @@ class Section_Class(object):
         if len(bad_acq_positions)>0|len(bad_bkg_acq_positions)>0:
             self.update_user('Imaging isnt finished ',level=30)
             self.update_user(hybe+' '+channel+' '+acq+' '+bkg_acq,level=30)
-            self.any_incomplete_hybes
+            self.any_incomplete_hybes = True
             return None,None,None,None,None
         else:
             nuc_exists = self.check_existance(
@@ -381,6 +392,33 @@ class Section_Class(object):
                     stitched = 0
                 return stitched
             else:
+                if self.config.parameters['acq_FF']:
+                    if (self.config.parameters['overwrite']==False)&self.check_existance(hybe=hybe,channel=self.config.parameters['total_channel'],file_type='constant')&self.check_existance(hybe=hybe,channel=self.config.parameters['total_channel'],file_type='FF'):
+                        self.update_user(f"Found Existing Flat Field for {hybe} {self.config.parameters['total_channel']}")
+                        self.FF = self.load(hybe=hybe,channel=self.config.parameters['total_channel'],file_type='FF')
+                        self.constant = self.load(hybe=hybe,channel=self.config.parameters['total_channel'],file_type='constant')
+                    else:
+                        self.update_user(f"Calculating Flat Field for {self.find_acq(hybe,protocol='hybe')} {self.config.parameters['total_channel']}")
+                        FF,constant = generate_FF(self.image_metadata,self.find_acq(hybe,protocol='hybe'),self.config.parameters['total_channel'],bkg_acq='',parameters=self.config.parameters)
+                        self.FF = FF
+                        self.save(FF,hybe=hybe,channel=self.config.parameters['total_channel'],file_type='FF')
+                        self.save((FF*1000),hybe=hybe,channel=self.config.parameters['total_channel'],file_type='image_FF')
+                        self.constant = constant
+                        self.save(constant,hybe=hybe,channel=self.config.parameters['total_channel'],file_type='constant')
+                        self.save(constant,hybe=hybe,channel=self.config.parameters['total_channel'],file_type='image_constant')
+                    if (self.config.parameters['overwrite']==False)&self.check_existance(hybe=hybe,channel=self.config.parameters['nucstain_channel'],file_type='FF')&self.check_existance(hybe=hybe,channel=self.config.parameters['nucstain_channel'],file_type='constant'):
+                        self.update_user(f"Found Existing Flat Field for {hybe} {self.config.parameters['nucstain_channel']}")
+                        self.nuc_FF = self.load(hybe=hybe,channel=self.config.parameters['nucstain_channel'],file_type='FF')
+                        self.nuc_constant = self.load(hybe=hybe,channel=self.config.parameters['nucstain_channel'],file_type='constant')
+                    else:
+                        self.update_user(f"Calculating Flat Field for {self.find_acq(hybe,protocol='hybe')} {self.config.parameters['nucstain_channel']}")
+                        nuc_FF,nuc_constant = generate_FF(self.image_metadata,self.find_acq(hybe,protocol='hybe'),self.config.parameters['nucstain_channel'],bkg_acq='',parameters=self.config.parameters)
+                        self.nuc_FF = nuc_FF
+                        self.save(nuc_FF,hybe=hybe,channel=self.config.parameters['nucstain_channel'],file_type='FF')
+                        self.save((nuc_FF*1000),hybe=hybe,channel=self.config.parameters['nucstain_channel'],file_type='image_FF')
+                        self.nuc_constant = nuc_constant
+                        self.save(nuc_constant,hybe=hybe,channel=channel,file_type='constant')
+                        self.save(nuc_constant,hybe=hybe,channel=self.config.parameters['nucstain_channel'],file_type='image_constant')
                 if isinstance(self.FF,str):
                     self.FF = 1
                 if isinstance(self.nuc_FF,str):
@@ -398,10 +436,7 @@ class Section_Class(object):
                 y_max,x_max = xy.max(0)+img_shape+self.config.parameters['border']
                 x_range = np.array(range(x_min,x_max+1))
                 y_range = np.array(range(y_min,y_max+1))
-                if self.config.parameters['stitch_raw']:
-                    stitched = torch.zeros([len(x_range),len(y_range),4],dtype=torch.int32)
-                else:
-                    stitched = torch.zeros([len(x_range),len(y_range),2],dtype=torch.int32)
+                stitched = torch.zeros([len(x_range),len(y_range),2],dtype=torch.int32)
                 if isinstance(self.reference_stitched,str):
                     pixel_coordinates_stitched = torch.zeros([len(x_range),len(y_range),2],dtype=torch.int32)
                 Input = []
@@ -433,22 +468,16 @@ class Section_Class(object):
                     translation_y_list = [0,0,0]
                     translation_x_list = [0,0,0]
                 results = {}
-                with multiprocessing.Pool(5) as p:
-                    for posname,nuc,signal,translation_x,translation_y,nuc_raw,signal_raw in self.generate_iterable(p.imap(pfunc,Input),'Processing '+acq+'_'+channel,length=len(Input)):
+                with multiprocessing.Pool(15) as p:
+                    for posname,nuc,signal,translation_x,translation_y in self.generate_iterable(p.imap(pfunc,Input),'Processing '+acq+'_'+channel,length=len(Input)):
                         results[posname] = {}
                         results[posname]['nuc'] = nuc
                         results[posname]['signal'] = signal
                         results[posname]['translation_x'] = translation_x
                         results[posname]['translation_y'] = translation_y
-                        if self.config.parameters['stitch_raw']:
-                            results[posname]['nuc_raw'] = nuc_raw
-                            results[posname]['signal_raw'] = signal_raw
                 for posname in self.generate_iterable(results.keys(),'Stitching '+acq+'_'+channel,length=len(results.keys())):
                     nuc = results[posname]['nuc']
                     signal = results[posname]['signal']
-                    if self.config.parameters['stitch_raw']:
-                        nuc_raw = results[posname]['nuc_raw']
-                        signal_raw = results[posname]['signal_raw']
                     translation_x = results[posname]['translation_x']
                     translation_y = results[posname]['translation_y']
                     if isinstance(translation_x,str):
@@ -489,12 +518,9 @@ class Section_Class(object):
                     try:
                         stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),0] = nuc
                         stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),1] = signal
-                        if self.config.parameters['stitch_raw']:
-                            stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),2] = nuc_raw
-                            stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),3] = signal_raw
                         if isinstance(self.reference_stitched,str):
-                            pixel_coordinates_stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),0] = np.stack([np.array(range(nuc.shape[1])) for i in range(nuc.shape[0])]) #x
-                            pixel_coordinates_stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),1] = np.stack([np.array(range(nuc.shape[0])) for i in range(nuc.shape[1])]).T #y
+                            pixel_coordinates_stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),0] = torch.tensor(np.stack([np.array(range(nuc.shape[1])) for i in range(nuc.shape[0])])) #x
+                            pixel_coordinates_stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),1] = torch.tensor(np.stack([np.array(range(nuc.shape[0])) for i in range(nuc.shape[1])]).T) #y
                             
                     except Exception as e:
                         print(posname,'Placing Image in Stitch with registration failed')
@@ -504,26 +530,15 @@ class Section_Class(object):
                         stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),0] = nuc
                         stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),1] = signal
                         if isinstance(self.reference_stitched,str):
-                            pixel_coordinates_stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),0] = np.stack([np.array(range(nuc.shape[1])) for i in range(nuc.shape[0])]) #x
-                            pixel_coordinates_stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),1] = np.stack([np.array(range(nuc.shape[0])) for i in range(nuc.shape[1])]).T #y
-                        if self.config.parameters['stitch_raw']:
-                            stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),2] = nuc_raw
-                            stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),3] = signal_raw
-
+                            pixel_coordinates_stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),0] = torch.tensor(np.stack([np.array(range(nuc.shape[1])) for i in range(nuc.shape[0])])) #x
+                            pixel_coordinates_stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),1] = torch.tensor(np.stack([np.array(range(nuc.shape[0])) for i in range(nuc.shape[1])]).T) #y
                 if len(redo_posnames)>0:
                     for posname in self.generate_iterable(redo_posnames,'Redoing Failed Positions '+acq+'_'+channel,length=len(redo_posnames)):
                         nuc = results[posname]['nuc']
                         signal = results[posname]['signal']
-                        if self.config.parameters['stitch_raw']:
-                            nuc_raw = results[posname]['nuc_raw']
-                            signal_raw = results[posname]['signal_raw']
-
                         translation_x = results[posname]['translation_x']
                         translation_y = results[posname]['translation_y']
-
-
                         position_y,position_x = self.coordinates[posname].astype(int)
-
                         img_x_min = position_x-x_min
                         img_x_max = (position_x-x_min)+img_shape[0] # maybe flipped 1,0
                         img_y_min = position_y-y_min
@@ -538,12 +553,8 @@ class Section_Class(object):
                         stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),0] = nuc
                         stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),1] = signal
                         if isinstance(self.reference_stitched,str):
-                            pixel_coordinates_stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),0] = np.stack([np.array(range(nuc.shape[1])) for i in range(nuc.shape[0])]) #x
-                            pixel_coordinates_stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),1] = np.stack([np.array(range(nuc.shape[0])) for i in range(nuc.shape[1])]).T #y
-                        if self.config.parameters['stitch_raw']:
-                            stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),2] = nuc_raw
-                            stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),3] = signal_raw
-
+                            pixel_coordinates_stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),0] = torch.tensor(np.stack([np.array(range(nuc.shape[1])) for i in range(nuc.shape[0])])) #x
+                            pixel_coordinates_stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),1] = torch.tensor(np.stack([np.array(range(nuc.shape[0])) for i in range(nuc.shape[1])]).T) #y
                 self.save(stitched[:,:,0],hybe=hybe,channel=self.config.parameters['nucstain_channel'],file_type='stitched')
                 self.save(stitched[:,:,1],hybe=hybe,channel=channel,file_type='stitched')
                 nuclei = stitched[self.config.parameters['border']:-self.config.parameters['border'],
@@ -559,55 +570,46 @@ class Section_Class(object):
                 if isinstance(self.reference_stitched,str):
                     self.save(pixel_coordinates_stitched[:,:,0],hybe='image_x',channel='',file_type='stitched')
                     self.save(pixel_coordinates_stitched[:,:,1],hybe='image_y',channel='',file_type='stitched')
-                if self.config.parameters['stitch_raw']:
-                    self.save(stitched[:,:,2],hybe=hybe,channel=self.config.parameters['nucstain_channel'],file_type='stitched_raw')
-                    self.save(stitched[:,:,3],hybe=hybe,channel=channel,file_type='stitched_raw')
-                    nuclei_raw = stitched[self.config.parameters['border']:-self.config.parameters['border'],
-                                    self.config.parameters['border']:-self.config.parameters['border'],2].numpy()
-                    scale_raw = (np.array(nuclei_raw.shape)*self.config.parameters['ratio']).astype(int)
-                    nuclei_raw_down = np.array(Image.fromarray(nuclei_raw.astype(float)).resize((scale_raw[1],scale_raw[0]), Image.BICUBIC))
-                    self.save(nuclei_raw_down,hybe=hybe,channel=self.config.parameters['nucstain_channel'],file_type='image_raw')
-                    signal_raw = stitched[self.config.parameters['border']:-self.config.parameters['border'],
-                                    self.config.parameters['border']:-self.config.parameters['border'],3].numpy()
-                    scale_raw = (np.array(signal_raw.shape)*self.config.parameters['ratio']).astype(int)
-                    signal_raw_down = np.array(Image.fromarray(signal_raw.astype(float)).resize((scale_raw[1],scale_raw[0]), Image.BICUBIC))
-                    self.save(signal_raw_down,hybe=hybe,channel=channel,file_type='image_raw')
                 return stitched
 
     def stitch(self):
         """
         stitch Wrapper to stitch all rounds of imaging
         """        
-        channel = self.config.parameters['total_channel']
+        self.update_user('Attempting To Stitch',level=20)
         acq = self.find_acq(self.config.parameters['nucstain_acq'],protocol='hybe')
         if self.config.parameters['use_FF']==False:
             self.FF = 1
             self.nuc_FF = 1
         elif isinstance(self.FF,str) | isinstance(self.nuc_FF,str):
-            if self.check_existance(channel=self.config.parameters['total_channel'],file_type='constant')&self.check_existance(channel=self.config.parameters['total_channel'],file_type='FF'):
-                self.FF = self.load(channel=self.config.parameters['total_channel'],file_type='FF')
-                self.constant = self.load(channel=self.config.parameters['total_channel'],file_type='constant')
+            if (self.config.parameters['overwrite']==False)&self.check_existance(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['total_channel'],file_type='constant')&self.check_existance(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['total_channel'],file_type='FF'):
+                self.update_user(f"Loading FF and Constant for {self.find_acq(self.config.parameters['nucstain_acq'],protocol='hybe')} {self.config.parameters['total_channel']}")
+                self.FF = self.load(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['total_channel'],file_type='FF')
+                self.constant = self.load(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['total_channel'],file_type='constant')
             else:
-                FF,constant = generate_FF(self.image_metadata,acq,channel,bkg_acq='',parameters=self.config.parameters,verbose=self.verbose)
+                self.update_user(f"Generating FF and Constant for {self.find_acq(self.config.parameters['nucstain_acq'],protocol='hybe')} {self.config.parameters['total_channel']}")
+                FF,constant = generate_FF(self.image_metadata,self.find_acq(self.config.parameters['nucstain_acq'],protocol='hybe'),self.config.parameters['total_channel'],bkg_acq='',parameters=self.config.parameters)
                 # FF,constant = generate_FF_constant(self.image_metadata,channel,posnames=self.posnames,bkg_acq='',parameters=self.config.parameters,verbose=self.verbose)
                 self.FF = FF
-                self.save(FF,channel=channel,file_type='FF')
-                self.save((FF*1000),hybe='FF',channel=channel,file_type='image_FF')
+                self.save(FF,hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['total_channel'],file_type='FF')
+                self.save((FF*1000),hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['total_channel'],file_type='image_FF')
                 self.constant = constant
-                self.save(constant,channel=channel,file_type='constant')
-                self.save((constant),hybe='constant',channel=channel,file_type='image_constant')
-            if self.check_existance(channel=self.config.parameters['nucstain_channel'],file_type='FF')&self.check_existance(channel=self.config.parameters['nucstain_channel'],file_type='constant'):
-                self.nuc_FF = self.load(channel=self.config.parameters['nucstain_channel'],file_type='FF')
-                self.nuc_constant = self.load(channel=self.config.parameters['nucstain_channel'],file_type='constant')
+                self.save(constant,hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['total_channel'],file_type='constant')
+                self.save(constant,hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['total_channel'],file_type='image_constant')
+            if (self.config.parameters['overwrite']==False)&self.check_existance(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='FF')&self.check_existance(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='constant'):
+                self.update_user(f"Loading FF and Constant for {self.find_acq(self.config.parameters['nucstain_acq'],protocol='hybe')} {self.config.parameters['nucstain_channel']}")
+                self.nuc_FF = self.load(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='FF')
+                self.nuc_constant = self.load(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='constant')
             else:
-                nuc_FF,nuc_constant = generate_FF(self.image_metadata,acq,self.config.parameters['nucstain_channel'],bkg_acq='',parameters=self.config.parameters,verbose=self.verbose)
+                self.update_user(f"Generating FF and Constant for {self.find_acq(self.config.parameters['nucstain_acq'],protocol='hybe')} {self.config.parameters['nucstain_channel']}")
+                nuc_FF,nuc_constant = generate_FF(self.image_metadata,self.find_acq(self.config.parameters['nucstain_acq'],protocol='hybe'),self.config.parameters['nucstain_channel'],bkg_acq='',parameters=self.config.parameters)
                 # nuc_FF,nuc_constant = generate_FF_constant(self.image_metadata,self.config.parameters['nucstain_channel'],posnames=self.posnames,bkg_acq='',parameters=self.config.parameters,verbose=self.verbose)
                 self.nuc_FF = nuc_FF
-                self.save(nuc_FF,channel=self.config.parameters['nucstain_channel'],file_type='FF')
-                self.save((nuc_FF*1000),hybe='FF',channel=self.config.parameters['nucstain_channel'],file_type='image_FF')
+                self.save(nuc_FF,hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='FF')
+                self.save((nuc_FF*1000),hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='image_FF')
                 self.nuc_constant = nuc_constant
-                self.save(nuc_constant,channel=channel,file_type='constant')
-                self.save((nuc_constant),hybe='constant',channel=self.config.parameters['nucstain_channel'],file_type='image_constant')
+                self.save(nuc_constant,hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='constant')
+                self.save((nuc_constant),hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='image_constant')
         if self.config.parameters['use_constant']==False:
             self.constant = 0
             self.nuc_constant = 0
@@ -625,85 +627,110 @@ class Section_Class(object):
                     self.update_user(e,level=40)
                     self.any_incomplete_hybes = True
 
-    def segment(self,model_type='nuclei'):
+    def segment(self):
         """
         segment Using stitched images segment cells 
 
         :param model_type: model for cellpose ('nuclei' 'total' 'cytoplasm'), defaults to 'nuclei'
         :type model_type: str, optional
         """      
-
-        if (not self.config.parameters['segment_overwrite'])&self.check_existance(file_type='mask',model_type=model_type):
-            self.mask = self.load(file_type='mask',model_type=model_type)
+        self.update_user(f"Attempting Segmentation {self.model_type}",level=20)
+        if (not self.config.parameters['segment_overwrite'])&self.check_existance(file_type='mask',model_type=self.model_type):
+            self.mask = self.load(file_type='mask',model_type=self.model_type)
+            self.update_user(f"Existing Mask Found {self.model_type}",level=20)
         else:
             """ Cytoplasm"""
-            if 'cytoplasm' in model_type:
+            if 'cytoplasm' in self.model_type:
                 """ Check Total"""
                 if self.check_existance(file_type='mask',model_type='total'):
                     """ Load """
                     total = self.load(file_type='mask',model_type='total')
                 else:
-                    self.segment(model_type='total')
+                    backup_type = self.model_type
+                    self.model_type = 'total'
+                    self.segment()
+                    self.model_type = backup_type
                     total = self.mask
                 """ Check Nuclei"""
                 if self.check_existance(file_type='mask',model_type='nuclei'):
                     """ Load """
                     nuclei = self.load(file_type='mask',model_type='nuclei')
                 else:
-                    self.segment(model_type='nuclei')
+                    backup_type = self.model_type
+                    self.model_type = 'nuclei'
+                    self.segment()
+                    self.model_type = backup_type
                     nuclei = self.mask
                 cytoplasm = total
                 cytoplasm[nuclei>0] = 0
                 self.mask = cytoplasm
-                self.save(self.mask,file_type='mask',model_type=model_type)
-            elif 'beads' in model_type:
+                self.save(self.mask,file_type='mask',model_type=self.model_type)
+            elif 'beads' in self.model_type:
                 self.update_user('Bead Segmentation Not Implemented',level=50)
                 """ Add Bead Segmentation Code Here """
             else:
                 """ Total & Nuclei"""
+                total = None
+                nucstain = None
+                model = None
+                self.mask = None
+                # nucstain
                 if self.check_existance(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='stitched'):
                     nucstain = self.load(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='stitched')
                     dapi_mask = nucstain<self.config.parameters['dapi_thresh']
                     nucstain[dapi_mask] = 0
-                    model = models.Cellpose(model_type='nuclei',gpu=self.config.parameters['segment_gpu'])
-                    self.mask = torch.zeros_like(nucstain)
                 else:
-                    """ Not processed"""
-                    nucstain = None
-                    model=None
-                    self.mask = None
-                if 'total' in model_type:
-                    if self.config.parameters['total_acq'] == 'all':
-                        total = ''
-                        for r,h,c in self.generate_iterable(self.config.bitmap,'Loading Total by Summing All Measurements'):
-                            if self.check_existance(hybe=h,channel=c,file_type='stitched'):
-                                if isinstance(total,str):
-                                    total = self.load(hybe=h,channel=c,file_type='stitched')
+                    if self.config.parameters['nucstain_acq'] == 'all':
+                        for r,h,c in self.generate_iterable(self.config.bitmap,'Loading Total by Averaging All Measurements'):
+                            if self.check_existance(hybe=h,channel=self.config.parameters['nucstain_channel'],file_type='stitched'):
+                                if isinstance(nucstain,type(None)):
+                                    nucstain = self.load(hybe=h,channel=self.config.parameters['nucstain_channel'],file_type='stitched')/len(self.config.bitmap)
                                 else:
-                                    total = total+self.load(hybe=h,channel=c,file_type='stitched')
+                                    nucstain = nucstain+(self.load(hybe=h,channel=self.config.parameters['nucstain_channel'],file_type='stitched')/len(self.config.bitmap))
                             else:
-                                total=None
-                        total[dapi_mask] = 0
-                    else:
-                        if self.check_existance(hybe=self.config.parameters['total_acq'],channel=self.config.parameters['total_channel'],file_type='stitched'):
+                                self.update_user(f" Missing {h} for generating nucstain",value=50)
+                                nucstain=None
+                if not isinstance(nucstain,type(None)):
+                    self.save(nucstain,hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='stitched')
+                    nuclei = nucstain[self.config.parameters['border']:-self.config.parameters['border'],
+                                    self.config.parameters['border']:-self.config.parameters['border']].numpy()
+                    scale = (np.array(nuclei.shape)*self.config.parameters['ratio']).astype(int)
+                    nuclei_down = np.array(Image.fromarray(nuclei.astype(float)).resize((scale[1],scale[0]), Image.BICUBIC))
+                    self.save(nuclei_down,hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='image')
+                # Total
+                if 'total' in self.model_type:
+                    if self.check_existance(hybe=self.config.parameters['total_acq'],channel=self.config.parameters['total_channel'],file_type='stitched'):
                             total = self.load(hybe=self.config.parameters['total_acq'],channel=self.config.parameters['total_channel'],file_type='stitched')
                             total[dapi_mask] = 0
-                            model = models.Cellpose(model_type='cyto2',gpu=self.config.parameters['segment_gpu'])
-                            self.mask = torch.zeros_like(total)
-                            if isinstance(nucstain,type(None)):
-                                self.mask = None
-                                model=None
-                        else:
-                            total = None
-                            model=None
-                            self.mask = None
-                if not isinstance(model,type(None)):
-                    # Define Global Thresholds
-                    if 'total' in model_type:
+                    else:
+                        if self.config.parameters['total_acq'] == 'all':
+                            for r,h,c in self.generate_iterable(self.config.bitmap,'Loading Total by Averaging All Measurements'):
+                                if self.check_existance(hybe=h,channel=c,file_type='stitched'):
+                                    if isinstance(total,type(None)):
+                                        total = self.load(hybe=h,channel=c,file_type='stitched')/len(self.config.bitmap)
+                                    else:
+                                        total = total+(self.load(hybe=h,channel=c,file_type='stitched')/len(self.config.bitmap))
+                                else:
+                                    self.update_user(f" Missing {h} for generating total",value=50)
+                                    total=None
+                    if not isinstance(total,type(None)):
+                        self.save(total,hybe=self.config.parameters['total_acq'],channel=self.config.parameters['total_channel'],file_type='stitched')
+                        signal = total[self.config.parameters['border']:-self.config.parameters['border'],
+                                        self.config.parameters['border']:-self.config.parameters['border']].numpy()
+                        scale = (np.array(signal.shape)*self.config.parameters['ratio']).astype(int)
+                        signal_down = np.array(Image.fromarray(signal.astype(float)).resize((scale[1],scale[0]), Image.BICUBIC))
+                        self.save(signal_down,hybe=self.config.parameters['total_acq'],channel=self.config.parameters['total_channel'],file_type='image')
+                        total[dapi_mask] = 0
+                if not isinstance(nucstain,type(None)):
+                    if 'total' in self.model_type:
+                        model = models.Cellpose(model_type='cyto3',gpu=self.config.parameters['segment_gpu'])
+                        self.mask = torch.zeros_like(total,dtype=torch.int32)
                         thresh = np.median(total[total!=0].numpy())+np.std(total[total!=0].numpy())
                     else:
+                        model = models.Cellpose(model_type='nuclei',gpu=self.config.parameters['segment_gpu'])
+                        self.mask = torch.zeros_like(nucstain,dtype=torch.int32)
                         thresh = np.median(nucstain[nucstain!=0].numpy())+np.std(nucstain[nucstain!=0].numpy())
-
+                if not isinstance(model,type(None)):
                     window = 2000
                     x_step = round(nucstain.shape[0]/int(nucstain.shape[0]/window))
                     y_step = round(nucstain.shape[1]/int(nucstain.shape[1]/window))
@@ -713,9 +740,9 @@ class Section_Class(object):
                     for x in range(n_x_steps):
                         for y in range(n_y_steps):
                             Input.append([x,y])
-                    for (x,y) in self.generate_iterable(Input,'Segmenting Cells: '+model_type):
+                    for (x,y) in self.generate_iterable(Input,'Segmenting Cells: '+self.model_type):
                         nuc = nucstain[(x*x_step):((x+1)*x_step),(y*y_step):((y+1)*y_step)].numpy()
-                        if 'total' in model_type:
+                        if 'total' in self.model_type:
                             tot = total[(x*x_step):((x+1)*x_step),(y*y_step):((y+1)*y_step)].numpy()
                             stk = np.dstack([nuc,tot,np.zeros_like(nuc)])
                             diameter = int(self.config.parameters['segment_diameter']*1.5)
@@ -736,11 +763,12 @@ class Section_Class(object):
                                                             channels=channels,
                                                             flow_threshold=1,
                                                             cellprob_threshold=0,
-                                                            min_size=min_size)
+                                                            min_size=min_size,
+                                                            batch_size=16)
                         mask = torch.tensor(raw_mask_image.astype(int),dtype=torch.int32)
                         updated_mask = mask.numpy().copy()
                         # Use Watershed to find missing cells 
-                        if 'total' in model_type:
+                        if 'total' in self.model_type:
                             image = stk[:,:,1]
                         else:
                             image = stk
@@ -796,22 +824,24 @@ class Section_Class(object):
                         self.mask[(x*x_step):((x+1)*x_step),(y*y_step):((y+1)*y_step)] = mask
                         del raw_mask_image,flows,styles,diams
                         torch.cuda.empty_cache()
-                    if 'nuclei' in model_type:
+                    if 'nuclei' in self.model_type:
                         if self.check_existance(file_type='mask',model_type='total'):
                             total = self.load(file_type='mask',model_type='total')
                             total[self.mask==0] = 0 # Set non nuclear to 0
                             self.mask = total # replace mask with total&nuclear
-                    self.save(self.mask,file_type='mask',model_type=model_type)
+                    self.save(self.mask,file_type='mask',model_type=self.model_type)
 
-    def pull_vectors(self,model_type='nuclei'):
+    def pull_vectors(self):
         """
         pull_vectors Using segmented cells pull pixels for each round for each cell and summarize into vector
 
         :param model_type: model for cellpose ('nuclei' 'total' 'cytoplasm'), defaults to 'nuclei'
         :type model_type: str, optional
-        """        
-        if (not self.config.parameters['vector_overwrite'])&self.check_existance(file_type='anndata',model_type=model_type):
-            self.data = self.load(file_type='anndata',model_type=model_type)
+        """      
+        self.update_user(f"Attempting to Pull Vectors {self.model_type}",level=20)  
+        if (not self.config.parameters['vector_overwrite'])&self.check_existance(file_type='anndata',model_type=self.model_type):
+            self.data = self.load(file_type='anndata',model_type=self.model_type)
+            self.update_user(f"Existing Data Found {self.model_type}",level=20)
         else:
             idxes = torch.where(self.mask!=0)
             labels = self.mask[idxes]
@@ -822,40 +852,15 @@ class Section_Class(object):
             pixel_image_xy[:,1] = self.load(hybe='image_y',channel='',file_type='stitched')[idxes]
 
             pixel_vectors = torch.zeros([idxes[0].shape[0],len(self.config.bitmap)+1],dtype=torch.int32)
-            if self.config.parameters['stitch_raw']:
-                pixel_vectors_raw = torch.zeros([idxes[0].shape[0],len(self.config.bitmap)+1],dtype=torch.int32)
-
             nuc_pixel_vectors = torch.zeros([idxes[0].shape[0],len(self.config.bitmap)+1],dtype=torch.int32)
-            if self.config.parameters['stitch_raw']:
-                nuc_pixel_vectors_raw = torch.zeros([idxes[0].shape[0],len(self.config.bitmap)+1],dtype=torch.int32)
-
             for i,(r,h,c) in self.generate_iterable(enumerate(self.config.bitmap),'Generating Pixel Vectors',length=len(self.config.bitmap)):
                 pixel_vectors[:,i] = self.load(hybe=h,channel=c,file_type='stitched')[idxes]
-                if self.config.parameters['stitch_raw']:
-                    pixel_vectors_raw[:,i] = self.load(hybe=h,channel=c,file_type='stitched_raw')[idxes]
                 nuc_pixel_vectors[:,i] = self.load(hybe=h,channel=self.config.parameters['nucstain_channel'],file_type='stitched')[idxes]
-                if self.config.parameters['stitch_raw']:
-                    nuc_pixel_vectors_raw[:,i] = self.load(hybe=h,channel=self.config.parameters['nucstain_channel'],file_type='stitched_raw')[idxes]
-            
-            # Nucstain Signal
             pixel_vectors[:,-1] = self.load(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='stitched')[idxes]
-            if self.config.parameters['stitch_raw']:
-                pixel_vectors_raw[:,-1] = self.load(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='stitched_raw')[idxes]
-            
             nuc_pixel_vectors[:,-1] = self.load(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='stitched')[idxes]
-            if self.config.parameters['stitch_raw']:
-                nuc_pixel_vectors_raw[:,-1] = self.load(hybe=self.config.parameters['nucstain_acq'],channel=self.config.parameters['nucstain_channel'],file_type='stitched_raw')[idxes]
-
             unique_labels = torch.unique(labels)
-            
             self.vectors = torch.zeros([unique_labels.shape[0],pixel_vectors.shape[1]],dtype=torch.int32)
-            if self.config.parameters['stitch_raw']:
-                self.vectors_raw = torch.zeros([unique_labels.shape[0],pixel_vectors_raw.shape[1]],dtype=torch.int32)
-            
             self.nuc_vectors = torch.zeros([unique_labels.shape[0],nuc_pixel_vectors.shape[1]],dtype=torch.int32)
-            if self.config.parameters['stitch_raw']:
-                self.nuc_vectors_raw = torch.zeros([unique_labels.shape[0],nuc_pixel_vectors_raw.shape[1]],dtype=torch.int32)
-            
             pixel_xy = torch.zeros([idxes[0].shape[0],2])
             pixel_xy[:,0] = idxes[0]
             pixel_xy[:,1] = idxes[1]
@@ -869,23 +874,13 @@ class Section_Class(object):
                 converter[int(labels[i])].append(i)
             for i,label in tqdm(enumerate(unique_labels),total=unique_labels.shape[0],desc=str(datetime.now().strftime("%H:%M:%S"))+' Generating Cell Vectors and Metadata'):
                 m = converter[int(label)]
-                
                 self.vectors[i,:] = torch.median(pixel_vectors[m,:],axis=0).values
-                if self.config.parameters['stitch_raw']:
-                    self.vectors_raw[i,:] = torch.median(pixel_vectors_raw[m,:],axis=0).values
-                
                 self.nuc_vectors[i,:] = torch.median(nuc_pixel_vectors[m,:],axis=0).values
-                if self.config.parameters['stitch_raw']:
-                    self.nuc_vectors_raw[i,:] = torch.median(nuc_pixel_vectors_raw[m,:],axis=0).values
-                
                 pxy = pixel_xy[m,:]
                 self.xy[i,:] = torch.median(pxy,axis=0).values
-                
                 pixy = pixel_image_xy[m,:]
                 self.image_xy[i,:] = torch.median(pixy,axis=0).values
-                
                 self.size[i] = pxy.shape[0]
-            
             cell_labels = [self.dataset+'_Section'+self.section+'_Cell'+str(i) for i in unique_labels.numpy()]
             self.cell_metadata = pd.DataFrame(index=cell_labels)
             self.cell_metadata['label'] = unique_labels.numpy()
@@ -896,63 +891,327 @@ class Section_Class(object):
             self.cell_metadata['size'] = self.size.numpy()
             self.cell_metadata['section_index'] = self.section
             self.cell_metadata['dapi'] = self.nuc_vectors[:,-1].numpy()
-
             self.vectors = self.vectors[:,0:-1]
-            if self.config.parameters['stitch_raw']:
-                self.vectors_raw = self.vectors_raw[:,0:-1]
-            
             self.nuc_vectors = self.nuc_vectors[:,0:-1]
-            if self.config.parameters['stitch_raw']:
-                self.nuc_vectors_raw = self.nuc_vectors_raw[:,0:-1]
-
             self.data = anndata.AnnData(X=self.vectors.numpy(),
                                 var=pd.DataFrame(index=np.array([r for r,h,c in self.config.bitmap])),
                                 obs=self.cell_metadata)
             self.data.var['readout'] = [r for r,h,c in self.config.bitmap]
             self.data.var['hybe'] = [h for r,h,c in self.config.bitmap]
             self.data.var['channel'] = [c for r,h,c in self.config.bitmap]
-
-            if self.config.parameters['stitch_raw']:
-                self.data.layers['raw_vectors'] = self.vectors_raw.numpy()
-
             self.data.layers['processed_vectors'] = self.vectors.numpy()
-            if self.config.parameters['stitch_raw']:
-                self.data.layers['nuc_raw_vectors'] = self.nuc_vectors_raw.numpy()
-
             self.data.layers['nuc_processed_vectors'] = self.nuc_vectors.numpy()
-            if self.config.parameters['stitch_raw']:
-                self.data.layers['raw'] = self.vectors.numpy()
-                self.data.layers['nuc_raw'] = self.nuc_vectors.numpy()
+            self.data.layers['raw'] = self.vectors.numpy()
+            self.data.layers['nuc_raw'] = self.nuc_vectors.numpy()
 
 
-            observations = ['PolyT','library_size','Nonspecific_Encoding','Nonspecific_Readout'] # FIX upgrade to be everything but the rs in design 
+            observations = ['PolyT','Housekeeping','Nonspecific_Encoding','Nonspecific_Readout'] # FIX upgrade to be everything but the rs in design 
             for obs in observations:
-                if obs in data.var.index:
+                if obs in self.data.var.index:
                     self.data.obs[obs.lower()] = self.data.layers['processed_vectors'][:,self.data.var.index==obs]
-                    if self.config.parameters['stitch_raw']:
-                        self.data.obs[obs.lower()+'_raw'] = self.data.layers['raw_vectors'][:,self.data.var.index==obs]
-            
+
             self.data = self.data[:,self.data.var.index.isin(observations)==False]
 
             self.save(
                 self.data.obs,
                 file_type='metadata',
-                model_type=model_type)
+                model_type=self.model_type)
             self.save(
                 self.data.var,
                 file_type='metadata_bits',
-                model_type=model_type)
+                model_type=self.model_type)
             self.save(pd.DataFrame(
                 self.data.layers['processed_vectors'],
                 index=self.data.obs.index,
                 columns=self.data.var.index),
                 file_type='matrix',
-                model_type=model_type)
+                model_type=self.model_type)
             self.save(
                 self.data,
                 file_type='anndata',
-                model_type=model_type)
+                model_type=self.model_type)
+    
+    def generate_report(self):
+        """ First Check if the report has been generated"""
+        report_path = self.generate_filename(hybe='', channel='', file_type='Report', model_type=self.model_type)
+        dpi = 200
+        paths= []
+        self.data.obs['sum'] = self.data.layers['processed_vectors'].sum(axis=1)
+        additional_views = ['housekeeping','dapi','nonspecific_encoding','nonspecific_readout','sum','ieg']
+        plt.close('all')
+        if (os.path.exists(report_path)==False)|self.config.parameters['overwrite_report']:
+            """ Vector """
+            path = self.generate_filename(hybe='', channel='RawVectors', file_type='Figure', model_type=self.model_type)
+            if (os.path.exists(path)==False)|self.config.parameters['overwrite_report']:
+                self.update_user('Generating Raw Figure')
+                n_bits = self.data.shape[1]
+                n_figs = n_bits+len(additional_views)
+                n_columns = 5
+                n_rows = math.ceil(n_figs/n_columns)
+                fig,axs = plt.subplots(n_columns,n_rows,figsize=[25,25])
+                plt.suptitle('Stain Signal Log')
+                axs = axs.ravel()
+                for i in range(n_figs):
+                    axs[i].axis('off')
+                    axs[i].set_aspect('equal')
+                x = self.data.obs['stage_x']
+                y = self.data.obs['stage_y']
+                X = basicu.normalize_fishdata_regress(self.data.layers['processed_vectors'].copy().astype(float),value='none',leave_log=True,log=True,bitwise=False)
+                for i in range(n_bits):
+                    c = X[:,i].copy()
+                    vmin,vmax = np.percentile(c[np.isnan(c)==False],[5,95])
+                    scatter = axs[i].scatter(x,y,c=np.clip(c,vmin,vmax),s=0.01,cmap='jet',marker='x')
+                    fig.colorbar(scatter, ax=axs[i])
+                    axs[i].set_title(np.array(self.data.var.index)[i])
+                    axs[i].axis('off')
+                shared_columns = [i for i in additional_views if i in self.data.obs.columns]
+                X = basicu.normalize_fishdata_regress(np.array(self.data.obs[shared_columns]).astype(float),value='none',leave_log=True,log=True,bitwise=False)
+                for i,obs in enumerate(shared_columns):
+                    c = X[:,i].copy()
+                    vmin,vmax = np.percentile(c[np.isnan(c)==False],[5,95])
+                    scatter = axs[i+n_bits].scatter(x,y,c=np.clip(c,vmin,vmax),s=0.01,cmap='jet',marker='x')
+                    fig.colorbar(scatter, ax=axs[i+n_bits])
+                    axs[i+n_bits].set_title(obs)
+                    axs[i+n_bits].axis('off')
+                paths.append(path)
+                plt.savefig(path,dpi=dpi)
+                plt.show()
+            plt.close('all')
+            """ Vector """
+            path = self.generate_filename(hybe='', channel='NormVectors', file_type='Figure', model_type=self.model_type)
+            if (os.path.exists(path)==False)|self.config.parameters['overwrite_report']:
+                self.update_user('Generating SumNorm Figure')
+                n_bits = self.data.shape[1]
+                n_figs = n_bits+len(additional_views)
+                n_columns = 5
+                n_rows = math.ceil(n_figs/n_columns)
+                fig,axs = plt.subplots(n_columns,n_rows,figsize=[25,25])
+                plt.suptitle('Stain Signal Sum Normalized')
+                axs = axs.ravel()
+                for i in range(n_figs):
+                    axs[i].axis('off')
+                    axs[i].set_aspect('equal')
+                x = self.data.obs['stage_x']
+                y = self.data.obs['stage_y']
+                X = basicu.normalize_fishdata_regress(self.data.layers['processed_vectors'].copy().astype(float),value='sum',leave_log=True,log=True,bitwise=False)
+                for i in range(n_bits):
+                    c = X[:,i].copy()
+                    vmin,vmax = np.percentile(c[np.isnan(c)==False],[5,95])
+                    scatter = axs[i].scatter(x,y,c=np.clip(c,vmin,vmax),s=0.01,cmap='jet',marker='x')
+                    fig.colorbar(scatter, ax=axs[i])
+                    axs[i].set_title(np.array(self.data.var.index)[i])
+                    axs[i].axis('off')
+                shared_columns = [i for i in additional_views if i in self.data.obs.columns]
+                X = basicu.normalize_fishdata_regress(np.array(self.data.obs[shared_columns]).astype(float),value='sum',leave_log=True,log=True,bitwise=False)
+                for i,obs in enumerate(shared_columns):
+                    c = X[:,i].copy()
+                    vmin,vmax = np.percentile(c[np.isnan(c)==False],[5,95])
+                    scatter = axs[i+n_bits].scatter(x,y,c=np.clip(c,vmin,vmax),s=0.01,cmap='jet',marker='x')
+                    fig.colorbar(scatter, ax=axs[i+n_bits])
+                    axs[i+n_bits].set_title(obs)
+                    axs[i+n_bits].axis('off')
+                paths.append(path)
+                plt.savefig(path,dpi=dpi)
+                plt.show()
+            plt.close('all')
+            """ Dapi  """
+            path = self.generate_filename(hybe='', channel='Dapi', file_type='Figure', model_type=self.model_type)
+            if (os.path.exists(path)==False)|self.config.parameters['overwrite_report']:
+                self.update_user('Generating Dapi Figure')
+                n_bits = self.data.shape[1]
+                n_figs = n_bits+len(additional_views)
+                n_columns = 5
+                n_rows = math.ceil(n_figs/n_columns)
+                fig,axs = plt.subplots(n_columns,n_rows,figsize=[25,25])
+                plt.suptitle('Dapi Signal')
+                axs = axs.ravel()
+                for i in range(n_figs):
+                    axs[i].axis('off')
+                    axs[i].set_aspect('equal')
+                x = self.data.obs['stage_x']
+                y = self.data.obs['stage_y']
+                X = basicu.normalize_fishdata_regress(self.data.layers['nuc_processed_vectors'].copy(),value='none',leave_log=True,log=True,bitwise=False)
+                for i in range(n_bits):
+                    c = X[:,i].copy()
+                    vmin,vmax = np.percentile(c[np.isnan(c)==False],[5,95])
+                    scatter = axs[i].scatter(x,y,c=np.clip(c,vmin,vmax),s=0.01,cmap='jet',marker='x')
+                    fig.colorbar(scatter, ax=axs[i])
+                    axs[i].set_title(np.array(self.data.var.index)[i])
+                    axs[i].axis('off')
+                shared_columns = [i for i in additional_views if i in self.data.obs.columns]
+                X = basicu.normalize_fishdata_regress(np.array(self.data.obs[shared_columns]).astype(float),value='none',leave_log=True,log=True,bitwise=False)
+                for i,obs in enumerate(shared_columns):
+                    c = X[:,i].copy()
+                    vmin,vmax = np.percentile(c[np.isnan(c)==False],[5,95])
+                    scatter = axs[i+n_bits].scatter(x,y,c=np.clip(c,vmin,vmax),s=0.01,cmap='jet',marker='x')
+                    fig.colorbar(scatter, ax=axs[i+n_bits])
+                    axs[i+n_bits].set_title(obs)
+                    axs[i+n_bits].axis('off')
+                paths.append(path)
+                plt.savefig(path,dpi=dpi)
+                plt.show()
+            plt.close('all')
+            """ Flat Field  """
+            path = self.generate_filename(hybe='', channel='FlatFields', file_type='Figure', model_type=self.model_type)
+            if (os.path.exists(path)==False)|self.config.parameters['overwrite_report']:
+                self.update_user('Generating Flat Field Figure')
+                if self.config.parameters['acq_FF']:
+                    n_bits = len(self.config.bitmap)
+                    n_figs = n_bits*2
+                    n_columns = 10
+                    n_rows = math.ceil(n_figs/n_columns)
+                    fig,axs = plt.subplots(n_columns,n_rows,figsize=[25,25])
+                    plt.suptitle('Image Processing Parameters')
+                    axs = axs.ravel()
+                    for i in range(n_figs):
+                        axs[i].axis('off')
+                        axs[i].set_aspect('equal')
+                    ticker = 0
+                    for readout,hybe,channel in self.config.bitmap:
+                        img = self.load(hybe=hybe,channel='FarRed',file_type='image_FF')
+                        vmin,vmax = np.percentile(img.ravel(),[5,95])
+                        plot = axs[ticker].imshow(np.clip(img,vmin,vmax),cmap='jet')
+                        axs[ticker].set_title(f"{readout} FlatField")
+                        fig.colorbar(plot, ax=axs[ticker])
+                        ticker+=1
+                        img = self.load(hybe=hybe,channel='FarRed',file_type='image_constant')
+                        vmin,vmax = np.percentile(img.ravel(),[5,95])
+                        plot = axs[ticker].imshow(np.clip(img,vmin,vmax),cmap='jet')
+                        axs[ticker].set_title(f"{readout} Constant")
+                        fig.colorbar(plot, ax=axs[ticker])
+                        ticker+=1
+                else:
+                    fig,axs  = plt.subplots(2,2,figsize=[25,25])
+                    plt.suptitle('Image Processing Parameters')
+                    axs = axs.ravel()
+
+                    img = self.load(hybe='FF',channel='FarRed',file_type='image_FF')
+                    vmin,vmax = np.percentile(img.ravel(),[5,95])
+                    plot = axs[0].imshow(np.clip(img,vmin,vmax),cmap='jet')
+                    axs[0].set_title('FarRed FF')
+                    fig.colorbar(plot, ax=axs[0])
+
+                    img = self.load(hybe='FF',channel='DeepBlue',file_type='image_FF')
+                    vmin,vmax = np.percentile(img.ravel(),[5,95])
+                    plot = axs[1].imshow(np.clip(img,vmin,vmax),cmap='jet')
+                    axs[1].set_title('DeepBlue FF')
+                    fig.colorbar(plot, ax=axs[1])
+
+                    img = self.load(hybe='constant',channel='FarRed',file_type='image_constant')
+                    vmin,vmax = np.percentile(img.ravel(),[5,95])
+                    plot = axs[2].imshow(np.clip(img,vmin,vmax),cmap='jet')
+                    axs[2].set_title('FarRed Constant')
+                    fig.colorbar(plot, ax=axs[2])
+
+                    img = self.load(hybe='constant',channel='DeepBlue',file_type='image_constant')
+                    vmin,vmax = np.percentile(img.ravel(),[5,95])
+                    plot = axs[3].imshow(np.clip(img,vmin,vmax),cmap='jet')
+                    axs[3].set_title('DeepBlue Constant')
+                    fig.colorbar(plot, ax=axs[3])
+
+                paths.append(path)
+                plt.savefig(path,dpi=dpi)
+                plt.show()
+            plt.close('all')
+            """ Louvain """
+            path = self.generate_filename(hybe='', channel='Louvain', file_type='Figure', model_type=self.model_type)
+            if (os.path.exists(path)==False)|self.config.parameters['overwrite_report']:
+                self.update_user('Generating Louvain Figure')
+                if self.config.parameters['overwrite_louvain']| (not 'louvain' in self.data.obs.columns):
+                    self.data.X = basicu.normalize_fishdata_regress(self.data.layers['processed_vectors'].copy(),value='sum',leave_log=True,log=True,bitwise=True)
+                    sc.pp.neighbors(self.data, n_neighbors=15, use_rep='X')
+                    sc.tl.umap(self.data, min_dist=0.1)
+                    sc.tl.louvain(self.data,resolution=5,key_added='louvain')
+                    self.data.X = self.data.layers['processed_vectors'].copy()
+                cts = np.array(self.data.obs['louvain'].unique())
+                louvain_counts = self.data.obs['louvain'].value_counts()
+                unique_louvain_values_ordered = louvain_counts.sort_values(ascending=False).index.tolist()
+                cts  = np.array(unique_louvain_values_ordered)
+                colors = np.random.choice(np.array(list(mcolors.XKCD_COLORS.keys())),cts.shape[0],replace=False)
+                # colors = np.array(list(mcolors.XKCD_COLORS.keys()))[0:cts.shape[0]]
+                pallette = dict(zip(cts, colors))
+                self.data.obs['louvain_colors'] = self.data.obs['louvain'].map(pallette)
+                x = self.data.obs['stage_x']
+                y = self.data.obs['stage_y']
+                c = np.array(self.data.obs['louvain_colors'])
+                fig,axs  = plt.subplots(1,3,figsize=[20,7])
+                plt.suptitle('Unsupervised Classification')
+                axs = axs.ravel()
+                axs[0].scatter(self.data.obsm['X_umap'][:,0],self.data.obsm['X_umap'][:,1],c=c,s=0.1,marker='x')
+                axs[0].set_title('UMAP Space')
+                axs[0].axis('off')
+                axs[1].scatter(x,y,s=0.1,c=c,marker='x')
+                axs[1].set_title('Physical Space')
+                axs[1].set_aspect('equal')
+                axs[1].axis('off')
+                handles = [plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=pallette[key], markersize=10, label=key) for key in cts]
+                axs[2].legend(handles=handles, loc='center',ncol=3, fontsize=8)
+                axs[2].axis('off')
+                paths.append(path)
+                plt.savefig(path,dpi=dpi)
+
+                fig,axs  = plt.subplots(8,8,figsize=[25,25])
+                plt.suptitle('Unsupervised Classification')
+                axs = axs.ravel()
+                x = np.array(self.data.obs['stage_x'])
+                y = np.array(self.data.obs['stage_y'])
+                c = np.array(self.data.obs['louvain_colors'])
+                for i in range(64):
+                    if i>cts.shape[0]:
+                        continue
+                    ct = cts[i]
+                    m = np.array(self.data.obs['louvain'])==ct
+                    axs[i].scatter(x[m],y[m],c=c[m],s=0.1,marker='x')
+                    axs[i].set_title(ct)
+                    axs[i].axis('off')
+                    axs[i].set_aspect('equal')
+                path = self.generate_filename(hybe='Louvain_Split', channel='', file_type='Figure', model_type=self.model_type)
+                paths.append(path)
+                plt.savefig(path,dpi=dpi)
+                plt.show()
+
+            plt.close('all')
+
+            self.save(
+                self.data.obs,
+                file_type='metadata',
+                model_type=self.model_type)
+            self.save(
+                self.data.var,
+                file_type='metadata_bits',
+                model_type=self.model_type)
+            self.save(pd.DataFrame(
+                self.data.layers['processed_vectors'],
+                index=self.data.obs.index,
+                columns=self.data.var.index),
+                file_type='matrix',
+                model_type=self.model_type)
+            self.save(
+                self.data,
+                file_type='anndata',
+                model_type=self.model_type)
             
+            # """ Generate Report """
+            # from reportlab.pdfgen import canvas
+            # def convert_pngs_to_pdf_reportlab(image_paths, output_filename):
+            #     """Converts a list of PNG image paths to a single PDF with layout options.
+
+            #     Args:
+            #         image_paths: A list of strings containing file paths to PNG images.
+            #         output_filename: The desired name for the output PDF file.
+            #     """
+            #     pdf = canvas.Canvas(output_filename)
+            #     page_width, page_height = pdf.pagesize
+            #     x, y = 0, page_height  # Starting coordinates for image placement
+
+            #     for image_path in image_paths:
+            #         img = canvas.drawImage(image_path, x, y)
+            #         y -= img.height  # Adjust y position for next image
+
+            #     pdf.save()
+            # convert_pngs_to_pdf_reportlab(paths, report_path)
+
+                
 
     def remove_temporary_files(self,data_types = ['stitched','stitched_raw','FF']):
         """
@@ -1137,11 +1396,15 @@ def generate_FF(image_metadata,acq,channel,posnames=[],bkg_acq='',parameters={},
         FF = torch.dstack(FF)
         bkg = torch.min(FF,dim=2).values # There may be a more robust way 
         bkg = gaussian_filter(bkg,50,mode='nearest')  # causes issues with corners
-        FF = FF-bkg[:,:,None]
-        FF = torch.mean(FF,dim=2).numpy() # There may be a more robust way in case of debris 
-        # bkg = bkg.numpy()
-        # FF = median_filter(FF,10)
-        FF = gaussian_filter(FF,50,mode='nearest') # causes issues with corners
+        if parameters['constant_FF']:
+            FF = FF-bkg[:,:,None]
+            FF = torch.mean(FF,dim=2).numpy() # There may be a more robust way in case of debris 
+            FF = gaussian_filter(FF,50,mode='nearest') # causes issues with corners
+            FF = bkg + FF
+        else:
+            FF = FF-bkg[:,:,None]
+            FF = torch.mean(FF,dim=2).numpy() # There may be a more robust way in case of debris 
+            FF = gaussian_filter(FF,50,mode='nearest') # causes issues with corners
         vmin,vmid,vmax = np.percentile(FF[np.isnan(FF)==False],[0.1,50,99.9]) 
         # Maybe add median filter to FF 
         FF[FF<vmin] = vmin
@@ -1224,27 +1487,19 @@ def preprocess_images(data,FF=1,nuc_FF=1,constant=0,nuc_constant=0):
     image_metadata = data['image_metadata']
     channel = data['channel']
     parameters = data['parameters']
-    img_raw = None
-    nuc_raw = None
     try:
         nuc = ((image_metadata.stkread(Position=posname,
                                         Channel=parameters['nucstain_channel'],
                                         acq=acq).max(axis=2).astype(float)))
-        if parameters['stitch_raw']:
-            nuc_raw = nuc.copy()
         nuc = process_img(nuc,parameters,FF=nuc_FF,constant=nuc_constant)
         img = ((image_metadata.stkread(Position=posname,
                                         Channel=channel,
                                         acq=acq).max(axis=2).astype(float)))
-        if parameters['stitch_raw']:
-            img_raw = img.copy()
         img = process_img(img,parameters,FF=FF,constant=constant)
         if not bkg_acq=='':
             bkg = ((image_metadata.stkread(Position=posname,
                                             Channel=channel,
                                             acq=bkg_acq).max(axis=2).astype(float)))
-            if parameters['stitch_raw']:
-                bkg_raw = bkg.copy()
             bkg = process_img(bkg,parameters,FF=FF,constant=constant)
             bkg_nuc = ((image_metadata.stkread(Position=posname,
                                             Channel=parameters['nucstain_channel'],
@@ -1259,12 +1514,7 @@ def preprocess_images(data,FF=1,nuc_FF=1,constant=0,nuc_constant=0):
                 y_correction = np.array(range(bkg.shape[0]))+translation_y
                 i2 = interpolate.interp2d(x_correction,y_correction,bkg,fill_value=None)
                 bkg = i2(range(bkg.shape[1]), range(bkg.shape[0]))
-                if parameters['stitch_raw']:
-                    i2 = interpolate.interp2d(x_correction,y_correction,bkg_raw,fill_value=None)
-                    bkg_raw = i2(range(bkg_raw.shape[1]), range(bkg_raw.shape[0]))
             img = img-bkg
-            if parameters['stitch_raw']:
-                img_raw = img_raw.astype(float)-bkg_raw
         for iter in range(parameters['background_estimate_iters']):
             img = img-gaussian_filter(
                 restoration.rolling_ball(
@@ -1283,39 +1533,21 @@ def preprocess_images(data,FF=1,nuc_FF=1,constant=0,nuc_constant=0):
         dtype = 'int32'
         nuc[nuc<np.iinfo(dtype).min] = np.iinfo(dtype).min
         img[img<np.iinfo(dtype).min] = np.iinfo(dtype).min
-        if parameters['stitch_raw']:
-            img_raw[img_raw<np.iinfo(dtype).min] = np.iinfo(dtype).min
-            nuc_raw[nuc_raw<np.iinfo(dtype).min] = np.iinfo(dtype).min
         nuc[nuc>np.iinfo(dtype).max] = np.iinfo(dtype).max
         img[img>np.iinfo(dtype).max] = np.iinfo(dtype).max
-        if parameters['stitch_raw']:
-            img_raw[img_raw>np.iinfo(dtype).max] = np.iinfo(dtype).max
-            nuc_raw[nuc_raw>np.iinfo(dtype).max] = np.iinfo(dtype).max
         
         img = torch.tensor(img,dtype=torch.int32)#+np.iinfo('int16').min
         nuc = torch.tensor(nuc,dtype=torch.int32)#+np.iinfo('int16').min
-        if parameters['stitch_raw']:
-            img_raw = torch.tensor(img_raw,dtype=torch.int32)#+np.iinfo('int16').min
-            nuc_raw = torch.tensor(nuc_raw,dtype=torch.int32)#+np.iinfo('int16').min
         
         if parameters['stitch_rotate']!=0:
             img = torch.rot90(img,parameters['stitch_rotate'])
             nuc = torch.rot90(nuc,parameters['stitch_rotate'])
-            if parameters['stitch_raw']:
-                img_raw = torch.rot90(img_raw,parameters['stitch_rotate'])
-                nuc_raw = torch.rot90(nuc_raw,parameters['stitch_rotate'])
         if parameters['stitch_flipud']:
             img = torch.flipud(img)
             nuc = torch.flipud(nuc)
-            if parameters['stitch_raw']:
-                img_raw = torch.flipud(img_raw)
-                nuc_raw = torch.flipud(nuc_raw)
         if parameters['stitch_fliplr']:
             img = torch.fliplr(img)
             nuc = torch.fliplr(nuc)
-            if parameters['stitch_raw']:
-                img_raw = torch.fliplr(img_raw)
-                nuc_raw = torch.fliplr(nuc_raw)
         if 'destination' in data.keys():
             destination = data['destination']
             """ Register to Correct Stage Error """
@@ -1346,7 +1578,7 @@ def preprocess_images(data,FF=1,nuc_FF=1,constant=0,nuc_constant=0):
         else:
             translation_x = 0
             translation_y = 0
-        return posname,nuc,img,translation_x,translation_y,nuc_raw,img_raw
+        return posname,nuc,img,translation_x,translation_y
     except Exception as e:
         print(e,posname)
         return posname,0,0,0,0,0,0
