@@ -18,6 +18,7 @@ import torch
 import anndata
 import shapely
 import shapely.wkt
+import json
 
 
 def check_existance(path='',hybe='',channel='',file_type='',model_type='',dataset='',section='',logger='FileU'):
@@ -42,6 +43,23 @@ def check_existance(path='',hybe='',channel='',file_type='',model_type='',datase
     filename = generate_filename(path,hybe,channel,file_type,model_type,dataset,section,logger=logger)
     return os.path.exists(filename)
 
+def interact_config(path,key='',data=None,return_config=True):
+    """
+    
+    """
+    config_path = os.path.join(path,'fileu.json')
+    if os.path.exists(config_path):
+        with open(config_path, 'r',encoding="utf-8") as json_file:
+            config = json.load(json_file)
+    else:
+        config = {}
+    if key!='':
+        config[key] = data
+        with open(config_path, 'w',encoding="utf-8") as json_file:
+            json.dump(config,json_file)
+    if return_config:
+        return config
+
 def generate_filename(path,hybe,channel,file_type,model_type,dataset='',section='',logger='FileU'):
     """
     fname Generate File Name 
@@ -63,6 +81,12 @@ def generate_filename(path,hybe,channel,file_type,model_type,dataset='',section=
     """
     # normalize path (removes trailing / and makes two consecutive // into /)
     path = os.path.normpath(path)
+
+    ## Check for config 
+    config = interact_config(path,return_config=True)
+    if not 'version' in config.keys():
+        config = interact_config(path,key='version',data=1,return_config=True)
+    
     # infer section and dataset from path if both are missing. 
     if section == '' and dataset == '':
         (prefix,section) = os.path.split(path)
@@ -70,7 +94,7 @@ def generate_filename(path,hybe,channel,file_type,model_type,dataset='',section=
 
     out_path = os.path.join(path,file_type)
     if not os.path.exists(out_path):
-        update_user('Making Type Path',logger=logger)
+        update_user(f"Making Type Path {file_type}",logger=logger)
         os.mkdir(out_path)
 
     backup_file_type = file_type
@@ -80,35 +104,31 @@ def generate_filename(path,hybe,channel,file_type,model_type,dataset='',section=
         hybe = hybe.split('hybe')[-1]
     if not 'Hybe' in hybe:
         hybe = 'Hybe'+hybe
-
-    if file_type == 'anndata':
-        fname = dataset+'_'+section+'_'+model_type+'_'+file_type+'.h5ad'
-    elif file_type =='matrix':
-        fname = dataset+'_'+section+'_'+model_type+'_'+file_type+'.csv'
-    elif file_type == 'metadata':
-        fname = dataset+'_'+section+'_'+model_type+'_'+file_type+'.csv'
-    elif file_type == 'mask':
-        fname = dataset+'_'+section+'_'+model_type+'_'+'mask_stitched'+'.pt'
-    elif file_type == 'image':
-        fname = dataset+'_'+section+'_'+hybe+'_'+channel+'_'+'stitched'+'.tif'
-    elif file_type == 'stitched':
-        fname = dataset+'_'+section+'_'+hybe+'_'+channel+'_'+file_type+'.pt'
-    elif file_type == 'FF':
-        fname = dataset+'_'+section+'_'+channel+'_'+file_type+'.pt'
-    elif file_type == 'constant':
-        fname = dataset+'_'+section+'_'+channel+'_'+file_type+'.pt'
-    elif file_type == 'Layer':
-        fname = dataset+'_'+model_type+'_'+file_type+'.h5ad'
-    elif file_type == 'Taxonomy': 
-        fname = dataset+'_'+model_type+'_'+file_type+'.csv'
-    elif file_type == 'Geom':
-        fname = dataset+'_'+section+'_'+model_type+'_'+file_type+'.wkt'
-    elif file_type == 'Figure':
-        fname = dataset+'_'+section+'_'+model_type+'_'+hybe+'_'+channel+'_'+file_type+'.png'
-    else:
+    ftype_converter = {'anndata':'.h5ad',
+                       'matrix':'.csv',
+                       'metadata':'.csv',
+                       'mask':'.pt',
+                       'image':'.tif',
+                       'stitched':'.pt',
+                       'FF':'.pt',
+                       'constant':'.pt',
+                       'Layer':'.h5ad',
+                       'Taxonomy':'.csv',
+                       'Geom':'.wkt',
+                       'Figure':'.png',
+                       'Report':'.pdf',
+                       'Config':'.json'}
+    if not file_type in ftype_converter.keys():
         update_user('Unsupported File Type '+backup_file_type+'->'+file_type,level=40,logger=logger)
-        fname = dataset+'_'+section+'_'+hybe+'_'+channel+'_'+file_type
-        raise ValueError('Unsupported File Type '+backup_file_type+'->'+file_type+' '+fname)
+        raise ValueError('Unsupported File Type '+backup_file_type+'->'+file_type)
+    fname = file_type+ftype_converter[file_type]
+    if config['version'] == 1:
+        optional_inputs = [model_type,channel,hybe,section,dataset]
+    elif config['version'] == 2:
+        optional_inputs = [model_type,channel,hybe]
+    for optional_input in optional_inputs:
+        if optional_input!='':
+            fname = f"{str(optional_input)}_{fname}"
     fname = os.path.join(out_path,fname)
     return fname
 
@@ -132,7 +152,7 @@ def save(data,path='',hybe='',channel='',file_type='',model_type='',dataset='',s
     :type logger: str, logging.Logger, optional
     """
     fname = generate_filename(path,hybe,channel,file_type,model_type,dataset,section,logger=logger)
-    update_user('Saving '+file_type,level=10,logger=logger)
+    update_user(f"Saving {fname.split('/')[-1]}",level=20,logger=logger)
     file_type = file_type.split('_')[0]
     if file_type == 'anndata':
         data.write(fname)
@@ -166,6 +186,9 @@ def save(data,path='',hybe='',channel='',file_type='',model_type='',dataset='',s
         data.to_csv(fname)
     elif file_type == 'Geom':
         save_polygon_list(data,fname)
+    elif file_type == 'Config':
+        with open(fname, 'w',encoding="utf-8") as json_file:
+            json.dump(data,json_file)
     else:
         update_user('Unsupported File Type '+file_type,level=30,logger=logger)
 
@@ -191,7 +214,7 @@ def load(path='',hybe='',channel='',file_type='anndata',model_type='',dataset=''
     fname = generate_filename(path,hybe,channel,file_type,model_type,dataset,section,logger=logger)
     file_type = file_type.split('_')[0]
     if os.path.exists(fname):
-        update_user('Loading '+file_type,level=10,logger=logger)
+        update_user(f"Loading {fname.split('/')[-1]}",level=20,logger=logger)
         if file_type == 'anndata':
             data = anndata.read_h5ad(fname)
         elif file_type =='matrix':
@@ -218,6 +241,9 @@ def load(path='',hybe='',channel='',file_type='anndata',model_type='',dataset=''
             data = pd.read_csv(fname)
         elif file_type == 'Geom':
             data = load_polygon_list(fname)
+        elif file_type == 'Config':
+            with open(fname, 'r',encoding="utf-8") as json_file:
+                data = json.load(json_file)
         else:
             update_user('Unsupported File Type '+file_type,level=30,logger=logger)
             data = None
@@ -247,19 +273,19 @@ def update_user(message,level=20,logger=None):
         log = logging.getLogger('Unknown Logger')
     if level<=10:
         # pylint: disable=logging-not-lazy
-        log.debug(str(datetime.now().strftime("%Y %B %d %H:%M:%S"))+' '+str(message))
+        log.debug(str(message))
     elif level==20:
         # pylint: disable=logging-not-lazy
-        log.info(str(datetime.now().strftime("%Y %B %d %H:%M:%S"))+' '+str(message))
+        log.info(str(message))
     elif level==30:
         # pylint: disable=logging-not-lazy
-        log.warning(str(datetime.now().strftime("%Y %B %d %H:%M:%S"))+' '+str(message))
+        log.warning(str(message))
     elif level==40:
         # pylint: disable=logging-not-lazy
-        log.error(str(datetime.now().strftime("%Y %B %d %H:%M:%S"))+' '+str(message))
+        log.error(str(message))
     elif level>=50:
         # pylint: disable=logging-not-lazy
-        log.critical(str(datetime.now().strftime("%Y %B %d %H:%M:%S"))+' '+str(message))
+        log.critical(str(message))
 
 def save_polygon_list(polys,fname):
     """

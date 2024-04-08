@@ -16,4 +16,5 @@ pip install datashader
 pip install seaborn
 pip install umap-learn
 pip install scanpy
+pip install ashlar
 
