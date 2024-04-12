@@ -14,7 +14,7 @@ if __name__ == '__main__':
     parser.add_argument("-c","--cword_config", type=str,dest="cword_config",default='dredfish_processing_config_tree', action='store',help="Name of Config File for analysis ie. dredfish_processing_config")
     parser.add_argument("-s","--section", type=str,dest="section",default='all', action='store',help="keyword in posnames to identify which section to process")
     parser.add_argument("-w","--well", type=str,dest="well",default='', action='store',help="keyword in well to identify which section to process")
-    # parser.add_argument("-f","--fishdata", type=str,dest="fishdata",default='fishdata', action='store',help="fishdata name for save directory")
+    parser.add_argument("-f","--fishdata", type=str,dest="fishdata",default='', action='store',help="fishdata name for save directory")
     
     args = parser.parse_args()
     
@@ -25,12 +25,13 @@ if __name__ == '__main__':
     metadata_path = args.metadata_path
     cword_config = args.cword_config
     config = importlib.import_module(cword_config)
-    config.parameters['nucstain_acq']
-    # if args.fishdata == 'fishdata':
-    #     fishdata = args.fishdata+str(datetime.today().strftime("_%Y%b%d"))
-    # else:
-    #     fishdata = args.fishdata
+
     print(args)
+    if args.fishdata == '':
+        fishdata = None
+    else:
+        fishdata = args.fishdata
+
     if args.section=='all':
         image_metadata = Metadata(metadata_path)
         hybe = [i for i in image_metadata.acqnames if config.parameters['nucstain_acq']+'_' in i.lower()]
@@ -52,24 +53,12 @@ if __name__ == '__main__':
             raise(ValueError('Max Attempts Reached'))
         attempt+=1
         for idx,section in enumerate(sections):
-            # print('Processing Section ',section)
             self = Section_Class(metadata_path,section,cword_config,verbose=True)
+            if isinstance(fishdata,str):
+                self.path = fishdata
+            self.setup_output()
             self.update_user(str(np.sum(completion_array==False))+ ' Unfinished Sections')
             self.update_user('Processing Section '+section)
-            # self.config.parameters['fishdata'] = fishdata
-            # self.out_path = os.path.join(self.metadata_path,self.config.parameters['fishdata'])
-            # if not os.path.exists(self.out_path):
-            #     os.mkdir(self.out_path)
-            src = os.path.join(Processing.__file__.split('dredFISH/P')[0],args.cword_config+'.py')
-            dst = os.path.join(self.path,args.cword_config+'.py')
-            if os.path.exists(dst):
-                os.remove(dst)
-            shutil.copyfile(src, dst)
-            # src = os.path.join(Processing.__file__.split('Processing')[0],'TutorialNotebooks/Processing_preview.ipynb')
-            # dst = os.path.join(self.path,'Processing_preview.ipynb')
-            # if os.path.exists(dst):
-            #     os.remove(dst)
-            # shutil.copyfile(src, dst)
             self.run()
             if isinstance(self.data,type(None)):
                 continue

@@ -1,5 +1,6 @@
 import numpy as np
 import logging
+import torch
 # Basic parameters of imaging
 bitmap = [('RS0095_cy5', 'hybe1', 'FarRed'),
             ('RS0109_cy5', 'hybe2', 'FarRed'),
@@ -27,7 +28,8 @@ bitmap = [('RS0095_cy5', 'hybe1', 'FarRed'),
             ('RS0255_SS_Cy5', 'hybe20', 'FarRed'), # (’R27’,’RS0255_SS_Cy5’, ’hybe20/DNA’, ‘FarRed’,’TCCTATTCTCAACCTAACCT’)
             ('Nonspecific_Readout','hybe27','FarRed'), # (’R5’,'RS0307_cy5', 'hybe5', 'FarRed',’TATCCTTCAATCCCTCCACA’)
             ('Nonspecific_Encoding','hybe26','FarRed'), #(’R28’,’RS1261_SS_Cy5’, ’hybe21/bDNA’, ‘FarRed’,’ACACCATTTATCCACTCCTC’) [Non Specific Encoding Probe ] 
-            ('Housekeeping', 'hybe25', 'FarRed')] #
+            ('Housekeeping', 'hybe25', 'FarRed'), #R29
+            ('IEG', 'hybe28', 'FarRed')] # R20
 # """2023Dec08"""
 # bitmap = [('RS0095_cy5', 'hybe1', 'FarRed'),
 #             ('RS0109_cy5', 'hybe2', 'FarRed'),
@@ -145,34 +147,29 @@ parameters['stitch_rotate'] = 0# NEW0 # NEW 0
 parameters['stitch_flipud'] = False# NEW False
 parameters['stitch_fliplr'] = True# NEW True
 parameters['register_stitch_reference'] = True
-parameters['use_FF'] = True
-parameters['use_constant'] = True
 parameters['segment_gpu'] = False
-parameters['fishdata']='fishdata_2024Mar27'
-parameters['QC_pixel_size'] = 2 # umj
+parameters['fishdata']='fishdata_2024Apr012a'
+parameters['QC_pixel_size'] = 2 # um
 parameters['diameter'] = 8 #15 # um
 parameters['segment_diameter'] = parameters['diameter']/parameters['pixel_size']
 parameters['nucstain_channel'] = 'DeepBlue'
-parameters['nucstain_acq'] = 'hybe25'
+parameters['nucstain_acq'] = 'hybe21'
 parameters['total_channel'] = 'FarRed'
 parameters['total_acq'] = 'all' #'hybe25'
-parameters['overwrite'] = False #False
-parameters['segment_overwrite'] = True #False
-parameters['vector_overwrite'] = True #False
 parameters['outpath'] = '/greendata/GeneralStorage/Data/dredFISH/' #"Path to save data"
 parameters['nuclei_size_threshold'] = parameters['segment_diameter']*2
 parameters['ratio'] = parameters['pixel_size']/parameters['QC_pixel_size']
-parameters['n_pixels']=np.array([2448, 2048])
+parameters['n_pixels']=[2448, 2048]
 parameters['border'] = 1000
-parameters['highpass_sigma'] = 25#int(50/parameters['pixel_size']) #ums -> pixels
-parameters['highpass_function'] = 'none'#'rolling_ball'
+# parameters['highpass_function'] = 'polyfit_8'#'downsample_quantile_0.1'
+# parameters['highpass_sigma'] = 5 #150
+parameters['highpass_function'] = 'polyfit_8'#'downsample_quantile_0.1'
+parameters['highpass_sigma'] = 5 #150
 parameters['highpass_smooth_function'] = 'none'
 parameters['strip'] = True
 parameters['highpass_smooth'] = 0
 parameters['model_types'] = ['total']
 parameters['dapi_thresh'] = 1000
-parameters['processing_log_level'] = logging.INFO
-parameters['registration_log_level'] = logging.INFO
 parameters['background_estimate_iters'] = 0
 parameters['stain_correction'] = False
 parameters['stain_correction_downsample'] = 10
@@ -181,6 +178,38 @@ parameters['overlap'] = 0.02 # 2% overlap
 parameters['segment_min_size'] = parameters['segment_diameter']*10
 parameters['overwrite_report']= True
 parameters['overwrite_louvain'] = True
-parameters['acq_FF'] = True
 parameters['fileu_version'] = 2
-parameters['constant_FF'] = True
+parameters['dtype'] = 'float32'
+parameters['anndata_dtype'] = 'float32'
+parameters['ncpu'] = 15
+parameters['set_min_zero'] = False
+parameters['metric'] = 'median'
+
+parameters['acq_FF'] = False
+parameters['acq_constant'] = False
+parameters['use_FF'] = True
+parameters['use_constant'] = False
+parameters['post_strip_FF'] = True
+parameters['fit_FF'] = True
+parameters['fit_constant'] = True
+parameters['clip_FF'] = False
+parameters['clip_constant'] = False
+parameters['post_processing_constant'] = True
+parameters['bitmap'] = bitmap
+parameters['config_overwrite'] = True
+parameters['FF_n_cpu'] = 1
+parameters['constant_poly_degrees'] = 5
+parameters['FF_poly_degrees'] = 5
+parameters['smooth_FF'] = Trues
+parameters['smooth_constant'] = False
+
+
+parameters['process_img_before_FF'] = False
+parameters['debug'] = True
+
+parameters['overwrite'] = False #False
+parameters['segment_overwrite'] = False #False
+parameters['vector_overwrite'] = False #False
+
+
+parameters['scratch_path'] = '/scratchdata1/Processing_tmp'
