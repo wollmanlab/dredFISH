@@ -99,11 +99,11 @@ def generate_filename(path,hybe,channel,file_type,model_type,dataset='',section=
 
     backup_file_type = file_type
     file_type = file_type.split('_')[0]
-
-    if 'hybe' in hybe:
-        hybe = hybe.split('hybe')[-1]
-    if not 'Hybe' in hybe:
-        hybe = 'Hybe'+hybe
+    if hybe != '':
+        if 'hybe' in hybe:
+            hybe = hybe.split('hybe')[-1]
+        if not 'Hybe' in hybe:
+            hybe = 'Hybe'+hybe
     ftype_converter = {'anndata':'.h5ad',
                        'matrix':'.csv',
                        'metadata':'.csv',
