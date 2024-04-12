@@ -82,8 +82,8 @@ class TissueMultiGraph:
     def __init__(self, 
         inputpath = None, 
         redo = False,
-        skip_geoms = False,
-        path_suffix = '_Analysis',
+        skip_geoms = True,
+        analysis_path = 'Analysis',
         mem_only = False, 
         ):
         """Create a TMG object
@@ -114,15 +114,17 @@ class TissueMultiGraph:
             raise ValueError(f"Path {inputpath} doesn't exist")
 
         # infer the basepath for this TMG object and create it if doesn't exist
-        self.path_suffix = path_suffix
+        self.analysis_path = analysis_path
         self.inputpath = inputpath
-        (prefix,self.dataset) = os.path.split(os.path.normpath(inputpath))
-        self.basepath = os.path.join(prefix,self.dataset+self.path_suffix)
+        (prefix,self.fish_ver) = os.path.split(os.path.normpath(inputpath))
+        (_,self.dataset) = os.path.split(prefix)
+        self.basepath = os.path.join(inputpath,self.analysis_path)
         if not os.path.exists(self.basepath) and not mem_only:
             os.mkdir(self.basepath, mode = 0o775)
 
         # check to see if a TMG.json file exists in that folder; if not, create an empty TMG. 
         if redo or not os.path.exists(os.path.join(self.basepath,"TMG.json")):
+            self.TMG_ver = 1
             self.Layers = list() # a list of TissueGraphs
             self.layers_graph = list() # a list of tuples that keep track of the relationship between different layers 
             self.skip_geoms = skip_geoms
