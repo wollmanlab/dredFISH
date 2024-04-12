@@ -346,7 +346,7 @@ class TissueMultiGraph:
                 adata = fileu.load(section_path,file_type='anndata',model_type=measurement_type)
                 if np.array(hybes).shape[0]>0:
                 #     matrix = np.array(matrix[hybes])
-                    adata[adata.var.index.isin(hybes)]
+                    adata = adata[:, adata.var.index.isin(hybes)]
                 # meta['stage_x'] = meta['stage_x'] + x_max
                 # x_max = meta['stage_x'].max()
                 adata.obs['stage_x'] = adata.obs['stage_x'] + x_max
