@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 from scipy import sparse
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression,RANSACRegressor
 
 import logging
 
