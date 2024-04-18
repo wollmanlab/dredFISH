@@ -19,6 +19,8 @@ import anndata
 import shapely
 import shapely.wkt
 import json
+import dill as pickle
+# import pickle
 
 
 def check_existance(path='',hybe='',channel='',file_type='',model_type='',dataset='',section='',logger='FileU'):
@@ -117,7 +119,8 @@ def generate_filename(path,hybe,channel,file_type,model_type,dataset='',section=
                        'Geom':'.wkt',
                        'Figure':'.png',
                        'Report':'.pdf',
-                       'Config':'.json'}
+                       'Config':'.json',
+                       'Model':'.pkl'}
     if not file_type in ftype_converter.keys():
         update_user('Unsupported File Type '+backup_file_type+'->'+file_type,level=40,logger=logger)
         raise ValueError('Unsupported File Type '+backup_file_type+'->'+file_type)
@@ -187,8 +190,13 @@ def save(data,path='',hybe='',channel='',file_type='',model_type='',dataset='',s
     elif file_type == 'Geom':
         save_polygon_list(data,fname)
     elif file_type == 'Config':
-        with open(fname, 'w',encoding="utf-8") as json_file:
-            json.dump(data,json_file)
+        with open(fname, 'w',encoding="utf-8") as f:
+            data = data.copy()
+            data = {k:v for k,v in data.items() if isinstance(v, (str, int, float, bool, list, dict, tuple, set))}
+            json.dump(data,f)
+    elif file_type == 'Model':
+        with open(fname, 'wb') as f:
+            pickle.dump(data,f)
     else:
         update_user('Unsupported File Type '+file_type,level=30,logger=logger)
 
@@ -214,38 +222,46 @@ def load(path='',hybe='',channel='',file_type='anndata',model_type='',dataset=''
     fname = generate_filename(path,hybe,channel,file_type,model_type,dataset,section,logger=logger)
     file_type = file_type.split('_')[0]
     if os.path.exists(fname):
-        update_user(f"Loading {fname.split('/')[-1]}",level=20,logger=logger)
-        if file_type == 'anndata':
-            data = anndata.read_h5ad(fname)
-        elif file_type =='matrix':
-            data = pd.read_csv(fname)
-        elif file_type == 'metadata':
-            data = pd.read_csv(fname)
-        elif file_type == 'mask':
-            data = torch.load(fname)
-        elif file_type == 'image':
-            try:
-                data = cv2.imread(fname,cv2.IMREAD_UNCHANGED)
-            except:
-                data = tifffile.imread(fname)
-            data = data.astype('uint16')
-        elif file_type == 'stitched':
-            data = torch.load(fname)
-        elif file_type == 'FF':
-            data = torch.load(fname)
-        elif file_type == 'constant':
-            data = torch.load(fname)
-        elif file_type == 'Layer':
-            data = anndata.read_h5ad(fname)
-        elif file_type == 'Taxonomy':
-            data = pd.read_csv(fname)
-        elif file_type == 'Geom':
-            data = load_polygon_list(fname)
-        elif file_type == 'Config':
-            with open(fname, 'r',encoding="utf-8") as json_file:
-                data = json.load(json_file)
-        else:
-            update_user('Unsupported File Type '+file_type,level=30,logger=logger)
+        try:
+            update_user(f"Loading {fname.split('/')[-1]}",level=20,logger=logger)
+            if file_type == 'anndata':
+                data = anndata.read_h5ad(fname)
+            elif file_type =='matrix':
+                data = pd.read_csv(fname)
+            elif file_type == 'metadata':
+                data = pd.read_csv(fname)
+            elif file_type == 'mask':
+                data = torch.load(fname)
+            elif file_type == 'image':
+                try:
+                    data = cv2.imread(fname,cv2.IMREAD_UNCHANGED)
+                except:
+                    data = tifffile.imread(fname)
+                data = data.astype('uint16')
+            elif file_type == 'stitched':
+                data = torch.load(fname)
+            elif file_type == 'FF':
+                data = torch.load(fname)
+            elif file_type == 'constant':
+                data = torch.load(fname)
+            elif file_type == 'Layer':
+                data = anndata.read_h5ad(fname)
+            elif file_type == 'Taxonomy':
+                data = pd.read_csv(fname)
+            elif file_type == 'Geom':
+                data = load_polygon_list(fname)
+            elif file_type == 'Config':
+                with open(fname, 'r',encoding="utf-8") as f:
+                    data = json.load(f)
+            elif file_type == 'Model':
+                with open(fname, 'rb') as f:
+                    data = pickle.load(f)
+            else:
+                update_user('Unsupported File Type '+file_type,level=30,logger=logger)
+                data = None
+        except Exception as e:
+            print(fname)
+            print(e)
             data = None
         return data
     else:
