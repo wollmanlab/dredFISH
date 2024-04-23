@@ -142,7 +142,7 @@ parameters = {}
 
 """ New Microscope Setup"""
 
-parameters['fishdata']='fishdata_2024Apr017'
+parameters['fishdata']='Processing_2024Apr19'
 
 # Orange
 parameters['pixel_size'] =0.490# 0.490#0.327#0.490 # um 490 or 330
