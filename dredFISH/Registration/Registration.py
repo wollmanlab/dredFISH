@@ -33,42 +33,45 @@ from sklearn.linear_model import LinearRegression
 from scipy.interpolate import Rbf
 import math
 import time
+import anndata
 
 class Registration_Class(object):
-    def __init__(self,
-                 processing_path,
+    def __init__(self, XYZC, 
+                 registration_path,
                  section,
                  verbose=True):
         self.completed = False
         self.section = str(section)
         self.verbose=verbose
-        # self.epochs = 5000
-        # self.hidden_size = 8
         self.window = 0.1
-        self.overwrite = True
+        self.overwrite = False
 
         for handler in logging.root.handlers[:]:
             logging.root.removeHandler(handler)
         logging.basicConfig(level=20)
         self.log = logging.getLogger("Registration")
         """ Convert to Checks not making directories These things should already exist """
-
-        self.processing_path = processing_path
-        self.path = processing_path.split('fishdata')[0]
+        self.ref_XYZC = None
+        self.XYZC = XYZC
+        self.path = registration_path
         if not os.path.exists(self.path):
             self.update_user(self.path,level=30)
             self.update_user('No Registration Path Found',level=30)
             os.mkdir(self.path)
-        self.path = os.path.join(self.path,'Registration')
-        if not os.path.exists(self.path):
-            self.update_user(self.path,level=30)
-            self.update_user('No Registration Path Found',level=30)
-            os.mkdir(self.path)
+        # self.path = os.path.join(self.path,'Registration')
+        # if not os.path.exists(self.path):
+        #     self.update_user(self.path,level=30)
+        #     self.update_user('No Registration Path Found',level=30)
+        #     os.mkdir(self.path)
         self.path = os.path.join(self.path,self.section)
         if not os.path.exists(self.path):
             self.update_user(self.path,level=30)
             self.update_user('No Section Path Found',level=30)
             os.mkdir(self.path)
+
+        fileu_config = fileu.interact_config(self.path,return_config=True)
+        if not 'version' in fileu_config.keys():
+            fileu_config = fileu.interact_config(self.path,key='version',data=2,return_config=True)
 
         logging.basicConfig(
                     filename=os.path.join(self.path,'registration_log.txt'),filemode='a',
@@ -76,18 +79,10 @@ class Registration_Class(object):
                     datefmt='%H:%M:%S',level=20, force=True)
         self.log = logging.getLogger("Registration")
 
-    def run(self,XYZC=None):
+    def run(self):
+        plt.close('all')
         start = time.time()
-        if isinstance(XYZC,type(None)):
-            """ Load Coordinates """
-            self.load_data()
-        else:
-            if XYZC.shape[1] != 4:
-                self.update_user(f" Filling in Zeros for {str(4 - XYZC.shape[1])} dimensions for XYZC")
-                zeros_to_add = np.zeros((XYZC.shape[0], 4 - XYZC.shape[1]))
-                XYZC = np.hstack((XYZC, zeros_to_add))
-                
-            self.XYZC = pd.DataFrame(XYZC,columns=['ccf_x','ccf_y','ccf_z','color'])
+        self.load_data()
         """ check Config & Model"""
         fit = True
         self.config = self.load(channel='Registration_Parameters',file_type='Config')
@@ -104,7 +99,6 @@ class Registration_Class(object):
             fit = False
         if isinstance(self.Z_model,type(None)):
             fit = False
-        
         if not fit:
             """ Fit Model"""
             self.fit()
@@ -206,7 +200,7 @@ class Registration_Class(object):
             center,angle,scale = set_registration_points(Z,Y,C)
             self.config = {}
             self.config['center'] = list(center)
-            self.config['reference_center'] = [self.reference_data['ccf_z'].mean(),self.reference_data['ccf_y'].mean()]
+            self.config['reference_center'] = [self.ref_XYZC['ccf_z'].mean(),self.ref_XYZC['ccf_y'].mean()]
             self.config['angle'] = angle
             self.config['scale'] = scale
             self.save(self.config,channel='Registration_Parameters',file_type='Config')
@@ -233,7 +227,7 @@ class Registration_Class(object):
             """ Set Reference Section """
 
             rigid_transformed_XYZC = self.rigid_transformation()
-
+            plt.close('all')
             completed = False
             while not completed:
                 X = []
@@ -245,20 +239,24 @@ class Registration_Class(object):
                         X.append(x)
                         Y.append(y)
                         Z.append(z)
-
+                xyz_coordinates = pd.DataFrame()
+                xyz_coordinates['x'] = X
+                xyz_coordinates['y'] = Y
+                xyz_coordinates['z'] = Z
+                
                 design_matrix = np.c_[Y,Z]
                 model = LinearRegression()
                 model.fit(design_matrix, X)
-                Y = self.reference_data['ccf_y']
-                Z = self.reference_data['ccf_z']
+                Y = self.ref_XYZC['ccf_y']
+                Z = self.ref_XYZC['ccf_z']
                 design_matrix = np.c_[Y,Z]
-                distance = self.reference_data['ccf_x'] - model.predict(design_matrix)[0]
+                distance = self.ref_XYZC['ccf_x'] - model.predict(design_matrix)[0]
 
-                self.reference_data_sample = np.random.choice(self.reference_data[np.abs(distance)<self.window].index,100000)
+                self.ref_XYZC_sample = np.random.choice(self.ref_XYZC[np.abs(distance)<self.window].index,100000)
                 fig,axs = plt.subplots(1,2,figsize=[20,10])
                 fig.suptitle(': Set Reference Section: ')
                 axs = axs.ravel()
-                axs[0].scatter(self.reference_data.loc[self.reference_data_sample,'ccf_z'],self.reference_data.loc[self.reference_data_sample,'ccf_y'],c=self.reference_data.loc[self.reference_data_sample,'color'],s=1,cmap='jet')
+                axs[0].scatter(self.ref_XYZC.loc[self.ref_XYZC_sample,'ccf_z'],self.ref_XYZC.loc[self.ref_XYZC_sample,'ccf_y'],c=self.ref_XYZC.loc[self.ref_XYZC_sample,'color'],s=1,cmap='jet')
                 sample = np.random.choice(rigid_transformed_XYZC.index,100000)
                 axs[1].scatter(rigid_transformed_XYZC.loc[sample,'ccf_z'],rigid_transformed_XYZC.loc[sample,'ccf_y'],s=1,c=rigid_transformed_XYZC.loc[sample,'color'],cmap='jet')
                 path = self.generate_filename(channel='Reference_Section',file_type='Figure')
@@ -346,16 +344,16 @@ class Registration_Class(object):
                 plt.show(block=False)
 
                 return points_cor_x,points_cor_y
-            Y = self.reference_data['ccf_y']
-            Z = self.reference_data['ccf_z']
+            Y = self.ref_XYZC['ccf_y']
+            Z = self.ref_XYZC['ccf_z']
             design_matrix = np.c_[Y,Z]
-            distance = self.reference_data['ccf_x'] - self.X_model.predict(design_matrix)[0]
-            self.reference_data_sample = np.random.choice(self.reference_data[np.abs(distance)<self.window].index,100000)
+            distance = self.ref_XYZC['ccf_x'] - self.X_model.predict(design_matrix)[0]
+            self.ref_XYZC_sample = np.random.choice(self.ref_XYZC[np.abs(distance)<self.window].index,100000)
 
-            ref_X = np.array(self.reference_data.loc[self.reference_data_sample,'ccf_x'].copy())
-            ref_Y = np.array(self.reference_data.loc[self.reference_data_sample,'ccf_y'].copy())
-            ref_Z = np.array(self.reference_data.loc[self.reference_data_sample,'ccf_z'].copy())
-            ref_C = np.array(self.reference_data.loc[self.reference_data_sample,'color'].copy())
+            ref_X = np.array(self.ref_XYZC.loc[self.ref_XYZC_sample,'ccf_x'].copy())
+            ref_Y = np.array(self.ref_XYZC.loc[self.ref_XYZC_sample,'ccf_y'].copy())
+            ref_Z = np.array(self.ref_XYZC.loc[self.ref_XYZC_sample,'ccf_z'].copy())
+            ref_C = np.array(self.ref_XYZC.loc[self.ref_XYZC_sample,'color'].copy())
 
             rigid_transformed_XYZC = self.rigid_transformation()
 
@@ -385,11 +383,11 @@ class Registration_Class(object):
 
     def view_transformation(self):
 
-        Y = self.reference_data['ccf_y']
-        Z = self.reference_data['ccf_z']
+        Y = self.ref_XYZC['ccf_y']
+        Z = self.ref_XYZC['ccf_z']
         design_matrix = np.c_[Y,Z]
-        distance = self.reference_data['ccf_x'] - self.X_model.predict(design_matrix)[0]
-        self.reference_data_sample = np.random.choice(self.reference_data[np.abs(distance)<self.window].index,100000)
+        distance = self.ref_XYZC['ccf_x'] - self.X_model.predict(design_matrix)[0]
+        self.ref_XYZC_sample = np.random.choice(self.ref_XYZC[np.abs(distance)<self.window].index,100000)
         
         self.update_user('Viewing Transformation',level=20)
         df_points = self.load(channel='df_points',file_type='matrix')
@@ -426,7 +424,7 @@ class Registration_Class(object):
         XYZC = self.rigid_transformation()
         fig = plt.figure(figsize=[5,5])
         fig.suptitle('Raw vs Ref')
-        plt.scatter(self.reference_data.loc[self.reference_data_sample,'ccf_z'],self.reference_data.loc[self.reference_data_sample,'ccf_y'],s=0.1,c='k',alpha=0.5)
+        plt.scatter(self.ref_XYZC.loc[self.ref_XYZC_sample,'ccf_z'],self.ref_XYZC.loc[self.ref_XYZC_sample,'ccf_y'],s=0.1,c='k',alpha=0.5)
         plt.scatter(XYZC['ccf_z'],XYZC['ccf_y'],s=0.1,c='r',alpha=0.5)
         path = self.generate_filename(channel='RoughAlignment',file_type='Figure')
         plt.savefig(path,dpi=200)
@@ -435,7 +433,7 @@ class Registration_Class(object):
         XYZC = self.non_rigid_transformation()
         fig = plt.figure(figsize=[5,5])
         fig.suptitle('Raw vs Ref')
-        plt.scatter(self.reference_data.loc[self.reference_data_sample,'ccf_z'],self.reference_data.loc[self.reference_data_sample,'ccf_y'],s=0.1,c='k',alpha=0.5)
+        plt.scatter(self.ref_XYZC.loc[self.ref_XYZC_sample,'ccf_z'],self.ref_XYZC.loc[self.ref_XYZC_sample,'ccf_y'],s=0.1,c='k',alpha=0.5)
         plt.scatter(XYZC['ccf_z'],XYZC['ccf_y'],s=0.1,c='r',alpha=0.5)
         path = self.generate_filename(channel='Aligned',file_type='Figure')
         plt.savefig(path,dpi=200)
@@ -577,39 +575,42 @@ class Registration_Class(object):
         # reference_data['ccf_x'] = reference_data['ccf_x'].astype(float)
         # reference_data['ccf_y'] = reference_data['ccf_y'].astype(float)
         # reference_data['ccf_z'] = reference_data['ccf_z'].astype(float)
+        if isinstance(self.ref_XYZC,type(None)):
+            """ /orangedata/Images2024/Zach/dredFISH/Notebooks/reference_sections_2024Mar06.ipynb"""
+            download_base = '/orangedata/ExternalData/Allen_WMB_2024Mar06'
+            reference_data = torch.load(os.path.join(download_base,'minimal_spatial_data.pt'))
+            reference_data = pd.DataFrame(reference_data.numpy(),columns=['ccf_x','ccf_y','ccf_z','cluster_alias'])
+            reference_data['cluster_alias'] = reference_data['cluster_alias'].astype(int)
+            negative_reference_data = reference_data.copy()
+            negative_reference_data['ccf_z'] = -negative_reference_data['ccf_z']
+            reference_data = pd.concat([reference_data,negative_reference_data],ignore_index=True)
 
-        """ /orangedata/Images2024/Zach/dredFISH/Notebooks/reference_sections_2024Mar06.ipynb"""
-        download_base = '/orangedata/ExternalData/Allen_WMB_2024Mar06'
-        reference_data = torch.load(os.path.join(download_base,'minimal_spatial_data.pt'))
-        reference_data = pd.DataFrame(reference_data.numpy(),columns=['ccf_x','ccf_y','ccf_z','cluster_alias'])
-        reference_data['cluster_alias'] = reference_data['cluster_alias'].astype(int)
-        negative_reference_data = reference_data.copy()
-        negative_reference_data['ccf_z'] = -negative_reference_data['ccf_z']
-        self.reference_data = pd.concat([reference_data,negative_reference_data],ignore_index=True)
+            pivot_table = pd.read_csv(os.path.join(download_base,'pivot_table.csv'))
 
-        self.pivot_table = pd.read_csv(os.path.join(download_base,'pivot_table.csv'))
-
-        colormap = dict(zip(self.pivot_table['cluster_alias'],self.pivot_table['subclass_color']))
-        self.reference_data['color'] = self.reference_data['cluster_alias'].map(colormap)
-
-        self.update_user(self.reference_data.head())
+            colormap = dict(zip(pivot_table['cluster_alias'],pivot_table['subclass_color']))
+            reference_data['color'] = reference_data['cluster_alias'].map(colormap)
+            self.ref_XYZC = reference_data[['ccf_x','ccf_y','ccf_z','color']].copy()
+            del reference_data
+            self.update_user(self.ref_XYZC.head())
 
     def load_data(self):
         """ Load processed anndata object from Section_Class """
         self.update_user('Loading Data',level=20)
-        self.XYZC = None
-        try:
-            self.data = self.load(path=self.processing_path,file_type='anndata')
-            self.update_user(self.data)
-            self.XYZC = pd.DataFrame()
-            self.XYZC['ccf_x'] = np.ones_like(self.data.obs['stage_x'])
-            self.XYZC['ccf_y'] = np.array(self.data.obs['stage_y'])
-            self.XYZC['ccf_z'] = np.array(self.data.obs['stage_x'])
-            self.XYZC['color'] = np.array(self.data.obs['louvain_colors'])
-            del self.data
-        except Exception as e:
-           self.update_user(str(e),level=40) 
-           self.update_user('Unable to Load Data',level=50) 
+        if isinstance(self.XYZC,str):
+            try:
+                self.XYZC = self.load(path=os.path.join(self.XYZC,self.section),file_type='anndata')
+            except Exception as e:
+                self.update_user(str(e),level=40) 
+                self.update_user('Unable to Load Data',level=50) 
+        if isinstance(self.XYZC,type(anndata.AnnData())):
+            data = self.XYZC.copy()
+            self.update_user(data)
+            self.XYZC = pd.DataFrame(index=data.obs.index)
+            self.XYZC['ccf_x'] = np.ones_like(data.obs['stage_x'])
+            self.XYZC['ccf_y'] = np.array(data.obs['stage_y'])
+            self.XYZC['ccf_z'] = np.array(data.obs['stage_x'])
+            self.XYZC['color'] = np.array(data.obs['louvain_colors'])
+            del data
         if isinstance(self.XYZC,type(None)):
             self.update_user('Data Not Found',level=50) 
 
