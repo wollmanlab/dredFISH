@@ -20,6 +20,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 import time
+from metadata import Metadata
 
 import numpy as np
 import tensorflow as tf
@@ -52,7 +53,7 @@ if __name__ == '__main__':
     cword_config = args.cword_config
     config = importlib.import_module(cword_config)
     config.parameters['nucstain_acq']
-    if args.fishdata == 'fishdata':
+    if not '_' in args.fishdata:
         fishdata = args.fishdata+str(datetime.today().strftime("_%Y%b%d"))
     else:
         fishdata = args.fishdata
@@ -72,14 +73,29 @@ if __name__ == '__main__':
         sections = np.array([i for i in sections if args.well in i])
     # np.random.shuffle(sections)
     print(sections)
+
+    """ Determine best order to register """
+    
     completion_array = np.array([False for i in sections])
+    reference_data = None
     while np.sum(completion_array==False)>0:
         for idx,section in enumerate(sections):
-            processing_path = os.path.join(metadata_path,fishdata,'Processing',section)
-            self = Registration_Class(processing_path,section)
+            processing_path = os.path.join(metadata_path,fishdata)
+            if not os.path.exists(processing_path):
+                processing_path = os.path.join(metadata_path,fishdata,'Processing')
+            registration_path = os.path.join(metadata_path,'Registration'+str(datetime.today().strftime("_%Y%b%d")))
+            self = Registration_Class(processing_path,registration_path,section)
+            self.overwrite = True
+            self.ref_XYZC = reference_data
             self.update_user(str(np.sum(completion_array==False))+ ' Unfinished Sections')
             self.update_user('Processing Section '+section)
-            self.run()
+            out = str(robust_input("Continue? (Y/N): ",dtype='str'))
+            if 'y' in out.lower():
+                self.run()
+                reference_data = self.ref_XYZC
             completion_array[idx] = True
         if np.sum(completion_array==False)>0:
             time.sleep(60)
+    out = ''
+    while not 'y' in out:
+        out = str(robust_input("Satisfied? (Y/N): ",dtype='str'))
