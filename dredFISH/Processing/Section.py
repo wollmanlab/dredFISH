@@ -36,7 +36,7 @@ from skimage import (
     data, restoration, util
 )
 from scipy.optimize import curve_fit
-
+from scipy.stats import norm
 from skimage.measure import block_reduce
 from scipy.ndimage import zoom
 from scipy.interpolate import griddata
@@ -139,6 +139,7 @@ class Section_Class(object):
             if not isinstance(self.data,type(None)):
                 self.generate_report()
                 self.remove_temporary_files()
+                self.qc_score()
                 # self.copy_to_drive()
         else:
             self.update_user('No positions found for this section',level=50)
@@ -179,10 +180,10 @@ class Section_Class(object):
             if not os.path.exists(self.path):
                 self.update_user('Making fishdata Path',level=20)
                 os.mkdir(self.path)
-            self.path = os.path.join(self.path,'Processing')
-            if not os.path.exists(self.path):
-                self.update_user('Making Processing Path',level=20)
-                os.mkdir(self.path)
+            # self.path = os.path.join(self.path,'Processing')
+            # if not os.path.exists(self.path):
+            #     self.update_user('Making Processing Path',level=20)
+            #     os.mkdir(self.path)
             self.well_path = os.path.join(self.path,self.well)
             if not os.path.exists(self.well_path):
                 self.update_user('Making Well Path',level=20)
@@ -211,7 +212,7 @@ class Section_Class(object):
         self.parameters['path'] = self.path
         self.parameters['well_path'] = self.well_path
         self.parameters['scratch_path'] = self.scratch_path
-        self.parameters['section'] = self.dataset
+        self.parameters['dataset'] = self.dataset
         self.parameters['section'] = self.section
         self.parameters['well'] = self.well
 
@@ -366,19 +367,19 @@ class Section_Class(object):
         """
         if isinstance(self.image_metadata,str):
             self.update_user('Loading Metadata')
-            self.image_metadata = Metadata(self.metadata_path)
+            self.image_metadata = Metadata(self.metadata_path,try_shortcut=False)
 
         self.parameters['scope'] =  self.image_metadata.image_table['Scope'].iloc[0]
         self.update_user(f"detected {self.parameters['scope']} as the device used")
         if self.parameters['scope']=='OrangeScope':
             self.parameters['pixel_size'] =0.490# 0.490#0.327#0.490 # um 490 or 330
             self.parameters['jitter_channel'] = ''
-            self.parameters['jitter_correction'] = True
+            self.parameters['jitter_correction'] = False
             self.parameters['n_pixels']=[2448, 2048]
         elif self.parameters['scope']=='PurpleScope':
             self.parameters['pixel_size'] = 0.409# 0.490#0.327#0.490 # um 490 or 330
             self.parameters['jitter_channel'] = 'FarRed'
-            self.parameters['jitter_correction'] = True
+            self.parameters['jitter_correction'] = False
             self.parameters['n_pixels']=[2448, 2048]
         else:
             self.update_user(f" {self.parameters['scope']} isnt a default device please check config file for pixel size accuracy")
@@ -416,6 +417,7 @@ class Section_Class(object):
             self.coordinates = {}
             for posname in self.posnames:
                 self.coordinates[posname] = (self.image_metadata.image_table[(self.image_metadata.image_table.Position==posname)].XY.iloc[0]/self.parameters['process_pixel_size']).astype(int)
+            self.posname_index_converter = {posname:posname_index for posname_index,posname in enumerate(self.posnames)}
 
     def find_acq(self,hybe,protocol='hybe'):
         """
@@ -444,9 +446,10 @@ class Section_Class(object):
                 else:
                     avg_time = acq_metadata.TimestampImage.mean()
                     acq_times.append(avg_time)
+                    new_acqs.append(acq)
             if len(new_acqs)>1:
                 acqs = [np.array(new_acqs)[np.argmax(np.array(acq_times))]]
-                self.update_user('Multiple Completed Acqs found choosing most recent '+str(acqs[0]),level=30)
+                self.update_user('Multiple Completed Acqs found choosing newest '+str(acqs[0]),level=30)
             elif len(new_acqs)==0:
                 self.update_user(f"No Complete Acqs found for {str(protocol)} {str(hybe)}",level=50)
             else:
@@ -603,7 +606,7 @@ class Section_Class(object):
                 y_range = np.array(range(y_min,y_max+1))
                 stitched = torch.zeros([len(x_range),len(y_range),2],dtype=self.parameters['pytorch_dtype'])
                 if isinstance(self.reference_stitched,str):
-                    pixel_coordinates_stitched = torch.zeros([len(x_range),len(y_range),2],dtype=self.parameters['pytorch_dtype'])
+                    pixel_coordinates_stitched = torch.zeros([len(x_range),len(y_range),3],dtype=self.parameters['pytorch_dtype'])
                 Input = []
                 for posname in self.posnames:
                     data = {}
@@ -722,8 +725,10 @@ class Section_Class(object):
                                 else:
                                     non_ref = signal[mask_x,:]
                                 non_ref = non_ref[:,mask_y]
+                                ref = ref.numpy() - gaussian_filter(ref.numpy(),25)
+                                non_ref = non_ref.numpy() - gaussian_filter(non_ref.numpy(),25)
                                 # Check if Beads work here
-                                shift, error = register(ref.numpy(), non_ref.numpy(),10)
+                                shift, error = register(ref, non_ref,10)
                                 if (error!=np.inf)&(np.max(np.abs(shift))<=self.parameters['border']):
                                     translation_y = int(shift[1])
                                     translation_x = int(shift[0])
@@ -752,7 +757,11 @@ class Section_Class(object):
                     destination[destination==0] = incoming[destination==0]
                     stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),:] = destination
                     if isinstance(self.reference_stitched,str):
-                        incoming = torch.dstack([torch.tensor(np.stack([np.array(range(nuc.shape[1])) for i in range(nuc.shape[0])])),torch.tensor(np.stack([np.array(range(nuc.shape[0])) for i in range(nuc.shape[1])]).T)])
+                        incoming = torch.dstack([
+                                torch.tensor(np.stack([np.array(range(nuc.shape[1])) for i in range(nuc.shape[0])])),
+                                torch.tensor(np.stack([np.array(range(nuc.shape[0])) for i in range(nuc.shape[1])]).T),
+                                torch.ones_like(nuc)*self.posname_index_converter[posname]
+                                ])
                         pixel_coordinates_stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),:] = incoming
                 if len(redo_posnames)>0:
                     for posname in self.generate_iterable(redo_posnames,f"Redoing {str(len(redo_posnames))} Failed Positions  {acq} {channel}",length=len(redo_posnames)):
@@ -776,7 +785,11 @@ class Section_Class(object):
                         destination[destination==0] = incoming[destination==0]
                         stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),:] = destination
                         if isinstance(self.reference_stitched,str):
-                            incoming = torch.dstack([torch.tensor(np.stack([np.array(range(nuc.shape[1])) for i in range(nuc.shape[0])])),torch.tensor(np.stack([np.array(range(nuc.shape[0])) for i in range(nuc.shape[1])]).T)])
+                            incoming = torch.dstack([
+                                torch.tensor(np.stack([np.array(range(nuc.shape[1])) for i in range(nuc.shape[0])])),
+                                torch.tensor(np.stack([np.array(range(nuc.shape[0])) for i in range(nuc.shape[1])]).T),
+                                torch.ones_like(nuc)*self.posname_index_converter[posname]
+                                ])
                             pixel_coordinates_stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),:] = incoming
                 if self.parameters['set_min_zero']:
                     thresh = torch.min(stitched[:,:,0][stitched[:,:,0]>0]).values
@@ -799,6 +812,7 @@ class Section_Class(object):
                 if isinstance(self.reference_stitched,str):
                     self.save(pixel_coordinates_stitched[:,:,0],hybe='image_x',channel='',file_type='stitched')
                     self.save(pixel_coordinates_stitched[:,:,1],hybe='image_y',channel='',file_type='stitched')
+                    self.save(pixel_coordinates_stitched[:,:,2],hybe='image_idx',channel='',file_type='stitched')
                 return stitched
 
     def stitch(self):
@@ -1064,9 +1078,10 @@ class Section_Class(object):
             labels = self.mask[idxes]
 
             """ Load Vector for each pixel """
-            pixel_image_xy = torch.zeros([idxes[0].shape[0],2],dtype=self.parameters['pytorch_dtype'])
+            pixel_image_xy = torch.zeros([idxes[0].shape[0],3],dtype=self.parameters['pytorch_dtype'])
             pixel_image_xy[:,0] = self.load(hybe='image_x',channel='',file_type='stitched')[idxes]
             pixel_image_xy[:,1] = self.load(hybe='image_y',channel='',file_type='stitched')[idxes]
+            pixel_image_xy[:,2] = self.load(hybe='image_idx',channel='',file_type='stitched')[idxes]
 
             pixel_vectors = torch.zeros([idxes[0].shape[0],len(self.parameters['bitmap'])],dtype=self.parameters['pytorch_dtype'])
             nuc_pixel_vectors = torch.zeros([idxes[0].shape[0],len(self.parameters['bitmap'])],dtype=self.parameters['pytorch_dtype'])
@@ -1083,7 +1098,7 @@ class Section_Class(object):
             pixel_xy[:,1] = idxes[1]
             
             self.xy = torch.zeros([unique_labels.shape[0],2],dtype=self.parameters['pytorch_dtype'])
-            self.image_xy = torch.zeros([unique_labels.shape[0],2],dtype=self.parameters['pytorch_dtype'])
+            self.image_xy = torch.zeros([unique_labels.shape[0],pixel_image_xy.shape[1]],dtype=self.parameters['pytorch_dtype'])
             self.size = torch.zeros([unique_labels.shape[0],1],dtype=self.parameters['pytorch_dtype'])
             
             converter = {int(label):[] for label in unique_labels}
@@ -1100,16 +1115,17 @@ class Section_Class(object):
                 pixy = pixel_image_xy[m,:]
                 self.image_xy[i,:] =self.metric(pixy)
                 self.size[i] = pxy.shape[0]
-            cell_labels = [self.dataset+'_Section'+self.section+'_Cell'+str(i) for i in unique_labels.numpy()]
+            cell_labels = [self.dataset+'_'+self.section+'_Cell'+str(i) for i in unique_labels.numpy()]
             self.cell_metadata = pd.DataFrame(index=cell_labels)
             self.cell_metadata['label'] = unique_labels.numpy()
             self.cell_metadata['stage_x'] = self.xy[:,0].numpy()
             self.cell_metadata['stage_y'] = self.xy[:,1].numpy()
             self.cell_metadata['image_x'] = self.image_xy[:,0].numpy()
             self.cell_metadata['image_y'] = self.image_xy[:,1].numpy()
+            self.cell_metadata['image_idx'] = self.image_xy[:,2].numpy()
             self.cell_metadata['size'] = self.size.numpy()
             self.cell_metadata['section_index'] = self.section
-            self.cell_metadata['dapi'] = torch.median(self.nuc_vectors,axis=1).numpy()
+            self.cell_metadata['dapi'] = torch.median(self.nuc_vectors,axis=1).values.numpy()
             self.cell_metadata['sum'] = torch.sum(self.vectors,axis=1).numpy()
             self.cell_metadata['dataset'] = self.dataset
             self.cell_metadata['well'] = self.well
@@ -1150,7 +1166,31 @@ class Section_Class(object):
                 self.data,
                 file_type='anndata',
                 model_type=self.model_type)
-    
+
+    def qc_score(self):
+        self.update_user(f"Calculating QC Score")
+
+        """ Nuclei Score """
+        """ detects cells whose brightness changes too much """
+        """ Likely due to gel or registration issues """
+        X = self.data.layers['nuc_raw'].copy()
+        X = np.clip(X,1,None) # Prevent divide by 0
+        X = X/np.median(X,axis=0,keepdims=True) # Correct for round to round staining
+        X = X/np.median(X,axis=1,keepdims=True) # correct for cell staining 
+        X = (X - np.median(X,axis=1,keepdims=True)) / np.mean(X.std(axis=1, keepdims=True)) # set median to 0 and std to 1 across rounds use average of std across all cells
+        X = norm.pdf(X)/norm.pdf(0) # Convert to probability density (norm max to 1 by prob at median)
+        self.data.layers['nuc_score'] = X.copy() # Values above 0.5 are within normal range 
+
+        """ Sum Score """
+        X = self.data.layers['raw'].sum(1).ravel()
+        X = np.clip(X,1,None)
+        X = np.log10(X)
+        X = (X-np.median(X))/np.std(X)
+        sum_score = norm.pdf(X)/norm.pdf(0)
+
+        """ """
+        
+
     def generate_report(self):
         """ First Check if the report has been generated"""
         report_path = self.generate_filename(hybe='', channel='', file_type='Report', model_type=self.model_type)
@@ -1769,7 +1809,8 @@ def image_filter(img,function,value,dtype=np.float32):
         # img = griddata(points, values, (grid_y, grid_x), method='linear', fill_value=0)
 
         # Creating an interpolator object with sorted values
-        interpolator = RectBivariateSpline(y_sml[:, 0], x_sml[0],  img_sml, kx=2, ky=2)
+        # interpolator = RectBivariateSpline(y_sml[:, 0], x_sml[0],  img_sml, kx=2, ky=2)
+        interpolator = RectBivariateSpline(y_sml[:, 0], x_sml[0],  img_sml, kx=1, ky=1)
 
         # Interpolating and extrapolating
         img  = interpolator.ev(grid_y, grid_x)
@@ -1848,7 +1889,10 @@ def preprocess_images(data,FF=1,nuc_FF=1,constant=0,nuc_constant=0):
             bkg_nuc = process_img(bkg_nuc,parameters,FF=nuc_FF,constant=nuc_constant)
 
             # Check if beads work here
-            shift, error = register(nuc, bkg_nuc,10)
+            ref = nuc - gaussian_filter(nuc,25)
+            non_ref = bkg_nuc - gaussian_filter(bkg_nuc,25)
+            # Check if Beads work here
+            shift, error = register(ref, non_ref,10)
             if error!=np.inf:
                 translation_x = int(shift[1])
                 translation_y = int(shift[0])
@@ -1922,7 +1966,10 @@ def preprocess_images(data,FF=1,nuc_FF=1,constant=0,nuc_constant=0):
                 non_ref = nuc[mask_x,:]
                 non_ref = non_ref[:,mask_y]
                 # Check if Beads work here
-                shift, error = register(ref.numpy(), non_ref.numpy(),10)
+                ref = ref.numpy() - gaussian_filter(ref.numpy(),25)
+                non_ref = non_ref.numpy() - gaussian_filter(non_ref.numpy(),25)
+                # Check if Beads work here
+                shift, error = register(ref, non_ref,10)
                 if (error!=np.inf)&(np.max(np.abs(shift))<=(parameters['border']/2)):
                     translation_y = int(shift[1])
                     translation_x = int(shift[0])
