@@ -141,75 +141,101 @@ nbits = len(bitmap)
 parameters = {}
 
 """ New Microscope Setup"""
+
+parameters['fishdata']='Processing_2024Apr19'
+
+# Orange
 parameters['pixel_size'] =0.490# 0.490#0.327#0.490 # um 490 or 330
+parameters['jitter_channel'] = ''
+parameters['jitter_correction'] = True
+
+# Purple
+# parameters['pixel_size'] =0.409# 0.490#0.327#0.490 # um 490 or 330
+# parameters['jitter_channel'] = 'DeepBlue'
+
+
+parameters['bin'] = 2
+# parameters['process_pixel_size'] = parameters['pixel_size']*parameters['bin']
 parameters['stitch_raw'] = False
 parameters['stitch_rotate'] = 0# NEW0 # NEW 0
 parameters['stitch_flipud'] = False# NEW False
 parameters['stitch_fliplr'] = True# NEW True
 parameters['register_stitch_reference'] = True
 parameters['segment_gpu'] = False
-parameters['fishdata']='fishdata_2024Apr012a'
+
 parameters['QC_pixel_size'] = 2 # um
 parameters['diameter'] = 8 #15 # um
-parameters['segment_diameter'] = parameters['diameter']/parameters['pixel_size']
+# parameters['segment_diameter'] = parameters['diameter']/parameters['process_pixel_size']
 parameters['nucstain_channel'] = 'DeepBlue'
 parameters['nucstain_acq'] = 'hybe21'
 parameters['total_channel'] = 'FarRed'
-parameters['total_acq'] = 'all' #'hybe25'
+parameters['total_acq'] = 'all_max' #'hybe25'
 parameters['outpath'] = '/greendata/GeneralStorage/Data/dredFISH/' #"Path to save data"
-parameters['nuclei_size_threshold'] = parameters['segment_diameter']*2
-parameters['ratio'] = parameters['pixel_size']/parameters['QC_pixel_size']
+# parameters['nuclei_size_threshold'] = parameters['segment_diameter']*2
+# parameters['ratio'] = parameters['process_pixel_size']/parameters['QC_pixel_size']
 parameters['n_pixels']=[2448, 2048]
-parameters['border'] = 1000
-# parameters['highpass_function'] = 'polyfit_8'#'downsample_quantile_0.1'
-# parameters['highpass_sigma'] = 5 #150
-parameters['highpass_function'] = 'polyfit_8'#'downsample_quantile_0.1'
-parameters['highpass_sigma'] = 5 #150
-parameters['highpass_smooth_function'] = 'none'
+# ratio = parameters['pixel_size']/parameters['process_pixel_size']
+# parameters['n_pixels']=[int(float(i)*ratio) for i in parameters['n_pixels']]
+# parameters['border'] = int(np.min(parameters['n_pixels']))
+
+parameters['highpass_function'] = 'none'#'gaussian_robust[1,60]'#'spline_min_robust_smooth'#'spline_min_smooth'#'spline_robust_min'#'downsample_quantile_0.1' _smooth
+parameters['highpass_sigma'] = 250
+parameters['highpass_smooth_function'] = 'median'
+parameters['highpass_smooth'] = 3
+
 parameters['strip'] = True
-parameters['highpass_smooth'] = 0
 parameters['model_types'] = ['total']
-parameters['dapi_thresh'] = 1000
+parameters['dapi_thresh'] = 200
 parameters['background_estimate_iters'] = 0
 parameters['stain_correction'] = False
 parameters['stain_correction_downsample'] = 10
 parameters['stain_correction_kernel'] = 1000
 parameters['overlap'] = 0.02 # 2% overlap
-parameters['segment_min_size'] = parameters['segment_diameter']*10
+# parameters['segment_min_size'] = parameters['segment_diameter']*10
 parameters['overwrite_report']= True
 parameters['overwrite_louvain'] = True
 parameters['fileu_version'] = 2
-parameters['dtype'] = 'float32'
-parameters['anndata_dtype'] = 'float32'
+
 parameters['ncpu'] = 15
 parameters['set_min_zero'] = False
 parameters['metric'] = 'median'
 
+parameters['post_strip_process'] = False
+
 parameters['acq_FF'] = False
 parameters['acq_constant'] = False
+
 parameters['use_FF'] = True
 parameters['use_constant'] = False
-parameters['post_strip_FF'] = True
-parameters['fit_FF'] = True
-parameters['fit_constant'] = True
+
+parameters['fit_FF'] = False
+parameters['fit_constant'] = False
+
 parameters['clip_FF'] = False
 parameters['clip_constant'] = False
-parameters['post_processing_constant'] = True
-parameters['bitmap'] = bitmap
-parameters['config_overwrite'] = True
+
 parameters['FF_n_cpu'] = 1
 parameters['constant_poly_degrees'] = 5
 parameters['FF_poly_degrees'] = 5
-parameters['smooth_FF'] = Trues
-parameters['smooth_constant'] = False
+parameters['smooth_FF'] = True
+parameters['smooth_constant'] = True
 
+parameters['constant_smooth_function'] = 'spline_min'
+parameters['constant_smooth_sigma'] = 4
+parameters['FF_smooth_function'] = 'spline_robust'
+parameters['FF_smooth_sigma'] = 4
+
+
+parameters['post_processing_constant'] = False
 
 parameters['process_img_before_FF'] = False
-parameters['debug'] = True
+parameters['debug'] = False
 
+parameters['config_overwrite'] = True
 parameters['overwrite'] = False #False
 parameters['segment_overwrite'] = False #False
 parameters['vector_overwrite'] = False #False
 
+parameters['scratch_path_base'] = '/scratchdata1/Processing_tmp'
 
-parameters['scratch_path'] = '/scratchdata1/Processing_tmp'
+parameters['bitmap'] = bitmap

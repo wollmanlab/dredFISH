@@ -1,23 +1,50 @@
 #!/usr/bin/env python
+import logging
+import numpy as np
+# import torch
+import os
+import importlib
+# from tqdm import tqdm
+from datetime import datetime
+# from metadata import Metadata
+# import sys
+# import pandas as pd
+from dredFISH.Utils import fileu
+# import anndata
+
 import argparse
 import shutil
-from datetime import datetime
-import dredFISH.Processing as Processing
-from dredFISH.Processing.Section import *
 import time
-"""
-conda activate dredfish_3.9; nohup python -W ignore /home/zach/PythonRepos/dredFISH/dredFISH/Processing/execute.py /orangedata/Images2023/Gaby/dredFISH/Acrydite_77.5.A_DPNMF_97.5.B_2023Feb16/ -c dredfish_processing_config_v1 -w A; conda deactivate
-"""
+import pandas as pd
+import numpy as np 
+import matplotlib.pyplot as plt
+import math
+import time
+from metadata import Metadata
+
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+from collections import Counter
+import torch
+
+from dredFISH.Registration.Registration import *
+
+import matplotlib as mpl
+mpl.rcParams['figure.dpi'] = 50
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("metadata_path", type=str, help="Path to folder containing Raw Data /bigstore/Images20XX/User/Project/Dataset/")
     parser.add_argument("-c","--cword_config", type=str,dest="cword_config",default='dredfish_processing_config_tree', action='store',help="Name of Config File for analysis ie. dredfish_processing_config")
     parser.add_argument("-s","--section", type=str,dest="section",default='all', action='store',help="keyword in posnames to identify which section to process")
     parser.add_argument("-w","--well", type=str,dest="well",default='', action='store',help="keyword in well to identify which section to process")
-    parser.add_argument("-f","--fishdata", type=str,dest="fishdata",default='', action='store',help="fishdata name for save directory")
+    parser.add_argument("-f","--fishdata", type=str,dest="fishdata",default='fishdata', action='store',help="fishdata name for save directory")
     
     args = parser.parse_args()
-    
+
+
 if __name__ == '__main__':
     """
      Main Executable to process raw Images to dredFISH data
@@ -25,15 +52,14 @@ if __name__ == '__main__':
     metadata_path = args.metadata_path
     cword_config = args.cword_config
     config = importlib.import_module(cword_config)
-
-    print(args)
-    if args.fishdata == '':
-        fishdata = None
+    config.parameters['nucstain_acq']
+    if not '_' in args.fishdata:
+        fishdata = args.fishdata+str(datetime.today().strftime("_%Y%b%d"))
     else:
         fishdata = args.fishdata
 
-    
-
+    fishdata_path = os.path.join(metadata_path,fishdata)
+    print(args)
     if args.section=='all':
         image_metadata = Metadata(metadata_path)
         hybe = [i for i in image_metadata.acqnames if config.parameters['nucstain_acq']+'_' in i.lower()]
@@ -47,24 +73,29 @@ if __name__ == '__main__':
         sections = np.array([i for i in sections if args.well in i])
     # np.random.shuffle(sections)
     print(sections)
+
+    """ Determine best order to register """
+    
     completion_array = np.array([False for i in sections])
-    max_attempts = 1
-    attempt = 1
+    reference_data = None
     while np.sum(completion_array==False)>0:
-        if attempt>max_attempts:
-            raise(ValueError('Max Attempts Reached'))
-        attempt+=1
         for idx,section in enumerate(sections):
-            self = Section_Class(metadata_path,section,cword_config,verbose=True)
-            if isinstance(fishdata,str):
-                self.path = fishdata.copy()
-            # self.setup_output()
+            processing_path = os.path.join(metadata_path,fishdata)
+            if not os.path.exists(processing_path):
+                processing_path = os.path.join(metadata_path,fishdata,'Processing')
+            registration_path = os.path.join(metadata_path,'Registration'+str(datetime.today().strftime("_%Y%b%d")))
+            self = Registration_Class(processing_path,registration_path,section)
+            self.overwrite = True
+            self.ref_XYZC = reference_data
             self.update_user(str(np.sum(completion_array==False))+ ' Unfinished Sections')
             self.update_user('Processing Section '+section)
-            self.run()
-            if isinstance(self.data,type(None)):
-                continue
+            out = str(robust_input("Continue? (Y/N): ",dtype='str'))
+            if 'y' in out.lower():
+                self.run()
+                reference_data = self.ref_XYZC
             completion_array[idx] = True
-        time.sleep(60)
-    self.update_user('Completed')
-
+        if np.sum(completion_array==False)>0:
+            time.sleep(60)
+    out = ''
+    while not 'y' in out:
+        out = str(robust_input("Satisfied? (Y/N): ",dtype='str'))
