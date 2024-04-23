@@ -450,7 +450,7 @@ class Colorpleth(Map):
                                       clp = (-np.inf,np.inf), **kwargs):
         # if geom_type is None chose it based on size of input vector
         if geom_type is None:         
-            lvlarr = np.flatnonzero(np.equal(V.TMG.N,len(values_to_map)))
+            lvlarr = np.flatnonzero(np.equal(V.TMG.get_N(section=section),len(values_to_map)))
             if len(lvlarr)!=1:
                 raise ValueError('number of items in values_to_map doesnt match any level size')
             if lvlarr[0] == 0: 
