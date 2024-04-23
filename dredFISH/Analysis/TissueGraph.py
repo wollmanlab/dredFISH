@@ -39,7 +39,7 @@ from dredFISH.Utils import tmgu
 from dredFISH.Utils import geomu
 from dredFISH.Utils import coloru
 from dredFISH.Processing.Section import *
-# from dredFISH.Registration.Registration import *
+from dredFISH.Registration.Registration import *
 
 rng = np.random.default_rng()
 
@@ -218,7 +218,6 @@ class TissueMultiGraph:
         self.Layers = [None]*len(LayerNameList)
         for i in range(len(LayerNameList)): 
             self.Layers[i] = TissueGraph(basepath = self.basepath,
-                                            dataset = self.dataset, 
                                             layer_type = LayerNameList[i], 
                                             redo = False)
             
@@ -258,7 +257,7 @@ class TissueMultiGraph:
         else:
             geom_types=list() 
 
-        input_df_dict = self.input_df.to_dict()
+        input_df_dict = self.input_df.to_dict('list')
         self._config = { "layers_graph" : self.layers_graph, 
                          "layer_taxonomy_mapping" : self.layer_taxonomy_mapping, 
                          "tax_types" : [tx.name for tx in self.Taxonomies], 
@@ -381,23 +380,26 @@ class TissueMultiGraph:
         # find list of sections
         adatas = []
         sections = []
-        for row in self.input_df.iterrows():
+        for index,row in self.input_df.iterrows():
             animal = row['animal']
             section_acq_name = row['section_acq_name']
             dataset = row['dataset']
             registration_path = row['registration_path']
-            processing = rows['processing']
-            dataset_path = rows['dataset_path']
+            processing = row['processing']
+            dataset_path = row['dataset_path']
             try:
                 adata = fileu.load(os.path.join(dataset_path,dataset,processing,section_acq_name),file_type='anndata')
                 if register_to_ccf: 
-                    XYZC  = Registration_Class(data.copy(),registration_path,section_acq_name,verbose=False).run()
-                    data.obs['ccf_x'] = XYZC['ccf_x']
-                    data.obs['ccf_y'] = XYZC['ccf_y']
-                    data.obs['ccf_z'] = XYZC['ccf_z']
+                    XYZC  = Registration_Class(adata.copy(),registration_path,section_acq_name,verbose=False).run()
+                    adata.obs['ccf_x'] = XYZC['ccf_x']
+                    adata.obs['ccf_y'] = XYZC['ccf_y']
+                    adata.obs['ccf_z'] = XYZC['ccf_z']
+                    """ Rename Section """
+                    section_name = f"{animal}_{adata.obs['ccf_x'].mean():.1f}"
+                else: 
+                    section_name = section_acq_name
+                
                 adatas.append(adata)
-                """ Rename Section """
-                section_name = f"{animal}_{data.obs['ccf_x'].mean():.1f)}"
                 sections.append(np.full((adata.shape[0], 1), section_name))
             except:
                 print('Unable to load '+str(section_acq_name))
@@ -427,7 +429,6 @@ class TissueMultiGraph:
 
         TG = TissueGraph(adata=adata,
                          basepath = self.basepath,
-                         dataset = self.dataset,
                          layer_type="cell",
                          redo=True)
 
@@ -802,10 +803,10 @@ class TissueGraph:
 
 
     """
-    def __init__(self, basepath=None, layer_type=None, dataset=None,
+    def __init__(self, basepath=None, layer_type=None,
                        feature_mat=None, feature_mat_raw=None,
                        redo=False, obs=None,layers=None,
-                       quick_load_cell_obs=False,adata=None
+                       adata=None
         ):
         """Create a TissueGraph object
         
@@ -824,8 +825,6 @@ class TissueGraph:
         # validate input
         if basepath is None: 
             raise ValueError("missing basepath in TissueGraph constructor")
-        if dataset is None: 
-            raise ValueError("missing dataset in TissueGraph constructor")
         if layer_type is None: 
             raise ValueError("Missing layer type information in TissueGraph constructor")
         if layer_type not in self.allowed_layer_types:
@@ -834,7 +833,6 @@ class TissueGraph:
         # what is stored in this layer (cells, zones, regions, etc)
         self.layer_type = layer_type # label layers by their type
         self.basepath = basepath
-        self.dataset = dataset
  
         # this dict stores the defaults field names in the anndata objects that maps to TissueGraph properties
         # this allows storing different versions (i.e. different cell type assignment) in the anndata object 
@@ -855,28 +853,12 @@ class TissueGraph:
         self.FG = None # Feature graph (created by build_feature_graph, or load in __init__)
         self._spatial_edge_list = None # for performance (of .contract_graph), going to save the edge list extermally from self.SG 
 
-        # if anndata file exists and redo is False, just read the file. 
-
-        # there are three mode of TG loading: 
-        # 1. quick (from drive) : only load data that came from Processing (feature_mat and obs), if there are any spatial/feature graphs remove them. 
-        # 2. standard (from drive): load the full adata and create SG and FG 
-        # 3. from scratch : uses input arguments to rebuild the TG object from scratch, ignores anything in the drive. 
+        # there are two mode of TG loading: 
+        # 1. standard (from drive): load the full adata and create SG and FG 
+        # 2. from scratch : uses input arguments to rebuild the TG object from scratch, ignores anything in the drive. 
         
-        if quick_load_cell_obs:
-            self.adata = fileu.load(path=self.basepath,
-                                    file_type='Layer',
-                                    model_type=self.layer_type,
-                                    dataset=self.dataset)
-            self.adata.obsp.clear()
-
-        elif not redo and fileu.check_existance(path=self.basepath,
-                                    file_type='Layer',
-                                    model_type=self.layer_type,
-                                    dataset=self.dataset):
-            self.adata = fileu.load(path=self.basepath,
-                                    file_type='Layer',
-                                    model_type=self.layer_type,
-                                    dataset=self.dataset)
+        if not redo:
+            self.adata = anndata.read_h5ad(os.path.join(self.basepath,'Layer',f"{self.layer_type}_layer.h5ad"))
             # SG is saved as a list of spatial graphs (one per section)
             if "SG" in self.adata.obsp.keys():
                 # create SG and FG from Anndata
@@ -945,11 +927,15 @@ class TissueGraph:
 
     def save(self):
         """save TG to file"""
+        layer_path = os.path.join(self.basepath, 'Layer')
+        if not os.path.exists(layer_path):
+            os.makedirs(layer_path)
         if not self.is_empty():
-            fileu.save(self.adata,path=self.basepath,
-                                  file_type='Layer',
-                                  model_type=self.layer_type,
-                                  dataset=self.dataset)
+            self.adata.write(os.path.join(layer_path,f"{self.layer_type}_layer.h5ad"))
+            # fileu.save(self.adata,path=self.basepath,
+            #                       file_type='Layer',
+            #                       model_type=self.layer_type,
+            #                       dataset=self.dataset)
     
     @property
     def names(self):
