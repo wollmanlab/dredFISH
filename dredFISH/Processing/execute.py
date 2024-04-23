@@ -32,6 +32,8 @@ if __name__ == '__main__':
     else:
         fishdata = args.fishdata
 
+    
+
     if args.section=='all':
         image_metadata = Metadata(metadata_path)
         hybe = [i for i in image_metadata.acqnames if config.parameters['nucstain_acq']+'_' in i.lower()]
