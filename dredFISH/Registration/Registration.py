@@ -134,7 +134,7 @@ class Registration_Class(object):
         Y = non_rigid_transformed_XYZC['ccf_y']
         Z = non_rigid_transformed_XYZC['ccf_z']
         design_matrix = np.c_[Y,Z]
-        non_rigid_transformed_XYZC[['ccf_x']] = self.X_model.predict(design_matrix)[0]
+        non_rigid_transformed_XYZC[['ccf_x']] = self.X_model.predict(design_matrix)#[0]
         
         return non_rigid_transformed_XYZC
 
@@ -250,7 +250,7 @@ class Registration_Class(object):
                 Y = self.ref_XYZC['ccf_y']
                 Z = self.ref_XYZC['ccf_z']
                 design_matrix = np.c_[Y,Z]
-                distance = self.ref_XYZC['ccf_x'] - model.predict(design_matrix)[0]
+                distance = self.ref_XYZC['ccf_x'] - model.predict(design_matrix)#[0]
 
                 self.ref_XYZC_sample = np.random.choice(self.ref_XYZC[np.abs(distance)<self.window].index,100000)
                 fig,axs = plt.subplots(1,2,figsize=[20,10])
@@ -347,7 +347,7 @@ class Registration_Class(object):
             Y = self.ref_XYZC['ccf_y']
             Z = self.ref_XYZC['ccf_z']
             design_matrix = np.c_[Y,Z]
-            distance = self.ref_XYZC['ccf_x'] - self.X_model.predict(design_matrix)[0]
+            distance = self.ref_XYZC['ccf_x'] - self.X_model.predict(design_matrix)#[0]
             self.ref_XYZC_sample = np.random.choice(self.ref_XYZC[np.abs(distance)<self.window].index,100000)
 
             ref_X = np.array(self.ref_XYZC.loc[self.ref_XYZC_sample,'ccf_x'].copy())
@@ -386,7 +386,7 @@ class Registration_Class(object):
         Y = self.ref_XYZC['ccf_y']
         Z = self.ref_XYZC['ccf_z']
         design_matrix = np.c_[Y,Z]
-        distance = self.ref_XYZC['ccf_x'] - self.X_model.predict(design_matrix)[0]
+        distance = self.ref_XYZC['ccf_x'] - self.X_model.predict(design_matrix)#[0]
         self.ref_XYZC_sample = np.random.choice(self.ref_XYZC[np.abs(distance)<self.window].index,100000)
         
         self.update_user('Viewing Transformation',level=20)
@@ -609,7 +609,16 @@ class Registration_Class(object):
             self.XYZC['ccf_x'] = np.ones_like(data.obs['stage_x'])
             self.XYZC['ccf_y'] = np.array(data.obs['stage_y'])
             self.XYZC['ccf_z'] = np.array(data.obs['stage_x'])
-            self.XYZC['color'] = np.array(data.obs['louvain_colors'])
+            bit = 'RS458122_cy5'
+            from dredFISH.Utils import basicu
+            X = data.layers['processed_vectors'].copy()
+            X = np.log10(np.clip(X,1,None))
+            X = basicu.normalize_fishdata_robust_regression(X)
+            c = X[:,data.var.index==bit]
+            vmin,vmax = np.percentile(c,[5,95])
+            c = np.clip(c,vmin,vmax)
+            
+            self.XYZC['color'] = c#np.array(data.obs['louvain_colors'])
             del data
         if isinstance(self.XYZC,type(None)):
             self.update_user('Data Not Found',level=50) 
