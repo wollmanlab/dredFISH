@@ -22,9 +22,6 @@ import math
 import time
 
 import numpy as np
-import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense
 from collections import Counter
 import torch
 import matplotlib as mpl

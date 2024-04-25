@@ -672,25 +672,30 @@ def create_mask_from_XY(XY,units = 'auto',dist_thresh = 2):
         raise ValueError('wrong units in create mask')
         
     XYint = (XY*rescal).astype(int)
+    dXdY = XYint.min(axis=0)
+    XYint -= dXdY
     sz = np.fliplr(XYint).max(axis=0)+10
     mask_raster = np.zeros(sz,dtype=bool)
     mask_raster[XYint[:,1],XYint[:,0]]=True
     mask_raster = distance_transform_edt(1-mask_raster)<dist_thresh
-    
     mask_polys = create_mask_from_raster(mask_raster)
     if rescal != 1:
         rescl_mat = [1/rescal, 0, 0, 1/rescal, 0, 0]
-        mask_polys = [shapely.affinity.affine_transform(m,rescl_mat) for m in mask_polys]
+        # Adjust the affine transformation matrix to include a shift by dXdY
+        rescl_mat_with_shift = [1/rescal, 0, 0, 1/rescal, dXdY[0], dXdY[1]]
+        mask_polys = [shapely.affinity.affine_transform(m, rescl_mat_with_shift) for m in mask_polys]
 
     return mask_polys
 
 # Create geoms per section:
-def calc_mask_voronoi_polygons_from_XY(XY):
+def calc_mask_voronoi_polygons_from_XY(XY,units='mm'):
     section_geom_polys = dict()
-    mask_polys = create_mask_from_XY(XY)
+    mask_polys = create_mask_from_XY(XY, units=units)
     section_geom_polys['mask'] = mask_polys
     vor_polys = voronoi_polygons(XY)
     masked_vor_polys = mask_voronoi(vor_polys,mask_polys)
     section_geom_polys['voronoi'] = masked_vor_polys
     
     return section_geom_polys
+
+

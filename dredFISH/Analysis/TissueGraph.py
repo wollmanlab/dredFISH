@@ -43,6 +43,16 @@ from dredFISH.Registration.Registration import *
 
 rng = np.random.default_rng()
 
+# define function (not nested...) to be used in parallel code
+def create_and_save_geoms(sec, xy, basepath): 
+    poly_dict = geomu.calc_mask_voronoi_polygons_from_XY(xy)
+    sec_geoms = dict()
+    for gt in ["mask","voronoi"]:
+        sec_geoms[gt] = Geom(geom_type=gt, polys = poly_dict[gt],
+                section = sec, basepath = basepath)
+        sec_geoms[gt].save()
+
+    return sec_geoms
 
 class TissueMultiGraph: 
     """Main class used to manage the creation of multi-layer graph representation of tissues. 
@@ -51,7 +61,6 @@ class TissueMultiGraph:
     and their relationships. Examples of biospatial units are cells, isozones, regions. 
     The main objects that TMG creates and stores are TissueGraphs, Taxonomies, and Geoms.    
 
-    
     Attributes
     ----------
     Layers : list 
@@ -115,6 +124,7 @@ class TissueMultiGraph:
 
         if not redo and os.path.exists(os.path.join(self.basepath,"TMG.json")):
             self._load()
+            return 
         
             # with open(os.path.join(self.basepath,"TMG.json"),encoding="utf-8") as fh:
             #     self._config = json.load(fh)
@@ -227,16 +237,8 @@ class TissueMultiGraph:
         self.Geoms = [None] * len(self.unqS)
         geom_types = self._config["geom_types"]
         self.skip_geoms = skip_geoms
-        if not skip_geoms:
-            for i,s in enumerate(self.unqS):
-                section_geoms = dict()
-                for gt in geom_types:
-                    polys = fileu.load(self.basepath,file_type='Geom',model_type=gt,
-                                        section=s,dataset=self.dataset)
-                    section_geoms[gt] = Geom(geom_type=gt,polys=polys,
-                                                basepath=self.basepath,
-                                                section=s,dataset=self.dataset)
-                self.Geoms[i] = section_geoms
+        if not self.skip_geoms:
+            self.load_geoms(sections=self.unqS,geom_types=geom_types)
         else:
             section_geoms = dict() 
             for gt in geom_types:
@@ -285,27 +287,19 @@ class TissueMultiGraph:
               
         logging.info("saved")
         
-    def load_geoms(self,sections = None): 
+    def load_geoms(self,sections = None, geom_types = ["mask","voronoi"]):
+        # get section names 
         if sections is None: 
             sections = self.unqS
         elif not isinstance(sections,list):
             sections = [sections]
-        if hasattr(self, '_config'):
-            geom_types = self._config["geom_types"]
-        else: 
-            raise ValueError('cannot load geoms that were never saved, please check!')
+
         for s in sections: 
             ix = self.unqS.index(s)
             section_geoms = dict()
             for gt in geom_types:
-                polys = fileu.load(self.basepath,file_type='Geom',model_type=gt,
-                                    section=s,dataset=self.dataset)
-                section_geoms[gt] = Geom(geom_type=gt,polys=polys,
-                                            basepath=self.basepath,
-                                            section=s,dataset=self.dataset)
+                section_geoms[gt] = Geom(geom_type=gt,polys=None,basepath=self.basepath, section=s)
             self.Geoms[ix] = section_geoms
-
-
     
     def add_type_information(self, layer_id, type_vec, tax): 
         """Adds type information to TMG
@@ -506,7 +500,7 @@ class TissueMultiGraph:
         
         # create the region layer merging information from contracted graph and environments
         RegionLayer = TissueGraph(feature_mat=Env, basepath=self.basepath, 
-                                  dataset = self.dataset, layer_type="region", redo=True)
+                                  layer_type="region", redo=True)
         RegionLayer.SG = CG.SG.copy()
         RegionLayer.node_size = CG.node_size.copy()
         RegionLayer.Upstream = CG.Upstream.copy()
@@ -645,8 +639,16 @@ class TissueMultiGraph:
         Sections = self.Layers[0].Section
         # return a list of (unique) sections 
         return(list(np.unique(Sections)))
+    
+    def add_and_save_vor_mask_geoms(self):
+        XY_per_section=self.Layers[0].get_XY(section=self.unqS)
+        XY_per_section_dict = {s: xy for s, xy in zip(self.unqS, XY_per_section)}
+        args = [(sec, XY_per_section_dict[sec],self.basepath) for sec in self.unqS]
+        with multiprocessing.Pool() as pool:
+            self.Geoms = pool.starmap(create_and_save_geoms, args)
 
-    def add_geoms(self,geom_types = ["points","mask","voronoi"], unqS = None,redo = False):
+
+    def add_geoms(self,geom_types = ["mask","voronoi"], unqS = None,redo = False):
         """
         Creates the geometries needed (mask, lines, points, and polygons) to be used in views to create maps.
         Geometries are vectorized representations of cells using lists of Shapely objects. 
@@ -663,18 +665,6 @@ class TissueMultiGraph:
         in the future either by upgrading shaply or some other workaround. 
         """
 
-        if redo == False and fileu.check_existance(path=self.basepath,file_type='Geom',model_type=geom_types[0],dataset=self.dataset,section=self.unqS[0]):
-            self.Geoms = list()
-            for s in self.unqS:
-                section_geoms = dict()
-                for gt in geom_types:
-                    polys = fileu.load(self.basepath,file_type='Geom',model_type=gt,
-                                       section=s,dataset=self.dataset)
-                    section_geoms[gt] = Geom(geom_type=gt,polys=polys,
-                                             basepath=self.basepath,
-                                             section=s,dataset=self.dataset)
-                self.Geoms.append(section_geoms)
-            return
         self.skip_geoms = False
         # create XY per section 
         XY_per_section = list()
@@ -685,6 +675,7 @@ class TissueMultiGraph:
 
         # if mask and/or voronoi are part of the geom_type, run those calculations in parallel
         geoms_requiering_voronoi = ['mask','voronoi','isozones','regions']
+        
         if any(gtype in geoms_requiering_voronoi for gtype in geom_types): 
             with Pool() as pool: 
                 section_geom_polys = pool.map(geomu.calc_mask_voronoi_polygons_from_XY,XY_per_section)
@@ -702,42 +693,42 @@ class TissueMultiGraph:
 
             if "mask" in geom_types:
                 section_geoms['mask'] = Geom(geom_type='mask',polys = mask_polys,section = s,
-                                            basepath = self.basepath,dataset = self.dataset)
+                                            basepath = self.basepath)
             if "voronoi" in geom_types:
                 section_geoms['voronoi'] = Geom(geom_type='voronoi',polys = masked_vor_polys,section = s,
-                                                basepath = self.basepath,dataset = self.dataset)
+                                                basepath = self.basepath)
             
             # Vectorize cell / nuclei / cytoplasm segmentations matrix
             if "cells" in geom_types:
                 cell_labels_raster = self.load_stiched_labeled_image(section = s,label_type = 'total') 
                 cell_polys = geomu.vectorize_labeled_matrix_to_polygons(cell_labels_raster)
                 section_geoms['cells'] = Geom(geom_type='cells',polys = cell_polys,section = s,
-                                              basepath = self.basepath,dataset = self.dataset)
+                                              basepath = self.basepath)
                 
             if "nuclei" in geom_types:
                 nuclei_labels_raster = self.load_stiched_labeled_image(section = s,label_type = 'nuclei')
                 nuclei_polys = geomu.vectorize_labeled_matrix_to_polygons(nuclei_labels_raster)
                 section_geoms['nuclei'] = Geom(geom_type='nuclei',polys = nuclei_polys,section = s,
-                                               basepath = self.basepath,dataset = self.dataset)
+                                               basepath = self.basepath)
                 
             if "cytoplasm" in geom_types:
                 cytoplasm_labels_raster = self.load_stiched_labeled_image(section = s,label_type = 'cytoplasm')
                 cytoplasm_polys = geomu.vectorize_labeled_matrix_to_polygons(cytoplasm_labels_raster)
                 section_geoms['cytoplasm'] = Geom(geom_type='cytoplasm',polys = cytoplasm_polys,section = s,
-                                                  basepath = self.basepath,dataset = self.dataset)
+                                                  basepath = self.basepath)
 
             # add "higher level" polygon merging based on layer mapping
             if "isozones" in geom_types:
                 layer_ix = self.find_layer_by_name(self.geom_to_layer_type_mapping['isozones'])
                 zones_polys = geomu.merge_polygons_by_ids(masked_vor_polys,self.Layers[layer_ix].Upstream)
                 section_geoms['isozones'] = Geom(geom_type='isozones',polys = zones_polys,section = s,
-                                                  basepath = self.basepath,dataset = self.dataset)
+                                                  basepath = self.basepath)
                 
             if "regions" in geom_types: 
                 layer_ix = self.find_layer_by_name(self.geom_to_layer_type_mapping['regions'])
                 region_polys = geomu.merge_polygons_by_ids(masked_vor_polys,self.Layers[layer_ix].Upstream)
                 section_geoms['regions'] =Geom(geom_type='regions',polys = region_polys,section = s,
-                                               basepath = self.basepath,dataset = self.dataset)
+                                               basepath = self.basepath)
 
             self.Geoms.append(section_geoms)
         
@@ -932,10 +923,7 @@ class TissueGraph:
             os.makedirs(layer_path)
         if not self.is_empty():
             self.adata.write(os.path.join(layer_path,f"{self.layer_type}_layer.h5ad"))
-            # fileu.save(self.adata,path=self.basepath,
-            #                       file_type='Layer',
-            #                       model_type=self.layer_type,
-            #                       dataset=self.dataset)
+
     
     @property
     def names(self):
@@ -1086,6 +1074,8 @@ class TissueGraph:
     def get_XY(self,section = None):
         if section is None: 
             return(self.XY)
+        elif isinstance(section, list):
+            return [self.XY[self.Section == sec, :] for sec in section]
         else: 
             return(self.XY[self.Section == section,:])
         
@@ -1310,7 +1300,6 @@ class TissueGraph:
         # create a new Tissue graph by copying existing one, contracting, and updating XY
         ZoneGraph = TissueGraph(feature_mat=zone_feat_mat, 
                                 basepath=self.basepath,
-                                dataset=self.dataset,
                                 layer_type="isozone",
                                 redo=True,
                                 )
@@ -1712,7 +1701,7 @@ class Geom:
 
     """
 
-    def __init__(self,geom_type = '',polys = [],basepath = '',dataset = '',section = ''):
+    def __init__(self,geom_type = None,polys = None,basepath = None,section = None, redo = False):
         self.type = geom_type
         self.allowed_geom_types=['voronoi',
                                   'cells',
@@ -1723,21 +1712,26 @@ class Geom:
                                   'mask']
         if geom_type not in self.allowed_geom_types:
             raise ValueError(f"Geom type {geom_type} is not in {self.allowed_geom_types}")
+        self.geom_type = geom_type
+        self.section = section
+        self.basepath = os.path.join(basepath,'Geom',section)
+        self.filename = os.path.join(self.basepath, f"{self.geom_type}.wkt")
+        # read from drive if exists already
+        if polys is None and os.path.exists(self.filename): 
+            polys = fileu.load_polygon_list(self.filename)
         self.polys = polys
         self._verts = geomu.get_polygons_vertices(polys)
-        self.basepath = basepath
-        self.dataset = dataset
-        self.section = section
-        
+
 
     @property
     def verts(self):
         return self._verts
 
     def save(self):
-        fileu.save(self.polys,path = self.basepath,file_type='Geom',
-                   model_type = self.type,dataset = self.dataset,
-                   section = self.section)
+        if not os.path.exists(self.basepath):
+            os.makedirs(self.basepath)
+        fileu.save_polygon_list(self.polys,self.filename)
+
        
     def get_xylim(self):
         """Returns the min/max xy of the geometry
