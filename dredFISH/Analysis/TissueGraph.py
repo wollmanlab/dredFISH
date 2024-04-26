@@ -107,7 +107,7 @@ class TissueMultiGraph:
                        cols are: ['animal', 'section_acq_name', 'registration', 'processing', 'dataset',
                                   'dataset_path']
 
-            basepth : a path to underwhith we create Analysis
+            basepth : a path to underwhith we save everything
                 
             redo : bool (default False)
                 If the object was already created in the past, the default behavior is to just load the object. 
@@ -126,53 +126,6 @@ class TissueMultiGraph:
             self._load()
             return 
         
-            # with open(os.path.join(self.basepath,"TMG.json"),encoding="utf-8") as fh:
-            #     self._config = json.load(fh)
-            
-            # # Load Taxonomies: 
-            # TaxNameList = self._config["tax_types"]
-            # self.Taxonomies = [None]*len(TaxNameList)
-            # for i in range(len(TaxNameList)): 
-            #     self.Taxonomies[i] = Taxonomy(TaxNameList[i])
-            #     self.Taxonomies[i].load(self.basepath,self.dataset)
-
-            # # Load layers
-            # # convert string key to int key (fixing an artifects of JSON dump and load)
-            # ltm = self._config["layer_taxonomy_mapping"]
-            # ltm = {int(layer_ix): tax_ix for layer_ix, tax_ix in ltm.items()}
-            # self.layer_taxonomy_mapping = ltm 
-            
-            # LayerNameList = self._config["layer_types"]
-            # self.Layers = [None]*len(LayerNameList)
-            # for i in range(len(LayerNameList)): 
-            #     self.Layers[i] = TissueGraph(basepath = self.basepath,
-            #                                  dataset = self.dataset, 
-            #                                  layer_type = LayerNameList[i], 
-            #                                  redo = False)
-                
-            # self.layers_graph = self._config["layers_graph"]
-
-            # # Load geoms
-            # self.Geoms = [None] * len(self.unqS)
-            # geom_types = self._config["geom_types"]
-            # self.skip_geoms = skip_geoms
-            # if not skip_geoms:
-            #     for i,s in enumerate(self.unqS):
-            #         section_geoms = dict()
-            #         for gt in geom_types:
-            #             polys = fileu.load(self.basepath,file_type='Geom',model_type=gt,
-            #                                 section=s,dataset=self.dataset)
-            #             section_geoms[gt] = Geom(geom_type=gt,polys=polys,
-            #                                         basepath=self.basepath,
-            #                                         section=s,dataset=self.dataset)
-            #         self.Geoms[i] = section_geoms
-            # else:
-            #     section_geoms = dict() 
-            #     for gt in geom_types:
-            #         section_geoms[gt] = None
-            #     self.Geoms[0] = section_geoms
-
-            # return
 
         # create a new TMG object from inputs
         self.input_df = input_df

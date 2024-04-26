@@ -7,7 +7,11 @@ import pandas as pd
 from sklearn.decomposition import PCA
 import datashader as ds
 
+import torch
+
 from skimage import io
+from scipy.ndimage import gaussian_filter, median_filter
+from skimage.measure import block_reduce
 
 from . import powerplots
 
@@ -234,7 +238,70 @@ def stkread(full_file_list):
     """
     read a stack of images based on list of filenames
     """
-    img1 = io.imread(full_file_list[0])
-    sz = (len(full_file_list,img1.shape[0],img1.shape[1]))
-    stk = nd.zeros(sz,dtype = img1.dtype)
-    
+    img = io.imread(full_file_list[0])
+    sz = ((img.shape[0],img.shape[1],len(full_file_list)))
+    stk = np.zeros(sz,dtype = img.dtype)
+    stk[:,:,0] = img
+    for i in range(1,len(full_file_list)):
+        stk[:,:,i] = io.imread(full_file_list[i])
+    return stk
+
+
+def iterative_gaussian_filter(img,sigma=1,iter=1,smooth_bound = True):
+    img_iter = img.copy()
+    for i in range(iter):
+        img_iter = gaussian_filter(img_iter,sigma=sigma,mode='nearest')
+        img_iter[:sigma,:] = img[:sigma,:]
+        img_iter[-sigma:,:] = img[-sigma:,:]
+        img_iter[:,:sigma] = img[:,:sigma]
+        img_iter[:,-sigma:] = img[:,-sigma:] 
+    if smooth_bound: 
+        img_iter = gaussian_filter(img_iter,sigma=sigma,mode='nearest')
+
+    return img_iter
+
+def median_bin(img_or_stk,bin = 2): 
+    # if only a single image: 
+    if len(img_or_stk.shape)==2: 
+        img_flt = block_reduce(median_filter(img_or_stk[:,:,i],2), tuple([2,2]), np.mean)
+        return img_flt
+    else: 
+        stk = img_or_stk
+
+    # init an empty downsized stack
+    stk_ds = np.zeros((stk.shape[0]//bin,stk.shape[1]//bin,stk.shape[2]),dtype=stk.dtype)
+    for i in range(stk.shape[2]): 
+        stk_ds[:,:,i] = block_reduce(median_filter(stk[:,:,i],2), tuple([2,2]), np.mean)
+
+    return stk_ds
+
+
+
+def estimate_flatfield_and_constant(full_file_list):
+    stk = stkread(full_file_list)
+    stk_ds = median_bin(stk)
+
+    # Calc constnt by taking bottom 1% and smoothing with iternative gaussian
+    stk_tensor = torch.Tensor(stk_ds.astype(np.float32))
+    Mraw_tensor = torch.kthvalue(stk_tensor, k=stk_tensor.shape[2]//100, dim=2).values
+    Mraw = np.array(Mraw_tensor)
+    Mflt = iterative_gaussian_filter(Mraw,sigma=20,iter=5)
+
+    # now subtract const
+    M_tensor = torch.Tensor(Mflt.astype(np.float32))
+    stk_m_M_tensor = stk_tensor - M_tensor.unsqueeze(2)
+
+    # rescale so all images get the same weight
+    avg_img_scale = torch.mean(stk_m_M_tensor, axis=(0, 1))
+    avg_img_scale = avg_img_scale/avg_img_scale.mean()
+    stk_rescaled_tensor = stk_m_M_tensor/avg_img_scale.unsqueeze(0).unsqueeze(1)
+
+    # get Imed and smooth
+    Imed_tensor = torch.kthvalue(stk_rescaled_tensor, k=stk_tensor.shape[2]//2, dim=2).values
+    FF = iterative_gaussian_filter(np.array(Imed_tensor),sigma=20,iter=5)
+
+    # convert to FF (1/FF and rescale)
+    FF = 1/FF
+    FF = FF/FF.mean()
+
+    return (FF,Mflt)
