@@ -260,7 +260,7 @@ class TissueMultiGraph:
             self.Geoms[ix] = section_geoms
 
     def update_current_type(self,layer_id,tax_id): 
-        # if layer_id or tax_id are numeric, find which id they are
+        # if layer_id or tax_id are not numeric, find which id they are
         if isinstance(layer_id,str): 
             all_layer_types = [L.layer_type for L in self.Layers]
             try:
@@ -420,73 +420,82 @@ class TissueMultiGraph:
         logging.info('done with create_cell_layer')
         return
 
-    def create_isozone_layer(self, cell_layer = 0, replace = False):
-        """Creates isozones layer using cell types. 
-        Contract cell types to create isozone graph. 
-        cell_layer determine the base layer to contract
+    def create_merged_layer(self, base_layer_id = 0, replace = False, layer_type = None, tax_name = None, update_featuremat_with_another_tax_composition = None):
+        """Creates an "iso-layer" from existing layer. 
+        As "iso-layer" is a layer created by merging neighboring units of the same type. 
         replace = True (default false) allow overwriting existing layer
+        Since we are only merging things of the same type, 
         """
-        isozone_layer_id = None
+        if layer_type is None: 
+            raise ValueError("what is the name (layer_type) of the new layer?")
+        
+        iso_layer_id = None
         for i,TG in enumerate(self.Layers):
-            if TG.layer_type == "isozone":
+            if TG.layer_type == layer_type:
                 isozone_layer_id = i
                 if not replace: 
-                    raise ValueError("!!`isozone` layer already exists; change replace=True to overwrite")
-         
-        IsoZoneLayer = self.Layers[cell_layer].contract_graph()
+                    raise ValueError(f"!!{layer_type}  already exists; change replace=True to overwrite")
+
+        if tax_name is not None: 
+            self.self.Layers[base_layer_id].update_current_type(base_layer_id,tax_name)
+        IsoZoneLayer = self.Layers[base_layer_id].contract_graph()
         if isozone_layer_id is None: 
             self.Layers.append(IsoZoneLayer)
             isozone_layer_id = len(self.Layers)-1  
         else: 
             self.Layers[isozone_layer_id] = IsoZoneLayer
+        self.layer_taxonomy_mapping[isozone_layer_id] = self.layer_taxonomy_mapping[base_layer_id]
+        self.layers_graph.append((base_layer_id,isozone_layer_id))
 
-        self.layer_taxonomy_mapping[isozone_layer_id] = self.layer_taxonomy_mapping[cell_layer]
-        self.layers_graph.append((cell_layer,isozone_layer_id))
+        if update_featuremat_with_another_tax_composition is not None:
+            self.self.Layers[base_layer_id].update_current_type(base_layer_id,tax_name)
+            Env = self.Layers[base_layer_id].extract_environments(typevec=self.Layers[isozone_layer_id].Upstream)
+            self.Layers[isozone_layer_id].feature_mat = Env
     
-    def create_region_layer(self, topics, region_tax, cell_layer=0):
-        """Add region layor given cells' region types (topics)
+    # def create_region_layer(self, topics, region_tax, cell_layer=0):
+    #     """Add region layor given cells' region types (topics)
         
-        Parameters
-        ----------
-        topics : numpy array / list
-            An array with local type environment (a number for each cell) 
-        region_tax : Taxonomy
-            A Taxonomy object that contains the region classification scheme
-        cell_layer : int (default,0)
-            Which layer in TMG is the cell layer?          
+    #     Parameters
+    #     ----------
+    #     topics : numpy array / list
+    #         An array with local type environment (a number for each cell) 
+    #     region_tax : Taxonomy
+    #         A Taxonomy object that contains the region classification scheme
+    #     cell_layer : int (default,0)
+    #         Which layer in TMG is the cell layer?          
 
-        """
-        for TG in self.Layers:
-            if TG.layer_type == "region":
-                print("!!`region` layer already exists; return...")
-                return 
+    #     """
+    #     for TG in self.Layers:
+    #         if TG.layer_type == "region":
+    #             print("!!`region` layer already exists; return...")
+    #             return 
 
-        # create region layers through graph contraction
-        CG = self.Layers[cell_layer].contract_graph(topics) # contract the cell layer by topics
+    #     # create region layers through graph contraction
+    #     CG = self.Layers[cell_layer].contract_graph(topics) # contract the cell layer by topics
         
-        # contraction assumes that the feature_mat and taxonomy of the contracted layers are
-        # inherited from the layer used for contraction. This is not true for regions so we need to update these
-        # feature_mat is updated here and tax is updated by calling add_type_information
-        Env = self.Layers[cell_layer].extract_environments(typevec=CG.Upstream)
-        row_sums = Env.sum(axis=1)
-        row_sums = row_sums[:,None]
-        Env = Env/row_sums
+    #     # contraction assumes that the feature_mat and taxonomy of the contracted layers are
+    #     # inherited from the layer used for contraction. This is not true for regions so we need to update these
+    #     # feature_mat is updated here and tax is updated by calling add_type_information
+    #     Env = self.Layers[cell_layer].extract_environments(typevec=CG.Upstream)
+    #     row_sums = Env.sum(axis=1)
+    #     row_sums = row_sums[:,None]
+    #     Env = Env/row_sums
         
-        # create the region layer merging information from contracted graph and environments
-        RegionLayer = TissueGraph(feature_mat=Env, basepath=self.basepath, 
-                                  layer_type="region", redo=True)
-        RegionLayer.SG = CG.SG.copy()
-        RegionLayer.node_size = CG.node_size.copy()
-        RegionLayer.Upstream = CG.Upstream.copy()
-        RegionLayer.XY = CG.XY.copy()
-        RegionLayer.Section = CG.Section.copy()
+    #     # create the region layer merging information from contracted graph and environments
+    #     RegionLayer = TissueGraph(feature_mat=Env, basepath=self.basepath, 
+    #                               layer_type="region", redo=True)
+    #     RegionLayer.SG = CG.SG.copy()
+    #     RegionLayer.node_size = CG.node_size.copy()
+    #     RegionLayer.Upstream = CG.Upstream.copy()
+    #     RegionLayer.XY = CG.XY.copy()
+    #     RegionLayer.Section = CG.Section.copy()
 
-        self.Layers.append(RegionLayer)
-        current_layer_id = len(self.Layers)-1
-        self.add_type_information(current_layer_id, CG.Type, region_tax)
+    #     self.Layers.append(RegionLayer)
+    #     current_layer_id = len(self.Layers)-1
+    #     self.add_type_information(current_layer_id, CG.Type, region_tax)
 
-        # update the layers graph to show that regions are created from cells
-        self.layers_graph.append((cell_layer, current_layer_id))
+    #     # update the layers graph to show that regions are created from cells
+    #     self.layers_graph.append((cell_layer, current_layer_id))
 
     def fill_holes(self,lvl_to_fill,min_node_size):
         """EXPERIMENTAL: merges small biospatial units with their neighbors. 
@@ -783,17 +792,14 @@ class TissueGraph:
         basepath : str
             Where to read/write files related to this TG
         layer_type : str
-            Name of the type of layer (cells, isozones, regions)
+            Name of the type of layer (cells, isozones, parcellation, etc. )
         """
-        self.allowed_layer_types = ['cell', 'isozone', 'region']
 
         # validate input
         if basepath is None: 
             raise ValueError("missing basepath in TissueGraph constructor")
         if layer_type is None: 
             raise ValueError("Missing layer type information in TissueGraph constructor")
-        if layer_type not in self.allowed_layer_types:
-            raise ValueError(f"Layer type {layer_type} is not in {self.allowed_layer_types}")
 
         # what is stored in this layer (cells, zones, regions, etc)
         self.layer_type = layer_type # label layers by their type
