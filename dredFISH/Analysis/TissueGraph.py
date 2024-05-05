@@ -122,6 +122,10 @@ class TissueMultiGraph:
         # check if file exist in basepath
         self.basepath = basepath
 
+        # update self if this instance of TMG is with geoms or not
+        self.skip_geoms = skip_geoms
+        self.save_taxonomies = False
+
         if not redo and os.path.exists(os.path.join(self.basepath,"TMG.json")):
             self._load()
             return 
@@ -139,9 +143,7 @@ class TissueMultiGraph:
         self.TMG_ver = 1
         self.Layers = list() # a list of TissueGraphs
         self.layers_graph = list() # a list of tuples that keep track of the relationship between different layers 
-        self.skip_geoms = skip_geoms
         self.Geoms = list()
-            
         self.Taxonomies = list() # a list of Taxonomies
         self.layer_taxonomy_mapping = dict() # dict() # a dictopnary that keep tracks of which TissueGraph (index into Layer) 
                                                 # uses which taxonomy (index into Taxonomies)
@@ -160,16 +162,17 @@ class TissueMultiGraph:
         
         return 
 
-    def _load(self,skip_geoms = False):
+    def _load(self):
         with open(os.path.join(self.basepath,"TMG.json"),encoding="utf-8") as fh:
             self._config = json.load(fh)
         self.input_df = pd.DataFrame(self._config["input_dfs"])
         # Load Taxonomies: 
         TaxNameList = self._config["tax_types"]
+        Tax_path_list = self._config["tax_paths"]
         self.Taxonomies = [None]*len(TaxNameList)
         for i in range(len(TaxNameList)): 
-            self.Taxonomies[i] = Taxonomy(TaxNameList[i])
-            self.Taxonomies[i].load(self.basepath,self.dataset)
+            self.Taxonomies[i] = Taxonomy(TaxNameList[i],basepath = Tax_path_list[i])
+            self.Taxonomies[i].load()
 
         # Load layers
         # convert string key to int key (fixing an artifects of JSON dump and load)
@@ -189,8 +192,8 @@ class TissueMultiGraph:
         # Load geoms
         self.Geoms = [None] * len(self.unqS)
         geom_types = self._config["geom_types"]
-        self.skip_geoms = skip_geoms
         if not self.skip_geoms:
+            print("Loading geometies")
             self.load_geoms(sections=self.unqS,geom_types=geom_types)
         else:
             section_geoms = dict() 
@@ -215,7 +218,8 @@ class TissueMultiGraph:
         input_df_dict = self.input_df.to_dict('list')
         self._config = { "layers_graph" : self.layers_graph, 
                          "layer_taxonomy_mapping" : self.layer_taxonomy_mapping, 
-                         "tax_types" : [tx.name for tx in self.Taxonomies], 
+                         "tax_types" : [tx.name for tx in self.Taxonomies],
+                         "tax_paths" : [tx.basepath for tx in self.Taxonomies],
                          "layer_types" : [tg.layer_type for tg in self.Layers],
                          "geom_types" : geom_types,
                          "input_dfs" : input_df_dict}
@@ -229,8 +233,9 @@ class TissueMultiGraph:
                 _adata.obsm['XY'] = _adata.obsm['XY'].astype(np.float32)
             self.Layers[i].save()
         
-        for i in range(len(self.Taxonomies)): 
-            self.Taxonomies[i].save(self.basepath, self.dataset)
+        if self.save_taxonomies: 
+            for Tx in self.Taxonomies: 
+                Tx.save()
 
         if not self.skip_geoms: 
             for i in range(len(self.unqS)):
@@ -253,6 +258,24 @@ class TissueMultiGraph:
             for gt in geom_types:
                 section_geoms[gt] = Geom(geom_type=gt,polys=None,basepath=self.basepath, section=s)
             self.Geoms[ix] = section_geoms
+
+    def update_current_type(self,layer_id,tax_id): 
+        # if layer_id or tax_id are numeric, find which id they are
+        if isinstance(layer_id,str): 
+            all_layer_types = [L.layer_type for L in self.Layers]
+            try:
+                layer_id = all_layer_types.index(layer_id)
+            except ValueError:
+                raise ValueError(f"Layer '{layer_id}' not found in available Layers.")
+        if isinstance(tax_id,str): 
+            all_tax_names = [tx.name for tx in self.Taxonomies]
+            try:
+                tax_id = all_tax_names.index(tax_id)
+            except ValueError:
+                raise ValueError(f"Taxonomy '{tax_id}' not found in available taxonomies.")
+            
+        self.layer_taxonomy_mapping[layer_id] = tax_id
+        self.Layers[layer_id].adata_mapping["Type"] = f"{self.Taxonomies[tax_id].name}_id"
     
     def add_type_information(self, layer_id, type_vec, tax): 
         """Adds type information to TMG
@@ -290,12 +313,10 @@ class TissueMultiGraph:
         if any(isinstance(item, str) for item in type_vec):
             type_vec = tax.get_type_ix(type_vec)
             
-        # update .Type  
+        # update Layer Type
+        self.update_current_type(layer_id,tax_id)  
         self.Layers[layer_id].Type = type_vec
 
-        # update mapping between layers and taxonomies to TMG (self)
-        # this decides on which type to move on next...
-        self.layer_taxonomy_mapping[layer_id] = tax_id 
         return 
     
     def create_cell_layer(self,  
@@ -1488,7 +1509,7 @@ class Taxonomy:
     
     """
     
-    def __init__(self, name=None, 
+    def __init__(self, name=None, basepath = None,
         Types=None, feature_mat=None,rgb_codes=None
         ): 
         """Create a Taxonomy object
@@ -1503,6 +1524,7 @@ class Taxonomy:
         if name is None: 
             raise ValueError("Taxonomy must get a name")
         self.name = name
+        self.basepath = basepath
         self._df = pd.DataFrame()
 
         if Types is not None and feature_mat is not None: 
@@ -1570,22 +1592,18 @@ class Taxonomy:
         """
         return (self._df.empty)
         
-    def save(self, basepath,dataset):
+    def save(self):
         """save to basepath using Taxonomy name
         """
+        if not os.path.exists(self.basepath):
+            os.makedirs(self.basepath)
         if not self.is_empty():
-            fileu.save(self._df,path=basepath,
-                                  file_type='Taxonomy',
-                                  model_type=self.name,
-                                  dataset=dataset)
+            self._df.to_csv(os.path.join(self.basepath, f"{self.name}.csv"))
                 
-    def load(self, basepath,dataset):
+    def load(self, basepath):
         """save from basepath using Taxonomy name
         """
-        self._df = fileu.load(path=basepath,
-                              file_type='Taxonomy',
-                              model_type=self.name,
-                              dataset=dataset)
+        self._df = pd.read_csv(os.path.join(self.basepath, f"{self.name}.csv"))
         self._df.set_index('type', inplace=True)
         
     def add_types(self,new_types,feature_mat):
