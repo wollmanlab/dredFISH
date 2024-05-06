@@ -79,7 +79,7 @@ if __name__ == '__main__':
     completion_array = np.array([False for i in sections])
     reference_data = None
     while np.sum(completion_array==False)>0:
-        for idx,section in enumerate(sections):
+        for idx,section in enumerate(sorted(sections)):
             processing_path = os.path.join(metadata_path,fishdata)
             if not os.path.exists(processing_path):
                 processing_path = os.path.join(metadata_path,fishdata,'Processing')
