@@ -43,11 +43,6 @@ class Registration_Class(object):
             self.update_user(self.path,level=30)
             self.update_user('No Registration Path Found',level=30)
             os.mkdir(self.path)
-        # self.path = os.path.join(self.path,'Registration')
-        # if not os.path.exists(self.path):
-        #     self.update_user(self.path,level=30)
-        #     self.update_user('No Registration Path Found',level=30)
-        #     os.mkdir(self.path)
         self.path = os.path.join(self.path,self.section)
         if not os.path.exists(self.path):
             self.update_user(self.path,level=30)
@@ -177,6 +172,12 @@ class Registration_Class(object):
                 self.update_user(f" Center:{center} Angle {angle} Scale {scale}")
                 return center,angle,scale
 
+
+            self.update_user(f"The purpose of this action is to rotate and center the section")
+            self.update_user(f"First you will click on the bottom of the tissue at the midline")
+            self.update_user(f"Then you will click of the top of the tissue at the midline")
+            self.update_user(f"Lastly you can click anywhere else to finish the action")
+
             X = self.XYZC['ccf_x'].copy()
             Y = self.XYZC['ccf_y'].copy()
             Z = self.XYZC['ccf_z'].copy()
@@ -218,6 +219,12 @@ class Registration_Class(object):
                 X = []
                 Y = []
                 Z = []
+                self.update_user(f"The purpose of this action is to roughly pick which plane of the reference does our section align with")
+                self.update_user(f"To do this you should first have ordered the sections for this animal using ordering.ipynb")
+                self.update_user(f"Once you have the order and the rough ccf_x that the section lays")
+                self.update_user(f"You can then correct for any uneven sectioning")
+                self.update_user(f"This is done by setting the ccf_x for 4 points[Top:Left,Bottom:Left,Top:Right,Bottom:Right]")
+                self.update_user(f"If the section is not uneven all 4 points can be given the same ccf_x")
                 for z in [-2,2]:
                     for y in [6,3]:
                         x = float(robust_input(f" Enter Desired Section for [{str(z)},{str(y)}]",dtype='float'))
@@ -247,7 +254,6 @@ class Registration_Class(object):
                 path = self.generate_filename(channel='Reference_Section',file_type='Figure')
                 plt.savefig(path,dpi=200)
                 plt.show(block=False)
-
                 print(' ')
                 out = str(robust_input("Satisfied? (Y/N): ",dtype='str'))
                 if 'y' in out.lower():
@@ -262,6 +268,12 @@ class Registration_Class(object):
         if isinstance(self.Y_model,type(None))|self.overwrite|isinstance(self.Z_model,type(None)):
             """ Pair Points between Reference and Data"""
             self.update_user('Setting Registation Points',level=20)
+
+            self.update_user(f"The purpose of this action is to perform a non rigid transformation")
+            self.update_user(f"To do this select points on the reference then the measured that you are confident are the same point")
+            self.update_user(f"The algorithm will interpolate between points so the more points you have the more accurate it will be")
+            self.update_user(f"One Strategy is to allign the outer border then work your way in")
+            self.update_user(f"Select atleast 20 points but you may need more if there are any sectioning artifacts")
             plt.close('all')
             def set_registration_points(path,X,Y,C,ref_X,ref_Y,ref_C):
                 def onpick(event):
