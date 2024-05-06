@@ -142,7 +142,8 @@ parameters = {}
 
 """ New Microscope Setup"""
 
-parameters['fishdata']='Processing_2024Apr19'
+parameters['fishdata']='Processing_2024May01'
+parameters['hard_overwrite'] = False
 
 # Orange
 parameters['pixel_size'] =0.490# 0.490#0.327#0.490 # um 490 or 330
@@ -162,12 +163,13 @@ parameters['stitch_flipud'] = False# NEW False
 parameters['stitch_fliplr'] = True# NEW True
 parameters['register_stitch_reference'] = True
 parameters['segment_gpu'] = False
+parameters['max_registration_shift'] = 50
 
 parameters['QC_pixel_size'] = 2 # um
 parameters['diameter'] = 8 #15 # um
 # parameters['segment_diameter'] = parameters['diameter']/parameters['process_pixel_size']
 parameters['nucstain_channel'] = 'DeepBlue'
-parameters['nucstain_acq'] = 'hybe21'
+parameters['nucstain_acq'] = 'hybe24'
 parameters['total_channel'] = 'FarRed'
 parameters['total_acq'] = 'all_max' #'hybe25'
 parameters['outpath'] = '/greendata/GeneralStorage/Data/dredFISH/' #"Path to save data"
@@ -179,7 +181,7 @@ parameters['n_pixels']=[2448, 2048]
 # parameters['border'] = int(np.min(parameters['n_pixels']))
 
 parameters['highpass_function'] = 'none'#'gaussian_robust[1,60]'#'spline_min_robust_smooth'#'spline_min_smooth'#'spline_robust_min'#'downsample_quantile_0.1' _smooth
-parameters['highpass_sigma'] = 250
+parameters['highpass_sigma'] = 0
 parameters['highpass_smooth_function'] = 'median'
 parameters['highpass_smooth'] = 3
 
@@ -192,13 +194,17 @@ parameters['stain_correction_downsample'] = 10
 parameters['stain_correction_kernel'] = 1000
 parameters['overlap'] = 0.02 # 2% overlap
 # parameters['segment_min_size'] = parameters['segment_diameter']*10
-parameters['overwrite_report']= True
-parameters['overwrite_louvain'] = True
+parameters['overwrite_report']= False
+parameters['overwrite_louvain'] = False
 parameters['fileu_version'] = 2
 
-parameters['ncpu'] = 15
-parameters['set_min_zero'] = False
+
+parameters['ncpu'] = 10
+parameters['set_min_zero'] = True # Post Strip bkg subtract
 parameters['metric'] = 'median'
+
+parameters['microscope_parameters'] = 'microscope_parameters'
+parameters['imaging_batch'] = 'hybe'
 
 parameters['post_strip_process'] = False
 
@@ -206,7 +212,7 @@ parameters['acq_FF'] = False
 parameters['acq_constant'] = False
 
 parameters['use_FF'] = True
-parameters['use_constant'] = False
+parameters['use_constant'] = True#False
 
 parameters['fit_FF'] = False
 parameters['fit_constant'] = False
@@ -221,9 +227,12 @@ parameters['smooth_FF'] = True
 parameters['smooth_constant'] = True
 
 parameters['constant_smooth_function'] = 'spline_min'
-parameters['constant_smooth_sigma'] = 4
-parameters['FF_smooth_function'] = 'spline_robust'
-parameters['FF_smooth_sigma'] = 4
+parameters['constant_smooth_sigma'] = '32|34'
+parameters['FF_smooth_function'] = 'spline'#'spline_robust'
+parameters['FF_smooth_sigma'] = '32|34' # '64|72' # '32|36' '16|18' '16|17' 
+# how many pixels to bin for spline 'value1|value2'
+# For binsize=2 [i  for i in range(1,1000) if ((2048/binsize)/i).is_integer()]
+# #'[1, 2, 4, 8, 16, 32, 64, 128, 256, 512]|[1, 2, 3, 4, 6, 8, 9, 12, 17, 18, 24, 34, 36, 51, 68, 72, 102, 136, 153, 204, 306, 408, 612]'
 
 
 parameters['post_processing_constant'] = False
@@ -236,6 +245,6 @@ parameters['overwrite'] = False #False
 parameters['segment_overwrite'] = False #False
 parameters['vector_overwrite'] = False #False
 
-parameters['scratch_path_base'] = '/scratchdata1/Processing_tmp'
+parameters['scratch_path_base'] = '/scratchdata2/Processing_tmp'
 
 parameters['bitmap'] = bitmap
