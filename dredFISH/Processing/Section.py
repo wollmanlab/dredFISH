@@ -32,6 +32,7 @@ from dredFISH.Utils import basicu
 import scanpy as sc
 import matplotlib.colors as mcolors
 import inspect
+from skimage import io
 from skimage import (
     data, restoration, util
 )
@@ -78,10 +79,10 @@ class Section_Class(object):
         self.well = self.section.split('-')[0]
         self.image_metadata = ''
         self.reference_stitched=''
-        self.FF=''
-        self.nuc_FF=''
-        self.constant=''
-        self.nuc_constant=''
+        # self.FF=''
+        # self.nuc_FF=''
+        # self.constant=''
+        # self.nuc_constant=''
         self.data = None
         self.verbose=verbose
         self.path = None
@@ -210,11 +211,22 @@ class Section_Class(object):
                 self.parameters = config.parameters
 
         self.parameters['path'] = self.path
+        self.parameters['metadata_path'] = self.metadata_path
         self.parameters['well_path'] = self.well_path
         self.parameters['scratch_path'] = self.scratch_path
         self.parameters['dataset'] = self.dataset
         self.parameters['section'] = self.section
         self.parameters['well'] = self.well
+
+        if self.parameters['hard_overwrite']:
+            self.update_user('Performing Hard Overwrite and Clearing Output paths',level=40)
+            shutil.rmtree(self.scratch_path)
+            os.mkdir(self.scratch_path)
+            shutil.rmtree(self.path)
+            os.mkdir(self.path)
+            shutil.rmtree(self.well_path)
+            os.mkdir(self.well_path)
+
 
         logging.basicConfig(
                     filename=os.path.join(self.path,'processing_log.txt'),filemode='a',
@@ -236,7 +248,7 @@ class Section_Class(object):
             print(datetime.now().strftime("%Y %B %d %H:%M:%S") + ' ' + message)
         fileu.update_user(message,level=level,logger=self.log)
 
-    def check_existance(self,hybe='',channel='',file_type='',model_type='',path=None):
+    def check_existance(self,fname='',hybe='',channel='',file_type='',model_type='',section='',path=None):
         """
         check_existance wrapper to fileu.check_existance
 
@@ -253,13 +265,13 @@ class Section_Class(object):
         """
         if isinstance(path,type(None)):
             path = self.path
-        if file_type in ['FF','constant','image_FF','image_constant']:
-            path = self.well_path
-        elif file_type in ['stitched']:
+        # if file_type in ['FF','constant','image_FF','image_constant']:
+        #     path = self.well_path
+        if file_type in ['stitched']:
             path = self.scratch_path
-        return fileu.check_existance(path,hybe=hybe,channel=channel,file_type=file_type,model_type=model_type,logger=self.log)
+        return fileu.check_existance(path=path,fname=fname,hybe=hybe,channel=channel,section=section,file_type=file_type,model_type=model_type,logger=self.log)
 
-    def generate_filename(self,hybe,channel,file_type,model_type='',path=None):
+    def generate_filename(self,hybe,channel,file_type,model_type='',section='',path=None):
         """
         fname Wrapper to fileu.generate_filename Generate Filename
 
@@ -278,13 +290,13 @@ class Section_Class(object):
             model_type = ''
         if isinstance(path,type(None)):
             path = self.path
-        if file_type in ['FF','constant','image_FF','image_constant']:
-            path = self.well_path
-        elif file_type in ['stitched']:
+        # if file_type in ['FF','constant','image_FF','image_constant']:
+        #     path = self.well_path
+        if file_type in ['stitched']:
             path = self.scratch_path
-        return fileu.generate_filename(path,hybe=hybe,channel=channel,file_type=file_type,model_type=model_type,logger=self.log)
+        return fileu.generate_filename(path=path,hybe=hybe,channel=channel,section=section,file_type=file_type,model_type=model_type,logger=self.log)
 
-    def save(self,data,hybe='',channel='',file_type='',model_type='',path=None):
+    def save(self,data,fname='',hybe='',channel='',file_type='',section='',model_type='',path=None):
         """
         save Wrapper to fileu.save Sae Files
 
@@ -303,13 +315,13 @@ class Section_Class(object):
             model_type = ''
         if isinstance(path,type(None)):
             path = self.path
-        if file_type in ['FF','constant','image_FF','image_constant']:
-            path = self.well_path
-        elif file_type in ['stitched']:
+        # if file_type in ['FF','constant','image_FF','image_constant']:
+        #     path = self.well_path
+        if file_type in ['stitched']:
             path = self.scratch_path
-        fileu.save(data,path=path,hybe=hybe,channel=channel,file_type=file_type,model_type=model_type,logger=self.log)
+        fileu.save(data,fname=fname,path=path,hybe=hybe,channel=channel,file_type=file_type,section=section,model_type=model_type,logger=self.log)
 
-    def load(self,hybe='',channel='',file_type='anndata',model_type='',path=None):
+    def load(self,fname='',hybe='',channel='',file_type='anndata',section='',model_type='',path=None):
         """
         load Wrapper to fileu.load Load Files
 
@@ -328,11 +340,11 @@ class Section_Class(object):
             model_type = ''
         if isinstance(path,type(None)):
             path = self.path
-        if file_type in ['FF','constant','image_FF','image_constant']:
-            path = self.well_path
-        elif file_type in ['stitched']:
+        # if file_type in ['FF','constant','image_FF','image_constant']:
+        #     path = self.well_path
+        if file_type in ['stitched']:
             path = self.scratch_path
-        return fileu.load(path=path,hybe=hybe,channel=channel,file_type=file_type,model_type=model_type,logger=self.log)
+        return fileu.load(path=path,fname=fname,hybe=hybe,channel=channel,section=section,file_type=file_type,model_type=model_type,logger=self.log)
 
     def generate_iterable(self,iterable,message,length=0):
         """
@@ -460,72 +472,156 @@ class Section_Class(object):
         else:
             return acqs[0]
 
-    def generate_image_parameters(self,hybe,channel):
-        if channel == self.parameters['nucstain_channel']:
-            self_FF = self.nuc_FF
-            self_constant = self.nuc_constant
-        else:
-            self_FF = self.FF
-            self_constant = self.constant
-        if isinstance(self_FF,str):
-            save_FF = True
-        else:
-            save_FF = False
-        if isinstance(self_constant,str):
-            save_constant = True
-        else:
-            save_constant = False
-        if self.parameters['acq_FF']:
-            self_FF = ''
-        if self.parameters['acq_constant']:
-            self_constant = ''
-        if not self.parameters['use_FF']:
-            self_FF = torch.ones(self.parameters['n_pixels']).T
-        if not self.parameters['use_constant']:
-            self_constant = torch.zeros(self.parameters['n_pixels']).T
-        if isinstance(self_FF,str)|isinstance(self_constant,str):
-            if (self.parameters['overwrite']==False)&self.check_existance(hybe=hybe,channel=channel,file_type='FF'):
-                self.update_user(f"Found Existing {'FF'} for {hybe} {channel}")
-                self_FF = self.load(hybe=hybe,channel=channel,file_type='FF')
-            if (self.parameters['overwrite']==False)&self.check_existance(hybe=hybe,channel=channel,file_type='constant'):
-                self.update_user(f"Found Existing {'constant'} for {hybe} {channel}")
-                self_constant = self.load(hybe=hybe,channel=channel,file_type='constant')
-            if isinstance(self_FF,str)|isinstance(self_constant,str):
-                self.update_user(f"Calculating {'FF&constant'} for {self.find_acq(hybe,protocol='hybe')} {channel}")
-                bkg_acq = ''
-                # if self.parameters['post_strip_process']&(channel!=self.parameters['nucstain_channel']):
-                #     bkg_acq = self.find_acq(hybe,protocol='strip')
-                FF,constant = generate_FF_parallel(self.image_metadata,self.find_acq(hybe,protocol='hybe'),
-                                        channel,
-                                        bkg_acq=bkg_acq,
-                                        parameters=self.parameters)
-                if isinstance(self_FF,str):
-                    self_FF = FF
-                if isinstance(self_constant,str):
-                    self_constant = constant
+    # def generate_image_parameters(self,acq,channel):
+    #     if channel == self.parameters['nucstain_channel']:
+    #         self_FF = self.nuc_FF
+    #         self_constant = self.nuc_constant
+    #     else:
+    #         self_FF = self.FF
+    #         self_constant = self.constant
+    #     if isinstance(self_FF,str):
+    #         save_FF = True
+    #     else:
+    #         save_FF = False
+    #     if isinstance(self_constant,str):
+    #         save_constant = True
+    #     else:
+    #         save_constant = False
+    #     if self.parameters['acq_FF']:
+    #         self_FF = ''
+    #     if self.parameters['acq_constant']:
+    #         self_constant = ''
+    #     if not self.parameters['use_FF']:
+    #         self_FF = torch.ones(self.parameters['n_pixels']).T
+    #     if not self.parameters['use_constant']:
+    #         self_constant = torch.zeros(self.parameters['n_pixels']).T
+    #     if isinstance(self_FF,str)|isinstance(self_constant,str):
+    #         if (self.parameters['overwrite']==False)&self.check_existance(hybe=hybe,channel=channel,file_type='FF'):
+    #             self.update_user(f"Found Existing {'FF'} for {hybe} {channel}")
+    #             self_FF = self.load(hybe=hybe,channel=channel,file_type='FF')
+    #         if (self.parameters['overwrite']==False)&self.check_existance(hybe=hybe,channel=channel,file_type='constant'):
+    #             self.update_user(f"Found Existing {'constant'} for {hybe} {channel}")
+    #             self_constant = self.load(hybe=hybe,channel=channel,file_type='constant')
+    #         if isinstance(self_FF,str)|isinstance(self_constant,str):
+    #             self.update_user(f"Calculating {'FF&constant'} for {self.find_acq(hybe,protocol='hybe')} {channel}")
+    #             bkg_acq = ''
+
+
+    #             if (self.parameters['scope'] == 'PurpleScope')&(channel!=self.parameters['nucstain_channel']):
+    #                 FF = np.load('/home/rwollman/MyProjects/AH/Analysis/FirstAtlas/FF.npy')
+    #                 constant = np.load('/home/rwollman/MyProjects/AH/Analysis/FirstAtlas/M.npy')
+    #             else:
+    #                 # if self.parameters['post_strip_process']&(channel!=self.parameters['nucstain_channel']):
+    #                 #     bkg_acq = self.find_acq(hybe,protocol='strip')
+    #                 FF,constant = generate_FF_parallel(self.image_metadata,self.find_acq(hybe,protocol='hybe'),
+    #                                         channel,
+    #                                         bkg_acq=bkg_acq,
+    #                                         parameters=self.parameters)
+    #             if isinstance(self_FF,str):
+    #                 self_FF = FF
+    #             if isinstance(self_constant,str):
+    #                 self_constant = constant
         
-        if self.parameters['acq_FF']|save_FF:
-            self.save(self_FF,hybe=hybe,channel=channel,file_type='FF')
-            self.save((self_FF*1000),hybe=hybe,channel=channel,file_type='image_FF')
-        if self.parameters['acq_constant']|save_constant:
-            self.save(self_constant,hybe=hybe,channel=channel,file_type='constant')
-            self.save((self_constant*1000),hybe=hybe,channel=channel,file_type='image_constant')
+    #     if self.parameters['acq_FF']|save_FF:
+    #         self.save(self_FF,hybe=hybe,channel=channel,file_type='FF')
+    #         self.save((self_FF*1000),hybe=hybe,channel=channel,file_type='image_FF')
+    #     if self.parameters['acq_constant']|save_constant:
+    #         self.save(self_constant,hybe=hybe,channel=channel,file_type='constant')
+    #         self.save((self_constant*1000),hybe=hybe,channel=channel,file_type='image_constant')
 
-        if isinstance(self_FF,torch.Tensor):
-            self_FF = self_FF.numpy()
-        if isinstance(self_constant,torch.Tensor):
-            self_constant = self_constant.numpy()
+    #     if isinstance(self_FF,torch.Tensor):
+    #         self_FF = self_FF.numpy()
+    #     if isinstance(self_constant,torch.Tensor):
+    #         self_constant = self_constant.numpy()
 
-        if channel == self.parameters['nucstain_channel']:
-            self.nuc_FF = self_FF
-            self.nuc_constant = self_constant
+    #     if channel == self.parameters['nucstain_channel']:
+    #         self.nuc_FF = self_FF
+    #         self.nuc_constant = self_constant
+    #     else:
+    #         self.FF = self_FF
+    #         self.constant = self_constant
+
+    def load_image_parameters(self,acq,channel,imaging_batch='acq',fname=False):
+        """ Determine which FF to use {acq,hybe,dataset,microscope}"""
+        """ Assume FF and Constant have already been calculated for the dataset"""
+        if imaging_batch == 'hybe':
+            self.update_user(f"Loading FF and Constant For entire Round for {acq.split('_')[0]} {channel}")
+            acq = acq.split('_')[0]
+        elif imaging_batch == 'dataset':
+            self.update_user(f"Loading FF and Constant For entire Dataset for {channel}")
+            acq = 'dataset'
+        path = os.path.join(self.parameters['metadata_path'],self.parameters['microscope_parameters'])
+        FF = self.generate_filename(path=path,section=self.dataset.split('_')[0],hybe=acq,channel=channel,file_type='FF')
+        constant = self.generate_filename(path=path,section=self.dataset.split('_')[0],hybe=acq,channel=channel,file_type='constant')
+        if self.check_existance(fname=FF):
+            FF = self.load(fname=FF,file_type='FF')
         else:
-            self.FF = self_FF
-            self.constant = self_constant
+            FF = None
+        if self.check_existance(fname=constant):
+            constant = self.load(fname=constant,file_type='constant')
+        else:
+            constant = None
+        
+        if (isinstance(FF,type(None))|isinstance(constant,type(None))):
+            if imaging_batch == 'acq':
+                self.update_user(f" {acq} FF and Constants should have already been precomputed",level=40)
+                return FF,constant,1,None
+            elif imaging_batch == 'hybe':
+                """ load all FF for this hybe and average """
+                acq_list = [i for i in self.image_metadata.acqnames if acq+'_' in i]
+            elif imaging_batch == 'dataset':
+                """ load all FF for this dataset and average """
+                acq_list = [i for i in self.image_metadata.acqnames if ('ybe' in i)|('rip' in i)]
+            else:
+                self.update_user(f"Unknown imaging batch {imaging_batch}",level=50)
+            FF = []
+            constant = []
+            for temp_acq in acq_list:
+                temp_ff,temp_constant = self.load_image_parameters(temp_acq,channel,imaging_batch='acq',fname=False)
+                if not isinstance(temp_ff,type(None)):
+                    FF.append(temp_ff)
+                if not isinstance(temp_constant,type(None)):
+                    constant.append(temp_constant)
+            if len(FF)>0:
+                FF = np.dstack(FF).mean(2)
+                self.save(FF,path=path,section=self.dataset.split('_')[0],hybe=acq,channel=channel,file_type='FF')
+                self.save(FF*1000,path=path,section=self.dataset.split('_')[0],hybe=acq,channel=channel,file_type='image_FF')
+            else:
+                FF = None
+            if len(constant)>0:
+                constant = np.dstack(constant).mean(2)
+                self.save(constant,path=path,section=self.dataset.split('_')[0],hybe=acq,channel=channel,file_type='constant')
+                self.save(constant,path=path,section=self.dataset.split('_')[0],hybe=acq,channel=channel,file_type='image_constant')
+            else:
+                constant = None
+            if not ((isinstance(FF,type(None))|isinstance(constant,type(None)))):
+                fig,axs = plt.subplots(1,2,figsize=[12,4])
+                fig.suptitle(f"{self.dataset} {acq} {channel}")
+                axs = axs.ravel()
+                ax = axs[0]
+                im = ax.imshow(constant,cmap='jet')
+                plt.colorbar(im,ax=ax)
+                ax.axis('off')
+                ax.set_title("const")
+                ax = axs[1]
+                im=ax.imshow(FF,cmap='jet')
+                plt.colorbar(im,ax=ax)
+                ax.axis('off')
+                ax.set_title("FF")
+                path = fileu.generate_filename(path=path,section=self.dataset.split('_')[0],hybe=acq,channel=channel,file_type='Figure')
+                plt.savefig(path)
+                plt.close('all')
 
-    def image_parameters(self,hybe,channel):
-        self.generate_image_parameters(hybe,channel)
-        self.generate_image_parameters(hybe,self.parameters['nucstain_channel'])
+
+                
+        if (isinstance(FF,type(None))|isinstance(constant,type(None))):
+            raise('FF and Constants should have already been precomputed')
+        else:
+            if fname:
+                FF = self.generate_filename(path=path,hybe=acq,channel=channel,file_type='FF')
+                constant = self.generate_filename(path=path,hybe=acq,channel=channel,file_type='constant')
+            return FF,constant
+
 
     def stitcher(self,hybe,channel,acq='',bkg_acq=''):
         """
@@ -594,7 +690,6 @@ class Section_Class(object):
                     stitched = 0
                 return stitched
             else:
-                self.image_parameters(hybe,channel)
                 xy = np.stack([pxy for i,pxy in self.coordinates.items()])
                 if (self.parameters['stitch_rotate'] % 2) == 0:
                     img_shape = np.flip(self.parameters['n_pixels'])
@@ -608,13 +703,27 @@ class Section_Class(object):
                 if isinstance(self.reference_stitched,str):
                     pixel_coordinates_stitched = torch.zeros([len(x_range),len(y_range),3],dtype=self.parameters['pytorch_dtype'])
                 Input = []
+
+                nuc_bkg_fnames = self.image_metadata.stkread(Channel=self.parameters['nucstain_channel'],acq=bkg_acq,groupby='Position',fnames_only = True)
+                nuc_acq_fnames = self.image_metadata.stkread(Channel=self.parameters['nucstain_channel'],acq=acq,groupby='Position',fnames_only = True)
+                bkg_fnames = self.image_metadata.stkread(Channel=channel,acq=bkg_acq,groupby='Position',fnames_only = True)
+                acq_fnames = self.image_metadata.stkread(Channel=channel,acq=acq,groupby='Position',fnames_only = True)
+
+                """ Load FlatField and Constant for Hybe and Strip"""
+                base_data = {}
+                fname_only = False
+                base_data['img_FF'],base_data['img_constant'] = self.load_image_parameters(acq,channel,fname=fname_only,imaging_batch=self.parameters['imaging_batch'])
+                base_data['bkg_FF'],base_data['bkg_constant'] = self.load_image_parameters(bkg_acq,channel,fname=fname_only,imaging_batch=self.parameters['imaging_batch'])
+                base_data['nuc_FF'],base_data['nuc_constant'] = self.load_image_parameters(acq,self.parameters['nucstain_channel'],fname=fname_only,imaging_batch=self.parameters['imaging_batch'])
+                base_data['bkg_nuc_FF'],base_data['bkg_nuc_constant'] = self.load_image_parameters(bkg_acq,self.parameters['nucstain_channel'],fname=fname_only,imaging_batch=self.parameters['imaging_batch'])
+
                 for posname in self.posnames:
-                    data = {}
-                    data['acq'] = acq
-                    data['bkg_acq'] = bkg_acq
+                    data = base_data.copy()
+                    data['bkg_nuc'] = nuc_bkg_fnames[posname][0]
+                    data['nuc'] = nuc_acq_fnames[posname][0]
+                    data['bkg'] = bkg_fnames[posname][0]
+                    data['img'] = acq_fnames[posname][0]
                     data['posname'] = posname
-                    data['image_metadata'] = self.image_metadata
-                    data['channel'] = channel
                     data['parameters'] = self.parameters
                     # If not Reference Then pass destination through and do registration in parrallel
                     if not isinstance(self.reference_stitched,str):
@@ -626,7 +735,7 @@ class Section_Class(object):
                         destination = self.reference_stitched[img_x_min:img_x_max,img_y_min:img_y_max,0]
                         data['destination'] = destination
                     Input.append(data)
-                pfunc = partial(preprocess_images,FF=self.FF,nuc_FF=self.nuc_FF,constant=self.constant,nuc_constant=self.nuc_constant)
+                pfunc = partial(preprocess_images)#,FF=self.FF,nuc_FF=self.nuc_FF,constant=self.constant,nuc_constant=self.nuc_constant)
                 translation_y_list = []
                 translation_x_list = []
                 redo_posnames = []
@@ -725,11 +834,15 @@ class Section_Class(object):
                                 else:
                                     non_ref = signal[mask_x,:]
                                 non_ref = non_ref[:,mask_y]
-                                ref = ref.numpy() - gaussian_filter(ref.numpy(),25)
-                                non_ref = non_ref.numpy() - gaussian_filter(non_ref.numpy(),25)
+                                ref = gaussian_filter(nuc - gaussian_filter(nuc,25),2)
+                                non_ref =gaussian_filter(non_ref - gaussian_filter(non_ref,25),2)
+                                vmin,vmax = np.percentile(ref.ravel(),[5,95])
+                                ref = np.clip(ref,vmin,vmax)
+                                vmin,vmax = np.percentile(non_ref.ravel(),[5,95])
+                                non_ref = np.clip(non_ref,vmin,vmax)
                                 # Check if Beads work here
                                 shift, error = register(ref, non_ref,10)
-                                if (error!=np.inf)&(np.max(np.abs(shift))<=self.parameters['border']):
+                                if (error!=np.inf)&(np.max(np.abs(shift))<=self.parameters['max_registration_shift']):
                                     translation_y = int(shift[1])
                                     translation_x = int(shift[0])
                                     translation_y_list.append(translation_y)
@@ -792,10 +905,19 @@ class Section_Class(object):
                                 ])
                             pixel_coordinates_stitched[(img_x_min+translation_x):(img_x_max+translation_x),(img_y_min+translation_y):(img_y_max+translation_y),:] = incoming
                 if self.parameters['set_min_zero']:
-                    thresh = torch.min(stitched[:,:,0][stitched[:,:,0]>0]).values
-                    stitched[:,:,0] = stitched[:,:,0]-thresh
-                    thresh = torch.min(stitched[:,:,1][stitched[:,:,1]>0]).values
-                    stitched[:,:,1] = stitched[:,:,1]-thresh
+                    # thresh = torch.min(stitched[:,:,0][stitched[:,:,0]>0]).values
+                    # stitched[:,:,0] = stitched[:,:,0]-thresh
+                    # thresh = torch.min(stitched[:,:,1][stitched[:,:,1]>0]).values
+                    # stitched[:,:,1] = stitched[:,:,1]-thresh
+
+                    for i in range(stitched.shape[2]):
+                        img = stitched[:,:,i].numpy().copy()
+                        vmin,vmax = np.percentile(img[img!=0],[1,50])
+                        bkg = gaussian_filter(np.clip(img.copy(),vmin,vmax),50)
+                        img = torch.tensor(img-bkg)
+                        torch.clip(img,0,None)
+                        stitched[:,:,i] = img
+
                 
                 self.save(stitched[:,:,0],hybe=hybe,channel=self.parameters['nucstain_channel'],file_type='stitched')
                 self.save(stitched[:,:,1],hybe=hybe,channel=channel,file_type='stitched')
@@ -956,6 +1078,7 @@ class Section_Class(object):
                     for x in range(n_x_steps):
                         for y in range(n_y_steps):
                             Input.append([x,y])
+                    self.update_user(f"Breaking Up Stitched to {len(Input)} batches for Segmentation")
                     for (x,y) in self.generate_iterable(Input,'Segmenting Cells: '+self.model_type):
                         nuc = nucstain[(x*x_step):((x+1)*x_step),(y*y_step):((y+1)*y_step)].numpy()
                         if 'total' in self.model_type:
@@ -1340,13 +1463,13 @@ class Section_Class(object):
                 if self.parameters['overwrite_louvain']| (not 'louvain' in self.data.obs.columns):
                     #  self.data.X = basicu.normalize_fishdata_regress(self.data.layers['processed_vectors'].copy(),value='sum',leave_log=True,log=True,bitwise=True)
                     X = self.data.layers['processed_vectors'].copy()
-                    X = basicu.normalize_fishdata_regress(X,value='none',leave_log=True,log=True,bitwise=False)
+                    # X = basicu.normalize_fishdata_regress(X,value='none',leave_log=True,log=True,bitwise=False)
                     X = basicu.normalize_fishdata_robust_regression(X)
                     # X = basicu.normalize_fishdata_regress(X,value='none',leave_log=True,log=True,bitwise=False)
                     self.data.X = X.copy()
-                    sc.pp.neighbors(self.data, n_neighbors=15, use_rep='X')
-                    sc.tl.umap(self.data, min_dist=0.1)
-                    sc.tl.louvain(self.data,resolution=5,key_added='louvain')
+                    sc.pp.neighbors(self.data, n_neighbors=15, use_rep='X',metric="correlation")
+                    # sc.tl.umap(self.data, min_dist=0.1)
+                    sc.tl.louvain(self.data,resolution=1,key_added='louvain')
                     self.data.X = self.data.layers['processed_vectors'].copy()
                 cts = np.array(self.data.obs['louvain'].unique())
                 louvain_counts = self.data.obs['louvain'].value_counts()
@@ -1359,19 +1482,19 @@ class Section_Class(object):
                 x = self.data.obs['stage_x']
                 y = self.data.obs['stage_y']
                 c = np.array(self.data.obs['louvain_colors'])
-                fig,axs  = plt.subplots(1,3,figsize=[20,7])
+                fig,axs  = plt.subplots(1,2,figsize=[20,7])
                 plt.suptitle('Unsupervised Classification')
                 axs = axs.ravel()
-                axs[0].scatter(self.data.obsm['X_umap'][:,0],self.data.obsm['X_umap'][:,1],c=c,s=0.1,marker='x')
-                axs[0].set_title('UMAP Space')
+                # axs[0].scatter(self.data.obsm['X_umap'][:,0],self.data.obsm['X_umap'][:,1],c=c,s=0.1,marker='x')
+                # axs[0].set_title('UMAP Space')
+                # axs[0].axis('off')
+                axs[0].scatter(x,y,s=0.1,c=c,marker='x')
+                axs[0].set_title('Physical Space')
+                axs[0].set_aspect('equal')
                 axs[0].axis('off')
-                axs[1].scatter(x,y,s=0.1,c=c,marker='x')
-                axs[1].set_title('Physical Space')
-                axs[1].set_aspect('equal')
-                axs[1].axis('off')
                 handles = [plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=pallette[key], markersize=10, label=key) for key in cts]
-                axs[2].legend(handles=handles, loc='center',ncol=3, fontsize=8)
-                axs[2].axis('off')
+                axs[1].legend(handles=handles, loc='center',ncol=3, fontsize=8)
+                axs[1].axis('off')
                 paths.append(path)
                 plt.savefig(path,dpi=dpi)
 
@@ -1503,7 +1626,7 @@ def generate_FF_parallel(image_metadata,acq,channel,posnames=[],bkg_acq='',param
 def generate_FF_wrapper(posnames,image_metadata=None,acq=None,channel=None,bkg_acq='',parameters={},verbose=False):
     return generate_FF(image_metadata,acq,channel,posnames=posnames,bkg_acq=bkg_acq,parameters=parameters,verbose=verbose)
 
-def generate_FF(image_metadata,acq,channel,posnames=[],bkg_acq='',parameters={},verbose=False):
+def generate_FF(image_metadata,acq,channel,posnames=[],bkg_acq='',parameters={},verbose=False,shortcut=False):
     """
     generate_FF Generate flat field to correct uneven illumination
 
@@ -1530,6 +1653,7 @@ def generate_FF(image_metadata,acq,channel,posnames=[],bkg_acq='',parameters={},
         n_pos = len(posnames)
         out_img = ''
         n_pixels = 5
+        out_stk = []
         for i,posname in enumerate(iterable):
             # try:
             img = image_metadata.stkread(Position=posname,Channel=channel,acq=acq).min(2).astype(parameters['numpy_dtype'])
@@ -1549,16 +1673,22 @@ def generate_FF(image_metadata,acq,channel,posnames=[],bkg_acq='',parameters={},
                 bkg = torch.tensor(bkg,dtype=parameters['pytorch_dtype'])
                 img = img-bkg
             img = torch.clip(img,1,None)
-            if isinstance(loc,str):
-                loc = {}
+            if shortcut:
+                if isinstance(loc,str):
+                    loc = {}
+                    for r in range(n_pixels):
+                        loc[r]= torch.tensor(np.random.randint(np.ones([img.shape[0],img.shape[1]])*n_pos))
+                    out_stk = torch.zeros([img.shape[0],img.shape[1],n_pixels],dtype=parameters['pytorch_dtype'])
                 for r in range(n_pixels):
-                    loc[r]= torch.tensor(np.random.randint(np.ones([img.shape[0],img.shape[1]])*n_pos))
-                out_stk = torch.zeros([img.shape[0],img.shape[1],n_pixels],dtype=parameters['pytorch_dtype'])
+                    x,y = torch.where(loc[r]==i)
+                    out_stk[x,y,r] = img[x,y]
+            else:
+                out_stk.append(img)
+        if shortcut:
             for r in range(n_pixels):
-                x,y = torch.where(loc[r]==i)
-                out_stk[x,y,r] = img[x,y]
-        for r in range(n_pixels):
-            out_stk[:,:,r] = torch.tensor(image_filter(out_stk[:,:,r].numpy(),'median',2),dtype=parameters['pytorch_dtype'])
+                out_stk[:,:,r] = torch.tensor(image_filter(out_stk[:,:,r].numpy(),'median',2),dtype=parameters['pytorch_dtype'])
+        else:
+            out_stk = torch.dstack(out_stk)
 
         FF = out_stk
         constant = torch.zeros_like(FF[:,:,0]) # There may be a more robust way 
@@ -1758,18 +1888,15 @@ def image_filter(img,function,value,dtype=np.float32):
     elif 'rolling_ball' in function:
         img = gaussian_filter(restoration.rolling_ball(gaussian_filter(img,value/5),radius=value,num_threads=30),value)
     elif 'spline' in function:
-        binsize = int(value)
+        new_width = int(value.split('|')[0])
+        new_height = int(value.split('|')[1])
+        # binsize = int(value)
         original_width, original_height = img.shape
-        # new_width = int(original_width/binsize)
-        # new_height = int(original_height/binsize)
-        # Resize to be a multiple of binsize
-        gcd_value = math.gcd(original_width, original_height)
-        gcd_value = np.min([original_width,original_height])/gcd_value
-        gcd_value = gcd_value/ (2**binsize)
-        new_width = int((original_width // gcd_value))
-        new_height = int((original_height // gcd_value))
-        # img = np.array(Image.fromarray(img.astype(dtype)).resize((new_height*binsize,new_width*binsize), Image.BICUBIC))
-
+        # Ensure that new values are multiples of img shape
+        original_width_posibilites = np.array([i  for i in range(1,original_width) if (original_width/i).is_integer()])
+        original_height_posibilites = np.array([i  for i in range(1,original_height) if (original_height/i).is_integer()])
+        new_width = original_width_posibilites[np.argmin(np.abs(original_width_posibilites-new_width))]
+        new_height = original_height_posibilites[np.argmin(np.abs(original_height_posibilites-new_height))]
         block_size = np.array([new_width, new_height])
         # print(gcd_value,block_size,img.shape)
         if 'mean' in function:
@@ -1827,8 +1954,22 @@ def image_filter(img,function,value,dtype=np.float32):
         img = 0*img.copy()
     return img
 
+def load_image(img,FF,constant,parameters):
+    if isinstance(img,str):
+        img = fileu.load(fname=img,file_type='tif')
+    img = img.astype(parameters['numpy_dtype'])
+    if isinstance(FF,str):
+        FF = fileu.load(fname=FF,file_type='FF')
+    if isinstance(constant,str):
+        constant = fileu.load(fname=constant,file_type='constant')
+    if parameters['bin']>1:
+        img = block_reduce(image_filter(img,'median',2), tuple([parameters['bin'],parameters['bin']]), np.mean)
+    img = process_img(img,parameters,FF=FF,constant=constant)
+    return img
 
-def preprocess_images(data,FF=1,nuc_FF=1,constant=0,nuc_constant=0):
+
+
+def preprocess_images(data):
     """
     preprocess_images _summary_
 
@@ -1845,55 +1986,28 @@ def preprocess_images(data,FF=1,nuc_FF=1,constant=0,nuc_constant=0):
     :return: _description_
     :rtype: _type_
     """    
-    acq = data['acq']
-    bkg_acq = data['bkg_acq']
+    # acq = data['acq']
+    # bkg_acq = data['bkg_acq']
     posname = data['posname']
-    image_metadata = data['image_metadata']
-    channel = data['channel']
+    # image_metadata = data['image_metadata']
+    # channel = data['channel']
     parameters = data['parameters']
     try:
-        nuc = ((image_metadata.stkread(Position=posname,
-                                        Channel=parameters['nucstain_channel'],
-                                        acq=acq).max(axis=2).astype(parameters['numpy_dtype'])))
-        if parameters['bin']>1:
-            nuc = block_reduce(image_filter(nuc,'median',2), tuple([parameters['bin'],parameters['bin']]), np.mean)
-        # nuc = np.array(Image.fromarray(image_filter(nuc,'median',2)).resize(parameters['n_pixels'],Image.BICUBIC),dtype=parameters['numpy_dtype'])
-        nuc = process_img(nuc,parameters,FF=nuc_FF,constant=nuc_constant)
-        img = ((image_metadata.stkread(Position=posname,
-                                        Channel=channel,
-                                        acq=acq).max(axis=2).astype(parameters['numpy_dtype'])))
-        if parameters['bin']>1:
-            img = block_reduce(image_filter(img,'median',2), tuple([parameters['bin'],parameters['bin']]), np.mean)
-        # img = np.array(Image.fromarray(image_filter(img,'median',2)).resize(parameters['n_pixels'],Image.BICUBIC),dtype=parameters['numpy_dtype'])
-        if parameters['post_strip_process']:
-            img = correct_optics(img,FF=FF,constant=constant)
-        else:
-            img = process_img(img,parameters,FF=FF,constant=constant)
-        if not bkg_acq=='':
-            bkg = ((image_metadata.stkread(Position=posname,
-                                            Channel=channel,
-                                            acq=bkg_acq).max(axis=2).astype(parameters['numpy_dtype'])))
-            if parameters['bin']>1:
-                bkg = block_reduce(image_filter(bkg,'median',2), tuple([parameters['bin'],parameters['bin']]), np.mean)
-            # bkg = np.array(Image.fromarray(image_filter(bkg,'median',2)).resize(parameters['n_pixels'],Image.BICUBIC),dtype=parameters['numpy_dtype'])
-            if parameters['post_strip_process']:
-                bkg = correct_optics(bkg,FF=FF,constant=constant)
-            else:
-                bkg = process_img(bkg,parameters,FF=FF,constant=constant)
-            bkg_nuc = ((image_metadata.stkread(Position=posname,
-                                            Channel=parameters['nucstain_channel'],
-                                            acq=bkg_acq).max(axis=2).astype(parameters['numpy_dtype'])))
-            if parameters['bin']>1:
-                bkg_nuc = block_reduce(image_filter(bkg_nuc,'median',2), tuple([parameters['bin'],parameters['bin']]), np.mean)
-            # bkg_nuc = np.array(Image.fromarray(image_filter(bkg_nuc,'median',2)).resize(parameters['n_pixels'],Image.BICUBIC),dtype=parameters['numpy_dtype'])
-            bkg_nuc = process_img(bkg_nuc,parameters,FF=nuc_FF,constant=nuc_constant)
-
+        nuc = load_image(data['nuc'],data['nuc_FF'],data['nuc_constant'],parameters=parameters)
+        img = load_image(data['img'],data['img_FF'],data['img_constant'],parameters=parameters)
+        if not data['bkg']=='':
+            bkg_nuc = load_image(data['bkg_nuc'],data['bkg_nuc_FF'],data['bkg_nuc_constant'],parameters=parameters)
+            bkg = load_image(data['bkg'],data['bkg_FF'],data['bkg_constant'],parameters=parameters)
             # Check if beads work here
-            ref = nuc - gaussian_filter(nuc,25)
-            non_ref = bkg_nuc - gaussian_filter(bkg_nuc,25)
+            ref = gaussian_filter(nuc - gaussian_filter(nuc,25),2)
+            non_ref =gaussian_filter(bkg_nuc - gaussian_filter(bkg_nuc,25),2)
+            vmin,vmax = np.percentile(ref.ravel(),[5,95])
+            ref = np.clip(ref,vmin,vmax)
+            vmin,vmax = np.percentile(non_ref.ravel(),[5,95])
+            non_ref = np.clip(non_ref,vmin,vmax)
             # Check if Beads work here
             shift, error = register(ref, non_ref,10)
-            if error!=np.inf:
+            if (error!=np.inf)&(np.max(np.abs(shift))<=parameters['max_registration_shift']):
                 translation_x = int(shift[1])
                 translation_y = int(shift[0])
             else:
@@ -1904,8 +2018,8 @@ def preprocess_images(data,FF=1,nuc_FF=1,constant=0,nuc_constant=0):
             i2 = interpolate.interp2d(x_correction,y_correction,bkg,fill_value=None)
             bkg = i2(range(bkg.shape[1]), range(bkg.shape[0]))
             img = img-bkg
-        if parameters['post_strip_process']:
-            img = subtract_background(img,parameters) 
+        # if parameters['post_strip_process']:
+        #     img = subtract_background(img,parameters) 
         for iter in range(parameters['background_estimate_iters']):
             img = img-gaussian_filter(
                 restoration.rolling_ball(
@@ -1921,24 +2035,13 @@ def preprocess_images(data,FF=1,nuc_FF=1,constant=0,nuc_constant=0):
                                 radius=parameters['highpass_sigma'],
                                 num_threads=30),
                 parameters['highpass_sigma'])
+        img = np.clip(img,1,None)
+        nuc = np.clip(nuc,1,None)
         if parameters['scope']=='OrangeScope':
             window = int(200/parameters['bin'])
             img[0:window,0:window] = 0
             nuc[0:window,0:window] = 0
 
-        # dtype = parameters['numpy_dtype']
-        # try:
-        #     nuc[nuc<np.finfo(dtype).min] = np.finfo(dtype).min
-        #     img[img<np.finfo(dtype).min] = np.finfo(dtype).min
-        #     nuc[nuc>np.finfo(dtype).max] = np.finfo(dtype).max
-        #     img[img>np.finfo(dtype).max] = np.finfo(dtype).max
-        # except:
-        #     nuc[nuc<np.iinfo(dtype).min] = np.iinfo(dtype).min
-        #     img[img<np.iinfo(dtype).min] = np.iinfo(dtype).min
-        #     nuc[nuc>np.iinfo(dtype).max] = np.iinfo(dtype).max
-        #     img[img>np.iinfo(dtype).max] = np.iinfo(dtype).max
-        img = np.clip(img,0,None)
-        nuc = np.clip(nuc,0,None)
         img = torch.tensor(img,dtype=parameters['pytorch_dtype'])
         nuc = torch.tensor(nuc,dtype=parameters['pytorch_dtype'])
         
@@ -1966,11 +2069,15 @@ def preprocess_images(data,FF=1,nuc_FF=1,constant=0,nuc_constant=0):
                 non_ref = nuc[mask_x,:]
                 non_ref = non_ref[:,mask_y]
                 # Check if Beads work here
-                ref = ref.numpy() - gaussian_filter(ref.numpy(),25)
-                non_ref = non_ref.numpy() - gaussian_filter(non_ref.numpy(),25)
+                ref = gaussian_filter(nuc - gaussian_filter(nuc,25),2)
+                non_ref =gaussian_filter(non_ref - gaussian_filter(non_ref,25),2)
+                vmin,vmax = np.percentile(ref.ravel(),[5,95])
+                ref = np.clip(ref,vmin,vmax)
+                vmin,vmax = np.percentile(non_ref.ravel(),[5,95])
+                non_ref = np.clip(non_ref,vmin,vmax)
                 # Check if Beads work here
                 shift, error = register(ref, non_ref,10)
-                if (error!=np.inf)&(np.max(np.abs(shift))<=(parameters['border']/2)):
+                if (error!=np.inf)&(np.max(np.abs(shift))<=parameters['max_registration_shift']):
                     translation_y = int(shift[1])
                     translation_x = int(shift[0])
                 else:
