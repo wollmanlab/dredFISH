@@ -1,19 +1,9 @@
 #!/usr/bin/env python
 import logging
 import numpy as np
-# import torch
 import os
-import importlib
-# from tqdm import tqdm
 from datetime import datetime
-# from metadata import Metadata
-# import sys
-# import pandas as pd
 from dredFISH.Utils import fileu
-# import anndata
-
-import argparse
-import shutil
 import time
 import pandas as pd
 import numpy as np 
@@ -22,9 +12,7 @@ import math
 import time
 
 import numpy as np
-from collections import Counter
 import torch
-import matplotlib as mpl
 
 from sklearn.linear_model import LinearRegression
 from scipy.interpolate import Rbf
@@ -131,7 +119,7 @@ class Registration_Class(object):
         Y = non_rigid_transformed_XYZC['ccf_y']
         Z = non_rigid_transformed_XYZC['ccf_z']
         design_matrix = np.c_[Y,Z]
-        non_rigid_transformed_XYZC[['ccf_x']] = self.X_model.predict(design_matrix)#[0]
+        non_rigid_transformed_XYZC['ccf_x'] = self.X_model.predict(design_matrix)#[0]
         
         return non_rigid_transformed_XYZC
 
