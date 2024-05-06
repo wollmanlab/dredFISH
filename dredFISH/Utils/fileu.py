@@ -20,10 +20,11 @@ import shapely
 import shapely.wkt
 import json
 import dill as pickle
+from skimage import io
 # import pickle
 
 
-def check_existance(path='',hybe='',channel='',file_type='',model_type='',dataset='',section='',logger='FileU'):
+def check_existance(fname='',path='',hybe='',channel='',file_type='',model_type='',dataset='',section='',logger='FileU'):
     """
     check_existance Check if File Existsin accordance with established file structure
 
@@ -42,7 +43,10 @@ def check_existance(path='',hybe='',channel='',file_type='',model_type='',datase
     :return : True of file exists, False otherwise
     :rtype : bool
     """
-    filename = generate_filename(path,hybe,channel,file_type,model_type,dataset,section,logger=logger)
+    if fname=='':
+        filename = generate_filename(path,hybe,channel,file_type,model_type,dataset,section,logger=logger)
+    else:
+        filename=fname
     return os.path.exists(filename)
 
 def interact_config(path,key='',data=None,return_config=True):
@@ -62,7 +66,7 @@ def interact_config(path,key='',data=None,return_config=True):
     if return_config:
         return config
 
-def generate_filename(path,hybe,channel,file_type,model_type,dataset='',section='',logger='FileU'):
+def generate_filename(path,hybe,channel,file_type,model_type='',dataset='',section='',logger='FileU'):
     """
     fname Generate File Name 
 
@@ -97,15 +101,18 @@ def generate_filename(path,hybe,channel,file_type,model_type,dataset='',section=
     out_path = os.path.join(path,file_type)
     if not os.path.exists(out_path):
         update_user(f"Making Type Path {file_type}",logger=logger)
-        os.mkdir(out_path)
+        try:
+            os.mkdir(out_path)
+        except:
+            update_user(f"Issue Making Type Path {file_type}",logger=logger)
 
     backup_file_type = file_type
     file_type = file_type.split('_')[0]
-    if hybe != '':
-        if 'hybe' in hybe:
-            hybe = hybe.split('hybe')[-1]
-        if not 'Hybe' in hybe:
-            hybe = 'Hybe'+hybe
+    # if hybe != '':
+    #     if 'hybe' in hybe:
+    #         hybe = hybe.split('hybe')[-1]
+    #     if not 'Hybe' in hybe:
+    #         hybe = 'Hybe'+hybe
     ftype_converter = {'anndata':'.h5ad',
                        'matrix':'.csv',
                        'metadata':'.csv',
@@ -135,7 +142,7 @@ def generate_filename(path,hybe,channel,file_type,model_type,dataset='',section=
     fname = os.path.join(out_path,fname)
     return fname
 
-def save(data,path='',hybe='',channel='',file_type='',model_type='',dataset='',section='',logger='FileU'):
+def save(data,fname='',path='',hybe='',channel='',file_type='',model_type='',dataset='',section='',logger='FileU'):
     """
     save save File in accordance with established file structure
 
@@ -154,7 +161,8 @@ def save(data,path='',hybe='',channel='',file_type='',model_type='',dataset='',s
     :param logger: Logger to send logs can be a name of logger, defaults to 'FileU'
     :type logger: str, logging.Logger, optional
     """
-    fname = generate_filename(path,hybe,channel,file_type,model_type,dataset,section,logger=logger)
+    if fname=='':
+        fname = generate_filename(path,hybe,channel,file_type,model_type,dataset,section,logger=logger)
     update_user(f"Saving {fname.split('/')[-1]}",level=20,logger=logger)
     file_type = file_type.split('_')[0]
     if file_type == 'anndata':
@@ -200,7 +208,7 @@ def save(data,path='',hybe='',channel='',file_type='',model_type='',dataset='',s
     else:
         update_user('Unsupported File Type '+file_type,level=30,logger=logger)
 
-def load(path='',hybe='',channel='',file_type='anndata',model_type='',dataset='',section='',logger='FileU'):
+def load(fname='',path='',hybe='',channel='',file_type='anndata',model_type='',dataset='',section='',logger='FileU'):
     """
     load load File in accordance with established file structure
 
@@ -219,7 +227,8 @@ def load(path='',hybe='',channel='',file_type='anndata',model_type='',dataset=''
     :return : Desired Data Object or None if not found
     :rtype : object
     """
-    fname = generate_filename(path,hybe,channel,file_type,model_type,dataset,section,logger=logger)
+    if fname=='':
+        fname = generate_filename(path,hybe,channel,file_type,model_type,dataset,section,logger=logger)
     file_type = file_type.split('_')[0]
     if os.path.exists(fname):
         try:
@@ -238,6 +247,8 @@ def load(path='',hybe='',channel='',file_type='anndata',model_type='',dataset=''
                 except:
                     data = tifffile.imread(fname)
                 data = data.astype('uint16')
+            elif file_type == 'tif':
+                data = io.imread(fname)
             elif file_type == 'stitched':
                 data = torch.load(fname)
             elif file_type == 'FF':
