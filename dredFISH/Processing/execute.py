@@ -4,6 +4,7 @@ import shutil
 from datetime import datetime
 import dredFISH.Processing as Processing
 from dredFISH.Processing.Section import *
+from dredFISH.Utils.imageu import *
 import time
 """
 conda activate dredfish_3.9; nohup python -W ignore /home/zach/PythonRepos/dredFISH/dredFISH/Processing/execute.py /orangedata/Images2023/Gaby/dredFISH/Acrydite_77.5.A_DPNMF_97.5.B_2023Feb16/ -c dredfish_processing_config_v1 -w A; conda deactivate
@@ -32,7 +33,8 @@ if __name__ == '__main__':
     else:
         fishdata = args.fishdata
 
-    
+    # if args.well=='X':
+    # generate_image_parameters(metadata_path,overwrite=False,nthreads = 3)
 
     if args.section=='all':
         image_metadata = Metadata(metadata_path)
@@ -48,7 +50,7 @@ if __name__ == '__main__':
     # np.random.shuffle(sections)
     print(sections)
     completion_array = np.array([False for i in sections])
-    max_attempts = 1
+    max_attempts = 5
     attempt = 1
     while np.sum(completion_array==False)>0:
         if attempt>max_attempts:
@@ -61,7 +63,10 @@ if __name__ == '__main__':
             # self.setup_output()
             self.update_user(str(np.sum(completion_array==False))+ ' Unfinished Sections')
             self.update_user('Processing Section '+section)
-            self.run()
+            try:
+                self.run()
+            except:
+                continue
             if isinstance(self.data,type(None)):
                 continue
             completion_array[idx] = True
