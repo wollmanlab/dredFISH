@@ -24,7 +24,7 @@ from skimage import io
 # import pickle
 
 
-def check_existance(fname='',path='',hybe='',channel='',file_type='',model_type='',dataset='',section='',logger='FileU'):
+def check_existance(path='',hybe='',channel='',file_type='',model_type='',dataset='',section='',fname='',logger='FileU'):
     """
     check_existance Check if File Existsin accordance with established file structure
 
@@ -66,7 +66,7 @@ def interact_config(path,key='',data=None,return_config=True):
     if return_config:
         return config
 
-def generate_filename(path,hybe,channel,file_type,model_type='',dataset='',section='',logger='FileU'):
+def generate_filename(path='',hybe='',channel='',file_type='',model_type='',dataset='',section='',logger='FileU'):
     """
     fname Generate File Name 
 
@@ -142,7 +142,7 @@ def generate_filename(path,hybe,channel,file_type,model_type='',dataset='',secti
     fname = os.path.join(out_path,fname)
     return fname
 
-def save(data,fname='',path='',hybe='',channel='',file_type='',model_type='',dataset='',section='',logger='FileU'):
+def save(data,path='',hybe='',channel='',file_type='',model_type='',dataset='',section='',fname='',logger='FileU'):
     """
     save save File in accordance with established file structure
 
@@ -208,7 +208,7 @@ def save(data,fname='',path='',hybe='',channel='',file_type='',model_type='',dat
     else:
         update_user('Unsupported File Type '+file_type,level=30,logger=logger)
 
-def load(fname='',path='',hybe='',channel='',file_type='anndata',model_type='',dataset='',section='',logger='FileU'):
+def load(path='',hybe='',channel='',file_type='anndata',model_type='',dataset='',section='',fname='',logger='FileU'):
     """
     load load File in accordance with established file structure
 
