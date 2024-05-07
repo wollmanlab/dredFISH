@@ -213,7 +213,6 @@ class Registration_Class(object):
             """ Set Reference Section """
 
             rigid_transformed_XYZC = self.rigid_transformation()
-            plt.close('all')
             completed = False
             while not completed:
                 X = []
@@ -231,6 +230,8 @@ class Registration_Class(object):
                         X.append(x)
                         Y.append(y)
                         Z.append(z)
+
+                plt.close('all')
                 xyz_coordinates = pd.DataFrame()
                 xyz_coordinates['x'] = X
                 xyz_coordinates['y'] = Y
