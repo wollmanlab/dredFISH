@@ -31,6 +31,7 @@ from scipy.sparse.csgraph import dijkstra
 import scipy.sparse
 
 from multiprocessing import Pool
+import warnings
 
 import anndata
 
@@ -1492,14 +1493,12 @@ class Taxonomy:
             raise ValueError("Taxonomy must get a name")
         self.name = name
         self.basepath = basepath
-        self._df = pd.DataFrame()
-
-        if Types is not None and feature_mat is not None: 
-            self.add_types(Types,feature_mat)
+        self.adata = anndata.AnnData(X=feature_mat)
+        self.adata.obs["Type"] = Types
 
         # add RGB values if provided
         if rgb_codes is not None:
-            self._df['RGB'] = list(rgb_codes)
+            self.adata.obs['RGB'] = list(rgb_codes)
 
         return None
     
@@ -1509,19 +1508,16 @@ class Taxonomy:
         
         Setter verify that there are no duplications. 
         """
-        return(list(self._df.index))
+        return(list(self.adata.obs["Type"]))
     
     @Type.setter
     def Type(self,Types):
         if len(Types) is not len(set(Types)):
             dups = [Types.count(t) for t in set(Types) if Types.count(t)>1]
             raise ValueError(f"Types must be unique. Found duplicates: {dups}")
-        if self.is_empty():
-            self._df.index = Types
-        else: 
-            if len(Types) is not self._df.shape[0]: 
-                raise ValueError('Changing Types of Taxonomy with defined values is not allowed')
-            self._df.index = Types
+        if not (len(Types) == self.adata.shape[0]): 
+            raise ValueError("Wrong number of types to assign - just remake the Tax")
+        self.adata.obs['Type'] = Types
 
     @property
     def feature_mat(self): 
@@ -1532,32 +1528,20 @@ class Taxonomy:
         if self.is_empty(): 
             return None
         else: 
-            return(self._df.to_numpy())
+            return(self.adata.X)
         
     @feature_mat.setter
     def feature_mat(self,F):
         # first, make sure F is a DataFrame
-        if isinstance(F, pd.DataFrame):
-            df_features = F
-        else: # assumes F is a matrix, make into a df and give col names
-            df_features = pd.DataFrame(F)
-            df_features.columns = [f"f_{i:03d}" for i in range(F.shape[1])]
-
-        self._df = df_features
-    #    # either replace or concat columns based on their name
-    #     for c in df_features.columns: 
-    #         if c in self._feature_cols: 
-    #             self._df.loc[:,c]=F.loc[:,c]
-    #         else: 
-    #             self._df = pd.concat((self._df,df_features.loc[:,c]),axis=1)
-    #             self._feature_cols.append(c)
-        
-    #     self._feature_cols = df_features.columns 
+        if self.adata.shape[0]==F.shape[0]: 
+            self.adata.X=F
+        else: 
+            raise ValueError("Wrong number of rows")
         
     def is_empty(self):
         """ determie if taxonomy is empty
         """
-        return (self._df.empty)
+        return (self.adata.shape[0] == 0)
         
     def save(self):
         """save to basepath using Taxonomy name
@@ -1565,27 +1549,17 @@ class Taxonomy:
         if not os.path.exists(self.basepath):
             os.makedirs(self.basepath)
         if not self.is_empty():
-            self._df.to_csv(os.path.join(self.basepath, f"{self.name}.csv"))
+            self.adata.write_h5ad(os.path.join(self.basepath, f"{self.name}.h5ad"))
                 
     def load(self):
         """save from basepath using Taxonomy name
         """
-        self._df = pd.read_csv(os.path.join(self.basepath, f"{self.name}.csv"))
-        self._df.set_index('type', inplace=True)
-        
-    def add_types(self,new_types,feature_mat):
-        """add new types and their feature average to the Taxonomy
-        """
-        df_new = pd.DataFrame(feature_mat)
-        df_new['type']=new_types
-        type_feat_df = df_new.groupby(['type']).mean()
-        if self._df.empty:
-            self._df = type_feat_df
+        filename = os.path.join(self.basepath, f"{self.name}.h5ad")
+        if os.path.exists(filename):
+            self.adata = anndata.read_h5ad(filename)
         else: 
-            missing_index = type_feat_df.index.difference(self._df.index)
-            self._df = pd.concat((self._df,type_feat_df.iloc[missing_index,:]),axis=0)
-        
-        return None
+            warnings.warn(f"Taxonomy file {filename} not found")
+    
     
     @property
     def N(self):
@@ -1596,19 +1570,19 @@ class Taxonomy:
         """
         Returns RGB values for all types (random value if none assigned)
         """
-        if 'RGB' in self._df.columns:
-            rgb = list(self._df['RGB'])
+        if 'RGB' in self.adata.obs.columns:
+            rgb = list(self.adata.obs['RGB'])
             if isinstance(rgb[0],str): 
                 # if RGB is string, convert to tuples of 0-255
                 rgb = coloru.hex_to_rgb(rgb)
                 rgb = np.array(rgb)
         else: 
-            rgb = coloru.rand_hex_codes(self._df.shape[0])
+            rgb = coloru.rand_hex_codes(self.adata.shape[0])
         return rgb
 
     @RGB.setter
     def RGB(self,rgb_codes):
-        self._df['RGB'] = rgb_codes
+        self.adata.obs['RGB'] = rgb_codes
 
     def get_type_ix(self,typ_str):
         Type_ix_dict = {item: i for i, item in enumerate(self.Type)}
