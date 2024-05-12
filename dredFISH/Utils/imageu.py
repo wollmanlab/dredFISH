@@ -305,3 +305,81 @@ def estimate_flatfield_and_constant(full_file_list):
     FF = FF/FF.mean()
 
     return (FF,Mflt)
+
+from metadata import Metadata
+from dredFISH.Utils import imageu
+import multiprocessing
+from functools import partial
+from tqdm import tqdm
+from dredFISH.Utils import fileu
+import os
+import matplotlib.pyplot as plt
+import shutil
+def wrapper(acq,image_metadata,channel,path=''):
+    try:
+        image_metadata = Metadata(os.path.join(image_metadata,acq))
+        well = [i for i in image_metadata.base_pth.split('/') if not i==''][-2].split('_')[0]#image_metadata.posnames[0].split('-')[0]
+        f = fileu.generate_filename(section=well,path=path,hybe=acq,channel=channel,file_type='FF')
+        if os.path.exists(f):
+            try:
+                FF = fileu.load(section=well,path=path,hybe=acq,channel=channel,file_type='FF')
+            except:
+                FF = None
+        else:
+            FF = None
+
+        f = fileu.generate_filename(section=well,path=path,hybe=acq,channel=channel,file_type='constant')
+        if os.path.exists(f):
+            try:
+                C = fileu.load(section=well,path=path,hybe=acq,channel=channel,file_type='constant')
+            except:
+                C = None
+        else:
+            C = None
+        if isinstance(C,type(None))|isinstance(FF,type(None)):
+            file_list = image_metadata.stkread(Channel=channel,acq=acq,groupby='Channel',fnames_only = True)
+            (FF, C) = imageu.estimate_flatfield_and_constant(file_list)
+            fileu.save(FF,section=well,path=path,hybe=acq,channel=channel,file_type='FF')
+            fileu.save(FF*1000,section=well,path=path,hybe=acq,channel=channel,file_type='image_FF')
+            fileu.save(C,section=well,path=path,hybe=acq,channel=channel,file_type='constant')
+            fileu.save(C,section=well,path=path,hybe=acq,channel=channel,file_type='image_constant')
+
+        return well,acq,FF,C
+    except Exception as e:
+        print(f"{acq} Failed")
+        print(e)
+        return None,acq,None,None
+
+def generate_image_parameters(base_path,overwrite=True,nthreads = 10):
+    dataset = [i for i in base_path.split('/') if not i==''][-1]
+    out_path = os.path.join(base_path,'microscope_parameters')
+    if overwrite:
+        if os.path.exists(out_path):
+            shutil.rmtree(out_path)
+    if not os.path.exists(out_path):
+        os.mkdir(out_path)
+    image_metadata = Metadata(base_path)
+    for channel in ['FarRed','DeepBlue']:
+        Input = sorted([i for i in image_metadata.acqnames if ('ybe' in i)|('rip' in i)])
+        np.random.shuffle(Input)
+        pfunc = partial(wrapper,image_metadata=base_path,channel=channel,path=out_path)
+        with multiprocessing.Pool(nthreads) as p:
+            for well,acq,FF,C in tqdm(p.imap(pfunc,Input),total=len(Input),desc=f"{dataset} {channel}"):
+                if isinstance(FF,type(None)):
+                    continue
+                fig,axs = plt.subplots(1,2,figsize=[12,4])
+                fig.suptitle(f"{dataset} {acq} {well} {channel}")
+                axs = axs.ravel()
+                ax = axs[0]
+                im = ax.imshow(C,cmap='jet')
+                plt.colorbar(im,ax=ax)
+                ax.axis('off')
+                ax.set_title("const")
+                ax = axs[1]
+                im=ax.imshow(FF,cmap='jet')
+                plt.colorbar(im,ax=ax)
+                ax.axis('off')
+                ax.set_title("FF")
+                path = fileu.generate_filename(section=well,path=out_path,hybe=acq,channel=channel,file_type='Figure')
+                plt.savefig(path)
+                plt.close('all')
