@@ -8,11 +8,13 @@ from skimage.morphology import remove_small_objects
 from skimage.filters import threshold_otsu 
 import skimage
 
-from scipy.ndimage import binary_fill_holes, uniform_filter,distance_transform_edt
+from scipy.ndimage import binary_fill_holes, uniform_filter,distance_transform_edt,maximum_filter
+from skimage.transform import resize
+from skimage.morphology import binary_closing, disk
 from scipy.spatial import Voronoi
 from scipy.signal import convolve2d
 import skimage.morphology
-from skimage.transform import rescale
+from skimage.transform import rescale, resize
 
 import scipy.ndimage.measurements
 
@@ -25,7 +27,7 @@ import math
 import igraph
 
 import shapely
-from shapely.geometry import Polygon, Point, MultiPoint
+from shapely.geometry import Polygon, Point, MultiPoint, MultiPolygon
 from shapely.ops import unary_union
 from shapely.ops import voronoi_diagram
 from shapely.strtree import STRtree
@@ -161,6 +163,8 @@ def mask_voronoi(vor_polys,mask_polys,area_thresh_percentile = 95):
     """
     masks voronoi polygons based on masks. Both inputs are lists
     """
+
+    # for comptational efficiency, only test the top 5% of polygons by area. 
     vor_poly_area = np.array([p.area for p in vor_polys])
     vor_ids = np.flatnonzero(vor_poly_area > np.percentile(vor_poly_area,area_thresh_percentile))
     mask_polys = shapely.geometry.MultiPolygon(mask_polys)
@@ -415,6 +419,73 @@ def plot_polygon_collection(verts_or_polys,
 
     ax.set_aspect('equal', 'box')
     ax.axis('off')
+    return ax
+
+def plot_polygon_boundaries(verts_or_polys, rgb_edges=None, ax=None, xlm=None, ylm=None, transpose=False, rotation=None, linewidths=1, inward_offset=0):
+    """
+    Plots only the boundaries of polygons using matplotlib LineCollection, with an option to draw lines inward.
+
+    Parameters:
+    - verts_or_polys: List of vertices (list of XYs) or polygons (list of shapely polygons).
+    - rgb_edges: RGB array (nx3) for edge colors.
+    - ax: Matplotlib axis object to draw on. If None, a new figure and axis are created.
+    - xlm: X-axis limits as a tuple (min, max).
+    - ylm: Y-axis limits as a tuple (min, max).
+    - transpose: If True, transposes the coordinates.
+    - rotation: Rotate the coordinates by a given angle (in degrees). If 'auto', calculates the optimal rotation.
+    - linewidths: Thickness of the lines.
+    - inward_offset: Distance to move the line inward (negative buffer distance).
+    """
+
+    # Convert verts_or_polys to just be verts, applying inward offset if specified
+    if isinstance(verts_or_polys[0], shapely.geometry.Polygon):
+        buffered_polys = [poly.buffer(-inward_offset) for poly in verts_or_polys if poly.area > 0]
+        # Handle cases where buffering results in MultiPolygons
+        single_polys = []
+        for poly in buffered_polys:
+            if isinstance(poly, shapely.geometry.MultiPolygon):
+                # Select the largest polygon from the MultiPolygon
+                largest_poly = max(poly.geoms, key=lambda p: p.area)
+                single_polys.append(largest_poly)
+            else:
+                single_polys.append(poly)
+        verts = [np.array(poly.exterior.xy).T for poly in single_polys]
+    else:
+        verts = verts_or_polys
+
+    if transpose:
+        verts = [np.fliplr(v) for v in verts]
+
+    if rotation is not None:
+        xy = np.vstack(verts)
+        if rotation == 'auto':
+            rotation = find_rotation_angle(xy)
+        xy_cntr = xy.mean(axis=0)
+        verts = [v - xy_cntr for v in verts]
+        rot_mat = rotation_matrix_degrees(rotation)
+        verts = [np.matmul(v, rot_mat) for v in verts]
+        verts = [v + xy_cntr for v in verts]
+
+    # Create the LineCollection from vertices and set edge colors and line widths
+    lc = LineCollection(verts, colors=rgb_edges, linewidths=linewidths)
+    if ax is None:
+        fig, ax = plt.subplots()
+    ax.add_collection(lc)
+
+    # Set axis limits
+    if xlm is None or ylm is None:
+        all_points = np.vstack(verts)
+        x_min, y_min = np.min(all_points, axis=0)
+        x_max, y_max = np.max(all_points, axis=0)
+        xlm = (x_min, x_max) if xlm is None else xlm
+        ylm = (y_min, y_max) if ylm is None else ylm
+
+    ax.set_xlim(xlm)
+    ax.set_ylim(ylm)
+    ax.set_aspect('equal', 'box')
+    ax.axis('off')
+
+    return ax
 
 def rotation_matrix_degrees(angle_degrees):
     # Convert angle from degrees to radians
@@ -473,6 +544,7 @@ def plot_point_collection(pnts,sizes,rgb_faces = None,rgb_edges = None,ax = None
     if ylm is None: 
         ylm = (mn[1],mx[1])
 
+    return ax
 
 def load_section_geometries(unqS,basepath):
     """
@@ -626,64 +698,106 @@ def in_graph_large_connected_components(XY,Section = None,max_dist = 300,large_c
 
     return(in_large_comp)
 
-def merge_polygons_by_ids(polys,ids,max_buff = 1000):
+def merge_polygons_by_ids(polys,ids,max_buff = 0.01,dbuffer=0.001, smooth_telerance = 0.05):
     """
     merges nearby poygons based on id vectors. 
     if polygons are not really touching, it will expand them slightsly until they do. 
+
+    buffer units use the coordiate of the polygons, mm by default. Make sure to change that as needed. 
     """
-    unq_id  = np.unique(ids)
+    unq_id = np.unique(ids)
     all_merged_polys = list()
-    for j,uid in enumerate(unq_id):
+    for uid in unq_id:
         ix = np.flatnonzero(ids == uid)
-        poly_list = list()
-        for i in range(len(ix)):
-            poly_list.append(polys[ix[i]])
-        merged_poly = shapely.ops.unary_union(poly_list)
+        poly_list = [polys[i] for i in ix]
+        merged_poly = unary_union(poly_list)
+        # if merging didn't work, i.e. it is still a multipolygon 
+        # first try to increase buffer and after that just take biggest
+        if isinstance(merged_poly, MultiPolygon):
+            bf = 0
+            while not isinstance(merged_poly, Polygon) and bf < max_buff:
+                bf += dbuffer
+                merged_poly = merged_poly.buffer(bf).buffer(-bf)
+            if isinstance(merged_poly, MultiPolygon):  # Fallback if still a MultiPolygon
+                merged_poly = max(merged_poly.geoms, key=lambda p: p.area)  # Select the largest polygon
         all_merged_polys.append(merged_poly)
-    
-    # expands polygons until they touch and merge (convetrs multi to poly)
-    not_reg_poly = np.array([not isinstance(mp,shapely.geometry.polygon.Polygon) for mp in all_merged_polys])
-    not_reg_poly_ix = np.flatnonzero(not_reg_poly)
-    for i,ix in enumerate(not_reg_poly_ix):
-        mp = all_merged_polys[ix]
-        bf=0
-        while not isinstance(mp,shapely.geometry.polygon.Polygon) and bf < max_buff:
-            bf+=1
-            mp = mp.buffer(bf)
-        if bf == max_buff:
-            raise ValueError("Issue with merging polygons, they are too far apart")
-        all_merged_polys[ix] = mp
+
+    if smooth_telerance is not None: 
+        all_merged_polys=[p.simplify(smooth_telerance) for p in all_merged_polys]
     
     return all_merged_polys
 
-def create_mask_from_XY(XY,units = 'auto',dist_thresh = 2):
-    # creates mask from XY coordinates using distance transform
-    # key is to create a raster with ones at each XY (rounded to int)
-    # and then use dist transform. 
-    # units are used to determine scale for rastering. 'auto' works pretty well for whole section with raster of ~5000x5000
+    # unq_id  = np.unique(ids)
+    # all_merged_polys = list()
+    # for j,uid in enumerate(unq_id):
+    #     ix = np.flatnonzero(ids == uid)
+    #     poly_list = list()
+    #     for i in range(len(ix)):
+    #         poly_list.append(polys[ix[i]])
+    #     merged_poly = shapely.ops.unary_union(poly_list)
+    #     all_merged_polys.append(merged_poly)
+    
+    # # expands polygons until they touch and merge (convetrs multi to poly)
+    # not_reg_poly = np.array([not isinstance(mp,shapely.geometry.polygon.Polygon) for mp in all_merged_polys])
+    # not_reg_poly_ix = np.flatnonzero(not_reg_poly)
+    # for i,ix in enumerate(not_reg_poly_ix):
+    #     mp = all_merged_polys[ix]
+    #     bf=0
+    #     while not isinstance(mp,shapely.geometry.polygon.Polygon) and bf < max_buff:
+    #         bf+=dbuffer
+    #         mp = mp.buffer(bf).buffer(-bf)
+    #     if bf == max_buff:
+    #         raise ValueError("Issue with merging polygons, they are too far apart")
+    #     all_merged_polys[ix] = mp
+    
+    # return all_merged_polys
+
+def create_mask_from_XY(XY,units = 'mm',down_size_factor = 10, strel_disk_radius=200):
+    """
+    creates mask from XY coordinates using distance transform
+    key is to create a raster with ones at each XY (rounded to int)
+    downsize binary close and upscale. Downsize is done in a smart way using maximum_filter 
+
+    units are used to determine scale for rastering. In the end we scale image to be 1um resolution but 
+    if XY are mm and not um just pass units to ne mm
+
+    the strel_disk_radius control how close neighboring centroids in the mask are when things are continous
+    "holes" bigger than this will stay holes, otherwise will get closed. Units are in um
+
+    """
+    
     if units=='mm':
         rescal = 1000
     elif units=='um':
         rescal = 1 
-    elif units=='auto':
-        rng = (XY.max(axis=0) - XY.min(axis=0)).max()
-        rescal = 5000/rng
+    # elif units=='auto':
+    #     rng = (XY.max(axis=0) - XY.min(axis=0)).max()
+    #     rescal = 5000/rng
     else:
         raise ValueError('wrong units in create mask')
         
+    strel_disk_radius=int(strel_disk_radius/down_size_factor)
+    pad_size=2*strel_disk_radius
     XYint = (XY*rescal).astype(int)
     dXdY = XYint.min(axis=0)
     XYint -= dXdY
-    sz = np.fliplr(XYint).max(axis=0)+10
+    sz = np.fliplr(XYint).max(axis=0)+1
     mask_raster = np.zeros(sz,dtype=bool)
     mask_raster[XYint[:,1],XYint[:,0]]=True
-    mask_raster = distance_transform_edt(1-mask_raster)<dist_thresh
+    mask_raster_maxed = maximum_filter(mask_raster, size=(down_size_factor, down_size_factor))
+    mask_sml = mask_raster_maxed[::down_size_factor,::down_size_factor]
+    mask_sml_padded = np.pad(mask_sml, pad_width=pad_size, mode='constant', constant_values=0)
+    # Create a structuring element (disk) with radius 10
+    strel = disk(int(strel_disk_radius/down_size_factor))
+
+    # Perform morphological closing on the small mask
+    mask_sml_closed = binary_closing(mask_sml_padded, strel)
+    mask_sml_closed=mask_sml_closed[pad_size:-pad_size,pad_size:-pad_size]
+    mask_raster = resize(mask_sml_closed, sz, order=0).astype(bool)
+    
     mask_polys = create_mask_from_raster(mask_raster)
-    if rescal != 1:
-        rescl_mat = [1/rescal, 0, 0, 1/rescal, 0, 0]
-        # Adjust the affine transformation matrix to include a shift by dXdY
-        rescl_mat_with_shift = [1/rescal, 0, 0, 1/rescal, dXdY[0], dXdY[1]]
-        mask_polys = [shapely.affinity.affine_transform(m, rescl_mat_with_shift) for m in mask_polys]
+    rescl_mat_with_shift = [1/rescal, 0, 0, 1/rescal, dXdY[0]/rescal, dXdY[1]/rescal]
+    mask_polys = [shapely.affinity.affine_transform(m, rescl_mat_with_shift) for m in mask_polys]
 
     return mask_polys
 

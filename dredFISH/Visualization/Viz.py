@@ -117,7 +117,7 @@ class BasisView(View):
 class SingleMapView(View):
     """
     A view that has only a single map in it. 
-    map_type is one of 'type', 'colorpleth', 'random'
+    map_type is one of 'type', 'colorpleth', 'random', 'type_with_boundaries' (supply two levels in level_type)
     """
     def __init__(self, TMG, section = None,level_type = "cell",map_type = "type", val_to_map = None, figsize=(11, 11),**kwargs):
         super().__init__(TMG, "Map", figsize)
@@ -125,15 +125,22 @@ class SingleMapView(View):
         if len(TMG.unqS)==1 and section is None: 
             section = TMG.unqS[0]
         
-        geom_type = TMG.layer_to_geom_type_mapping[level_type]
+        
         if map_type == 'type':
+            geom_type = TMG.layer_to_geom_type_mapping[level_type]
             Pmap = TypeMap(geom_type,V=self,section = section,**kwargs)
         elif map_type == 'colorpleth': 
+            geom_type = TMG.layer_to_geom_type_mapping[level_type]
             if val_to_map is None: 
                 raise ValueError("Must provide val_to_map if map_type is colorpleth")
-            Pmap = Colorpleth(val_to_map,V=self,section = section,**kwargs)
+            Pmap = Colorpleth(val_to_map,geom_type=geom_type,V=self,section = section,**kwargs)
         elif map_type == 'random':
+            geom_type = TMG.layer_to_geom_type_mapping[level_type]
             Pmap = RandomColorMap(geom_type,V=self,section=section,**kwargs)
+        elif map_type == 'type_with_boundaries':
+            poly_geom = TMG.layer_to_geom_type_mapping[level_type[0]]
+            bound_geom = TMG.layer_to_geom_type_mapping[level_type[1]]
+            Pmap = TypeWithBoundaries(V=self, section=section, poly_geom=poly_geom, boundaries_geom=bound_geom)
         else: 
             raise ValueError(f"value {map_type} is not a recognized map_type")
         
@@ -325,7 +332,67 @@ class Panel(metaclass=abc.ABCMeta):
         actual plotting happens here, overload in subclasses! 
         """
         pass
-        
+
+class LayeredMap(Panel):
+    """
+    """
+    def __init__(self, V = None, section = None, name = None, 
+                       pos=(0,0,1,1), geom_list_to_plot=dict(), **kwargs):
+        super().__init__(V,name, pos)
+         # set default section to be the first in unqS, useful is there is only single section
+        if section is None:
+            section = self.V.TMG.unqS[0]    
+
+        self.xlim = kwargs.get('xlim',None)
+        self.ylim = kwargs.get('ylim',None)
+        self.rotation = kwargs.get('rotation','auto')
+
+        # section information: which section in TMG are we plotting
+        self.section = section
+        # Verify that each item in geom_list_to_plot is a dictionary with the required keys
+        for item in geom_list_to_plot:
+            if not isinstance(item, dict):
+                raise ValueError("Each item in geom_list_to_plot must be a dictionary.")
+            required_keys = {'geom', 'plot_type','rgb_faces', 'rgb_edges'}
+            if not required_keys.issubset(item.keys()):
+                missing_keys = required_keys - item.keys()
+                raise ValueError(f"Missing keys in geom_list_to_plot item: {missing_keys}")
+            
+        self.geom_list_to_plot=geom_list_to_plot
+
+    def plot(self):
+        """
+        The LayeredMap plotting function runs through the list of dicts and plots 
+        the geometrycollection (points, lines, polygons) requested 
+        """
+        for geom_to_plot in self.geom_list_to_plot: 
+            if geom_to_plot["plot_type"] == "points":
+                self.sizes = None # TODO - make sure to fix self.sizes to something real...
+                self.ax = geomu.plot_point_collection(geom_to_plot["geom"],
+                                            self.sizes,
+                                            rgb_faces = geom_to_plot["rgb_faces"],
+                                            rgb_edges = geom_to_plot["rgb_edges"], 
+                                            ax = self.ax,
+                                            xlm = self.xlim,ylm = self.ylim,
+                                            rotation = self.rotation)
+                
+            elif geom_to_plot["plot_type"] == "lines":
+                self.ax = geomu.plot_polygon_boundaries(geom_to_plot["geom"],
+                                              rgb_edges = geom_to_plot["rgb_edges"],
+                                              linewidths=geom_to_plot["linewidths"], 
+                                              inward_offset = geom_to_plot["inward_offset"],
+                                              ax=self.ax)
+                
+            elif geom_to_plot["plot_type"] == "polygons": 
+                self.ax = geomu.plot_polygon_collection(geom_to_plot["geom"],
+                                            rgb_faces = geom_to_plot["rgb_faces"],
+                                            rgb_edges = geom_to_plot["rgb_edges"], 
+                                            ax = self.ax,
+                                            xlm = self.xlim,ylm = self.ylim,
+                                            rotation = self.rotation)    
+            else: 
+                raise ValueError(f"Geometry plotting type: {geom_to_plot['plot_type']} not supported")
+
 
 class Map(Panel):
     """
@@ -386,14 +453,14 @@ class Map(Panel):
                                           ax = self.ax,
                                           xlm = self.xlim,ylm = self.ylim,
                                           rotation = self.rotation)
-            
+        
 
 class TypeMap(Map):
     """
     plots types of given geom using UMAP color projection of types
     """
     def __init__(self, geom_type, V = None,section = None, name = None, 
-                                      pos = (0,0,1,1), color_assign_method = 'supervised_umap',**kwargs):
+                                      pos = (0,0,1,1), color_assign_method = 'taxonomy',**kwargs):
         super().__init__(V = V,section = section, geom_type = geom_type, name = name, pos = pos,rgb_faces=[1,1,1],**kwargs)
         
         # find layer and tax ids
@@ -422,6 +489,47 @@ class TypeMap(Map):
             self.rgb_by_type = coloru.type_color_using_linkage(data,self.cmap,metric = metric)
         self.rgb_faces = self.rgb_by_type[types.astype(int),:]
 
+class TypeWithBoundaries(LayeredMap): 
+
+    def __init__(self, V=None, section=None, name=None, pos=(0, 0, 1, 1), poly_geom = None,  
+                 boundaries_geom = None, **kwargs):
+        
+        geom_list_to_plot = [{'geom' : None, 'plot_type' : None,'rgb_faces' : None, 'rgb_edges' : None}]
+        super().__init__(V, section, name, pos, geom_list_to_plot,**kwargs)
+        self.geom_list_to_plot=[None]*2
+        section_ix = self.V.TMG.unqS.index(section)
+
+        # collect infomraiton about polygon layer (Types)
+        layer = self.V.TMG.geom_to_layer_type_mapping[poly_geom]
+        layer_ix = self.V.TMG.find_layer_by_name(layer)
+        tax_ix = self.V.TMG.layer_taxonomy_mapping[layer_ix]
+
+        self.rgb_by_type = self.V.TMG.Taxonomies[tax_ix].RGB
+        poly_types = self.V.TMG.Layers[layer_ix].Type[self.V.TMG.Layers[layer_ix].Section==section]
+        self.rgb = self.rgb_by_type[poly_types,:]
+        
+        self.geom_list_to_plot[0]={'geom' : self.V.TMG.Geoms[section_ix][poly_geom].polys, 
+                              'plot_type' : 'polygons',
+                              'rgb_faces' : self.rgb, 
+                              'rgb_edges' : None}
+        
+        # collect infomraiton about polygon layer (Types)
+
+        bound = self.V.TMG.geom_to_layer_type_mapping[boundaries_geom]
+        bound_layer_ix = self.V.TMG.find_layer_by_name(bound)
+        bound_tax_ix = self.V.TMG.layer_taxonomy_mapping[bound_layer_ix]
+        
+        linewidths = kwargs.get("linewidths",2)
+        inward_offset = kwargs.get("inward_offset",0)
+
+        types = self.V.TMG.Layers[bound_layer_ix].Type[self.V.TMG.Layers[bound_layer_ix].Section==section]
+        self.geom_list_to_plot[1]={'geom' : self.V.TMG.Geoms[section_ix][boundaries_geom].polys, 
+                              'plot_type' : 'lines',
+                              'rgb_faces' : None, 
+                              'rgb_edges' : self.V.TMG.Taxonomies[bound_tax_ix].RGB[types,:],
+                              'linewidths' : linewidths,
+                              'inward_offset' : inward_offset}
+
 
 class RandomColorMap(Map):
     """
@@ -445,20 +553,13 @@ class Colorpleth(Map):
     Show a user-provided vector color coded. 
     It will choose the geomtry (voronoi,isozones,regions) from the size of the use provided values_to_map vector. 
     """
-    def __init__(self, values_to_map, V = None,section = None, name = None, 
-                                      pos = (0,0,1,1), geom_type = None,qntl = (0,1),
+    def __init__(self, values_to_map,geom_type = None,V = None,section = None, name = None, 
+                                      pos = (0,0,1,1), qntl = (0,1),
                                       clp = (-np.inf,np.inf), **kwargs):
         # if geom_type is None chose it based on size of input vector
         if geom_type is None:         
-            lvlarr = np.flatnonzero(np.equal(V.TMG.get_N(section=section),len(values_to_map)))
-            if len(lvlarr)!=1:
-                raise ValueError('number of items in values_to_map doesnt match any level size')
-            if lvlarr[0] == 0: 
-                geom_type = "voronoi"
-            elif lvlarr[0] == 1: 
-                geom_type = "isozones"
-            elif lvlarr[0] == 2: 
-                geom_type = "regions"
+            raise ValueError("Must supply geom_type to colorpleth")
+        
         super().__init__(V = V,section = section, name = name, pos = pos,rgb_faces=[1,1,1],geom_type=geom_type,**kwargs)
         self.Data['values_to_map'] = values_to_map
         
