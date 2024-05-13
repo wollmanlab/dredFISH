@@ -103,6 +103,10 @@ class Registration_Class(object):
         return rigid_transformed_XYZC
     
     def non_rigid_transformation(self):
+        self.config = self.load(channel='Registration_Parameters',file_type='Config')
+        self.X_model = self.load(channel='X',file_type='Model')
+        self.Y_model = self.load(channel='Y',file_type='Model')
+        self.Z_model = self.load(channel='Z',file_type='Model')
         """ Center Rotate and Scale"""
         rigid_transformed_XYZC = self.rigid_transformation()
         non_rigid_transformed_XYZC = rigid_transformed_XYZC.copy()
