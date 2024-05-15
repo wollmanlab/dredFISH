@@ -287,19 +287,20 @@ class TissueMultiGraph:
         if len(self.Layers) < layer_id or layer_id is None or layer_id < 0: 
             raise ValueError(f"requested layer id: {layer_id} doesn't exist")
 
-        # if Tax is a new Taxonomy, add it to self
+        # if Tax is a new Taxonomy check if name exist, and if not add. 
         if isinstance(tax, Taxonomy): # add to the pool and use an index to represent it
-            self.Taxonomies.append(tax)
-            tax_id = len(self.Taxonomies)-1
+            if tax.name in self.tax_names: 
+                tax_id = self.tax_names.index(tax.name)
+                self.Taxonomies[tax_id] = tax
+            else: 
+                self.Taxonomies.append(tax)
+                tax_id = len(self.Taxonomies)-1
 
         if isinstance(tax,str):
-            tax_names = [t.name for t in self.Taxonomies]
-            tax_id = [i for i, word in enumerate(tax_names) if word == tax]
-            if len(tax_id)==0:
-                raise ValueError(f"taxonomy {tax} not found in {tax_names}")
-            if len(tax_id)>1:
-                raise ValueError(f"taxonomy {tax} apears more then once in {tax_names}, please check!")
-            tax_id = tax_id[0]
+            if tax in self.tax_names:
+                tax_id = self.tax_names.index(tax)
+            else: 
+                raise ValueError(f"taxonomy {tax} not found in {self.tax_names}")
             tax = self.Taxonomies[tax_id]
 
         if any(isinstance(item, str) for item in type_vec):
@@ -356,6 +357,7 @@ class TissueMultiGraph:
                     adata.obs['ccf_z'] = XYZC['ccf_z']
                     """ Rename Section """
                     section_name = f"{animal}_{adata.obs['ccf_x'].mean():.1f}"
+                    adata.obs['old_section_name'] = section_acq_name
                 else: 
                     section_name = section_acq_name
                 
@@ -632,7 +634,7 @@ class TissueMultiGraph:
 
     @property
     def layer_names(self):
-        return [l.layer_types for l in self.Layers]
+        return [l.layer_type for l in self.Layers]
     
     def add_and_save_vor_mask_geoms(self):
         XY_per_section=self.Layers[0].get_XY(section=self.unqS)

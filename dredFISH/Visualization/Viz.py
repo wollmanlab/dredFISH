@@ -112,7 +112,7 @@ class BasisView(View):
         feature_mat = self.TMG.Layers[0].get_feature_mat(section = section)
         feature_mat = feature_mat[:,basis]
         for i in range(len(basis)):
-            P = Colorpleth(feature_mat[:,i],V = self,section = section,colormaps = colormaps,pos = gs[i],**kwargs,qntl = qntl)
+            P = Colorpleth(feature_mat[:,i],V = self,section = section,geom_type='voronoi',colormaps = colormaps,pos = gs[i],**kwargs,qntl = qntl)
 
 class SingleMapView(View):
     """

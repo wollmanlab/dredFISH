@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 from scipy import sparse
+from scipy.interpolate import interp1d
 from sklearn.linear_model import LinearRegression,RANSACRegressor
 
 import logging
@@ -601,6 +602,28 @@ def normalize_fishdata_robust_regression(X):
     Nrm = X/Xrobust.mean(axis=1).reshape(-1,1)*Xrobust.mean()
 
     return Nrm
+
+def quantile_matching(M1, M2):
+    """
+    function gets matrices M1 and M2 and for each pairs of cols, calculate the qq-plot and uses that to interpolate values 
+    of M2 into M1 space. 
+    """ 
+    if not M1.shape[1]==M2.shape[1]: 
+        raise ValueError("Matrices used to match quantile must have the same number of cols")
+
+    interpolators = []
+    quantiles = np.linspace(0.01, 0.995, 1000)  # 0.01 resolution from 0 to 1
+    for i in range(M1.shape[1]):
+        quantiles_M1 = np.quantile(M1[~np.isnan(M1[:,i]), i], quantiles)
+        quantiles_M2 = np.quantile(M2[~np.isnan(M2[:,i]), i], quantiles)
+        interpolators.append(interp1d(quantiles_M2, quantiles_M1, fill_value="extrapolate"))
+
+    # Initialize an empty array for I_mms with the same number of rows as N_mms and 13 columns
+    I = np.zeros(M2.shape)
+
+    # Apply interpolators to each row in N_mms for the selected columns
+    for i, interp in enumerate(interpolators):
+        I[:, i] = interp(M2[:, i])
 
 
 def swap_mask(mat, lookup_o2n):
