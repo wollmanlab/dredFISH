@@ -63,7 +63,7 @@ TODO:
 """
 
 class View:
-    def __init__(self, TMG, name=None, figsize=(11,11)):
+    def __init__(self, TMG, name=None, figsize=(11,11),facecolor='white'):
         
         # each view needs a unique name
         self.name = name
@@ -76,6 +76,7 @@ class View:
         
         self.figsize = figsize
         self.fig = plt.figure(figsize = self.figsize)
+        self.fig.patch.set_facecolor(facecolor)
         
     def show(self):
         """
@@ -114,36 +115,91 @@ class BasisView(View):
         for i in range(len(basis)):
             P = Colorpleth(feature_mat[:,i],V = self,section = section,geom_type='voronoi',colormaps = colormaps,pos = gs[i],**kwargs,qntl = qntl)
 
+def MultiSectionMapView(TMG, sections=None, level_type="cell", map_type="type", figsize='infer', n_columns=4,facecolor='white', **kwargs):
+    """
+    Creates a figure with multiple sections displayed in a grid layout.
+
+    Args:
+        TMG: The TissueMultiGraph object containing the data.
+        sections: A list of sections to display. If None, defaults to the first 24 sections.
+        level_type: The level of geometry to plot (e.g., "cell").
+        map_type: The type of map to create (e.g., "type").
+        figsize: The size of the overall figure.
+        **kwargs: Additional keyword arguments passed to the SingleMapView constructor.
+    """
+
+    # Determine sections to plot
+    if sections is None:
+        sections = TMG.unqS
+
+    num_cols = n_columns
+    num_rows = math.ceil(len(sections)/num_cols)
+    if figsize=='infer':
+        figsize = (num_cols*5,num_rows*3.5)
+    fig, axes = plt.subplots(num_rows, num_cols, figsize=figsize)
+    fig.patch.set_facecolor(facecolor)
+    axes = axes.ravel()
+    for ax in axes:
+        ax.axis('off')
+    # Iterate over sections and axes
+    for i, section in enumerate(sections):
+
+        # Create a SingleMapView for the current section
+        
+        V = SingleMapView(TMG, section=section, level_type=level_type, map_type=map_type, **kwargs)
+
+        # Plot the map on the corresponding axis
+        V.show()
+        V.Panels[0].ax = axes[i]  # Assign the axis to the panel
+        V.Panels[0].plot()  # Replot on the assigned axis
+        plt.close(V.fig)
+
+        # Remove axis labels and ticks for cleaner appearance
+        axes[i].set_xticks([])
+        axes[i].set_yticks([])
+
+    # # Adjust layout for better spacing
+    # plt.tight_layout()
+    # plt.show()
+
 class SingleMapView(View):
     """
     A view that has only a single map in it. 
     map_type is one of 'type', 'colorpleth', 'random', 'type_with_boundaries' (supply two levels in level_type)
     """
-    def __init__(self, TMG, section = None,level_type = "cell",map_type = "type", val_to_map = None, figsize=(11, 11),**kwargs):
+    def __init__(self, TMG, section = None,level_type = "cell",map_type = "type", val_to_map = None, figsize=(11, 11),
+                        flip_left_right=False,flip_top_down=False,**kwargs):
         super().__init__(TMG, "Map", figsize)
 
         if len(TMG.unqS)==1 and section is None: 
             section = TMG.unqS[0]
         
+        # Calculate global x and y limits across all sections
+        all_XY = TMG.Layers[0].XY
+        x_min, x_max = all_XY[:, 0].min(), all_XY[:, 0].max()
+        if flip_left_right:
+            x_max, x_min = all_XY[:, 0].min(), all_XY[:, 0].max()
+        y_min, y_max = all_XY[:, 1].min(), all_XY[:, 1].max()
+        if flip_top_down:
+            y_max, y_min = all_XY[:, 1].min(), all_XY[:, 1].max()
         
         if map_type == 'type':
             geom_type = TMG.layer_to_geom_type_mapping[level_type]
-            Pmap = TypeMap(geom_type,V=self,section = section,**kwargs)
+            Pmap = TypeMap(geom_type,V=self,section = section, xlim=(x_min, x_max), ylim=(y_min, y_max),**kwargs)
         elif map_type == 'colorpleth': 
             geom_type = TMG.layer_to_geom_type_mapping[level_type]
             if val_to_map is None: 
                 raise ValueError("Must provide val_to_map if map_type is colorpleth")
-            Pmap = Colorpleth(val_to_map,geom_type=geom_type,V=self,section = section,**kwargs)
+            Pmap = Colorpleth(val_to_map,geom_type=geom_type,V=self,section = section, xlim=(x_min, x_max), ylim=(y_min, y_max),**kwargs)
         elif map_type == 'random':
             geom_type = TMG.layer_to_geom_type_mapping[level_type]
-            Pmap = RandomColorMap(geom_type,V=self,section=section,**kwargs)
+            Pmap = RandomColorMap(geom_type,V=self,section=section, xlim=(x_min, x_max), ylim=(y_min, y_max),**kwargs)
         elif map_type == 'type_with_boundaries':
             poly_geom = TMG.layer_to_geom_type_mapping[level_type[0]]
             bound_geom = TMG.layer_to_geom_type_mapping[level_type[1]]
-            Pmap = TypeWithBoundaries(V=self, section=section, poly_geom=poly_geom, boundaries_geom=bound_geom)
+            Pmap = TypeWithBoundaries(V=self, section=section, poly_geom=poly_geom, boundaries_geom=bound_geom, xlim=(x_min, x_max), ylim=(y_min, y_max),**kwargs)
         else: 
             raise ValueError(f"value {map_type} is not a recognized map_type")
-        
 
 class UMAPwithSpatialMap(View):
     """
@@ -426,7 +482,7 @@ class Map(Panel):
 
         self.xlim = kwargs.get('xlim',None)
         self.ylim = kwargs.get('ylim',None)
-        self.rotation = kwargs.get('rotation','auto')
+        self.rotation = kwargs.get('rotation',None)
 
         # get the geom collection saved in appropriate TMG Geom
         self.geom_collection = self.V.TMG.Geoms[section_ix][geom_type].verts
@@ -927,3 +983,36 @@ class Zoom(Panel):
         self.ZP.plot()
         self.ax.set_xlim(self.zoom_coords[0],self.zoom_coords[0]+self.zoom_coords[2])
         self.ax.set_ylim(self.zoom_coords[1],self.zoom_coords[1]+self.zoom_coords[3])
+
+def frequency_table(df, col1_name, col2_name):
+    """
+    Creates a frequency table from a DataFrame based on two columns.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame.
+        col1_name (str): The name of the column to use as indices.
+        col2_name (str): The name of the column to use as columns.
+
+    Returns:
+        pd.DataFrame: A frequency table with unique values of col1 as indices 
+                      and unique values of col2 as columns.
+    """
+
+    # Extract unique values from each column
+    unique_col1 = np.unique(df[col1_name])
+    unique_col2 = np.unique(df[col2_name])
+
+    # Create an empty DataFrame with the specified index and columns
+    result_df = pd.DataFrame(index=unique_col1, columns=unique_col2)
+
+    # Iterate over unique values of col1
+    for val1 in unique_col1:
+        # Filter rows matching val1
+        filtered_df = df[df[col1_name] == val1]
+
+        # Count occurrences of unique values of col2 within the filtered rows
+        value_counts = filtered_df[col2_name].value_counts()
+
+        # Update the result DataFrame with the counts
+        result_df.loc[val1, value_counts.index] = value_counts.values
+    return result_df.fillna(0)  # Fill missing values with 0
