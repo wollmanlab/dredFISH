@@ -33,6 +33,7 @@ import scipy.sparse
 from multiprocessing import Pool
 import warnings
 
+from scipy import stats
 import anndata
 
 from dredFISH.Utils import basicu
@@ -43,6 +44,7 @@ from dredFISH.Processing.Section import *
 from dredFISH.Registration.Registration import *
 
 rng = np.random.default_rng()
+
 
 # define function (not nested...) to be used in parallel code
 def create_and_save_geoms(sec, xy, basepath): 
@@ -153,6 +155,12 @@ class TissueMultiGraph:
         self.geom_to_layer_type_mapping = { 'voronoi' : 'cell'}
         
         self.layer_to_geom_type_mapping = {'cell' : 'voronoi'}
+
+        self.adata_mapping = {"Type": "Type", #obs
+                              "node_size": "node_size", #obs
+                              "name" : "label", #obs
+                              "XY" : "XY", #obsm
+                              "Section" : "Slice"} #obs
              
         return 
 
@@ -337,10 +345,8 @@ class TissueMultiGraph:
             if TG.layer_type == "cell":
                 print("!!`cell` layer already exists; return...")
                 return
-
         # find list of sections
         adatas = []
-        sections = []
         for index,row in self.input_df.iterrows():
             animal = row['animal']
             section_acq_name = row['section_acq_name']
@@ -348,9 +354,20 @@ class TissueMultiGraph:
             registration_path = row['registration_path']
             processing = row['processing']
             dataset_path = row['dataset_path']
+            if not os.path.exists(os.path.join(dataset_path,dataset,processing,section_acq_name)):
+                print(f" Processing path Not Found {section_acq_name} {os.path.join(dataset_path,dataset,processing,section_acq_name)}")
+                continue
+            if not os.path.exists(os.path.join(registration_path,section_acq_name)):
+                print(f" Registration path Not Found {section_acq_name} {os.path.join(registration_path,section_acq_name)}")
+                continue
             try:
                 adata = fileu.load(os.path.join(dataset_path,dataset,processing,section_acq_name),file_type='anndata')
-                if register_to_ccf: 
+            except:
+                print(f"Unable to Load Data {section_acq_name}")
+                continue
+
+            if register_to_ccf: 
+                try:
                     XYZC  = Registration_Class(adata.copy(),registration_path,section_acq_name,verbose=False).run()
                     adata.obs['ccf_x'] = XYZC['ccf_x']
                     adata.obs['ccf_y'] = XYZC['ccf_y']
@@ -358,25 +375,74 @@ class TissueMultiGraph:
                     """ Rename Section """
                     section_name = f"{animal}_{adata.obs['ccf_x'].mean():.1f}"
                     adata.obs['old_section_name'] = section_acq_name
-                else: 
-                    section_name = section_acq_name
-                
-                adatas.append(adata)
-                sections.append(np.full((adata.shape[0], 1), section_name))
-            except:
-                print('Unable to load '+str(section_acq_name))
+                except:
+                    print(f"Unable to Register Data {section_acq_name}")
+                    continue
+            else: 
+                section_name = section_acq_name
+            adata.obs['section_name'] = section_name
+            adata.obs[self.adata_mapping['Section']] = section_name
+            adatas.append(adata)
 
         adata = anndata.concat(adatas)
-        print(f"{adata.shape[0]} cells across {adata.obs['section_index'].unique().shape[0]} sections")
-        
+        print(f"{adata.shape[0]} cells across {adata.obs[self.adata_mapping['Section']].unique().shape[0]} sections")
+
+        """ Sort adata by section name """
+        adata = adata[adata.obs[self.adata_mapping['Section']].argsort()]
+
+
+        """ Filter Out Non Cells and Batch Correct"""
+        adata.layers['dapi_score'] = np.zeros_like(adata.layers['raw'])
+        for section in adata.obs[self.adata_mapping['Section']].unique():
+            m = adata.obs[self.adata_mapping['Section']]==section
+            X = adata.layers['nuc_raw'][m,:].copy()
+            X = np.clip(X,1,None)
+            X = np.log10(X/np.mean(X,axis=1,keepdims=True))
+            adata.layers['dapi_score'][m,:] = X.copy() # Values above 0.5 are within normal range 
+        X = adata.layers['dapi_score'].copy()
+        X = X/(2*np.std(X))
+        X = np.abs(X)
+        X = stats.norm.pdf(X)/stats.norm.pdf(0)
+        adata.layers['dapi_score'] = X.copy()
+
+        cell_mask = np.ones(adata.shape[0])>0
+        cell_mask = cell_mask & (np.log10(np.clip(adata.X.sum(1),1,None))>2) 
+        cell_mask = cell_mask & (np.log10(np.clip(adata.obs['dapi'],1,None))>2)
+        adata = adata[cell_mask,:].copy()
+
+        print(f"{adata.shape[0]} cells across {adata.obs[self.adata_mapping['Section']].unique().shape[0]} sections")
+
         if register_to_ccf: 
             XY = np.array(adata.obs[["ccf_z","ccf_y"]])
         else: 
             XY = np.array(adata.obs[["stage_x","stage_y"]])
-        S = np.vstack(sections)
+        S = np.array(adata.obs[self.adata_mapping['Section']])
 
-        FISHbasis = adata.X.copy()
-        adata.layers['raw'] = FISHbasis.copy()
+        """ Normalize """
+        X = XY
+        adata.layers['normalized'] = adata.layers['raw'].copy()
+        """ First Correct for linear spatial patterns"""
+        for i,bit in tqdm(enumerate(adata.var.index),desc='Stain Correction'):
+            bit_mask = np.array(adata.layers['dapi_score'][:,np.array(adata.var.index)==bit]>0.3).ravel()
+            for batch in adata.obs[self.adata_mapping['Section']].unique():
+                m = adata.obs[self.adata_mapping['Section']]==batch
+                c = adata.layers['normalized'][m&bit_mask,i].copy()
+                model = LinearRegression()
+                model.fit(X[m&bit_mask,:], c)
+                predicted_values = model.predict(X[m,:])
+                scalar = predicted_values.mean()/predicted_values
+                c = adata.layers['normalized'][m,i].copy()
+                adata.layers['normalized'][m,i] = c*scalar
+        """  Second Assume that there is a batch scalar for each bit (assume median cell is roughly the same across batches )"""
+        for i,bit in tqdm(enumerate(adata.var.index),desc='Batch Correction'):
+            bit_mask = np.array(adata.layers['dapi_score'][:,np.array(adata.var.index)==bit]>0.3).ravel()
+            median = np.median(adata.layers['normalized'][bit_mask,i])
+            for batch in adata.obs[self.adata_mapping['Section']].unique():
+                m = adata.obs[self.adata_mapping['Section']]==batch
+                c = adata.layers['normalized'][m,i].copy()
+                adata.layers['normalized'][m,i] = c*(median/np.clip(np.median(c),1,None))
+
+        FISHbasis = adata.layers['normalized'].copy()
         if norm == 'robust_regression':
             FISHbasis_norm = basicu.normalize_fishdata_robust_regression(FISHbasis)
         elif norm == 'logrowmedian':
@@ -388,6 +454,7 @@ class TissueMultiGraph:
         else:
             FISHbasis_norm = FISHbasis
         adata.X = FISHbasis_norm
+        adata.layers['normalized'] = FISHbasis_norm.copy()
 
         TG = TissueGraph(adata=adata,
                          basepath = self.basepath,
