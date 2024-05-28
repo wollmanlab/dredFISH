@@ -1,8 +1,5 @@
 #!/usr/bin/env python
 import argparse
-import shutil
-from datetime import datetime
-import dredFISH.Processing as Processing
 from dredFISH.Processing.Section import *
 from dredFISH.Utils.imageu import *
 import time
@@ -63,10 +60,10 @@ if __name__ == '__main__':
             # self.setup_output()
             self.update_user(str(np.sum(completion_array==False))+ ' Unfinished Sections')
             self.update_user('Processing Section '+section)
-            try:
-                self.run()
-            except:
-                continue
+            # try:
+            self.run()
+            # except Exc
+            #     continue
             if isinstance(self.data,type(None)):
                 continue
             completion_array[idx] = True
