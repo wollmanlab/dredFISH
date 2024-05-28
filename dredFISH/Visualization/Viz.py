@@ -97,7 +97,7 @@ class BasisView(View):
     def __init__(self,TMG,section = None, basis = np.arange(24), qntl = (0.025,0.975),colormaps="jet",subplot_layout = [1,1],**kwargs):
         figsize = kwargs.get('figsize',(15,10))
         super().__init__(TMG,name = "View basis",figsize=figsize)
-
+        self.fig.patch.set_facecolor(kwargs.get('facecolor','white'))
         # decide the subplot layout, that keep a 2x3 design
         # this will only run if the subplot_layout is smaller then needed 
         while np.prod(subplot_layout)<len(basis):
