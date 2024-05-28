@@ -142,7 +142,7 @@ parameters = {}
 
 """ New Microscope Setup"""
 
-parameters['fishdata']='Processing_2024May13'
+parameters['fishdata']='Processing_2024May28'
 parameters['hard_overwrite'] = False
 
 # Orange
@@ -197,10 +197,10 @@ parameters['overlap'] = 0.02 # 2% overlap
 parameters['overwrite_report']= False
 parameters['overwrite_louvain'] = False
 parameters['fileu_version'] = 2
-parameters['overlap_correction'] = True
+parameters['overlap_correction'] = False #Problematic
 
 parameters['ncpu'] = 10
-parameters['set_min_zero'] = True # Post Strip bkg subtract
+parameters['set_min_zero'] = False#True # Post Strip bkg subtract ****
 parameters['metric'] = 'median'
 
 parameters['microscope_parameters'] = 'microscope_parameters'
