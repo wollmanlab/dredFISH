@@ -144,6 +144,8 @@ parameters = {}
 
 parameters['fishdata']='Processing_2024May28'
 parameters['hard_overwrite'] = False
+parameters['use_scratch'] = False 
+
 
 # Orange
 parameters['pixel_size'] =0.490# 0.490#0.327#0.490 # um 490 or 330
