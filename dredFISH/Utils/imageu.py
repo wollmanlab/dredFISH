@@ -25,7 +25,7 @@ def max_norm(ar, maxp=99):
     return normar
 
 def block_mean(ar, fact):
-    """Downsample an 2d numpy array by a factor; taking the block mean
+    """Downsample an 2d numpy array by a bin; taking the block mean
 
     """
     assert isinstance(fact, int)
@@ -41,7 +41,7 @@ def block_mean(ar, fact):
     return res
 
 def block_downsamp_3d(ar, fact):
-    """Downsample an 2d numpy array by a factor; taking the block mean
+    """Downsample an 2d numpy array by a bin; taking the block mean
 
     """
     assert isinstance(fact, int)
@@ -275,11 +275,26 @@ def median_bin(img_or_stk,bin = 2):
 
     return stk_ds
 
+def fast_median_bin(stk,bin=2):
+    if stk.shape[0] % bin != 0 or stk.shape[1] % bin != 0:
+            raise ValueError(f"Image dimensions must be divisible by {bin} for downsampling.")
+    if len(stk.shape)==2: 
+        reshaped = stk.reshape(stk.shape[0] // bin, bin, stk.shape[1] // bin, bin)
+        output = np.median(reshaped, axis=(1, 3)) 
+    else:
+        output = np.zeros([stk.shape[0]//bin,stk.shape[1]//bin,stk.shape[2]],dtype=stk.dtype)
+        for i in range(stk.shape[2]): 
+            img = stk[:,:,i].copy()
+            reshaped = img.reshape(img.shape[0] // bin, bin, img.shape[1] // bin, bin)
+            img = np.median(reshaped, axis=(1, 3)) 
+            output[:,:,i] = img
+    return output
+
 
 
 def estimate_flatfield_and_constant(full_file_list):
     stk = stkread(full_file_list)
-    stk_ds = median_bin(stk)
+    stk_ds = fast_median_bin(stk)
 
     # Calc constnt by taking bottom 1% and smoothing with iternative gaussian
     stk_tensor = torch.Tensor(stk_ds.astype(np.float32))
