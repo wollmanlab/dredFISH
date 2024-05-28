@@ -913,8 +913,9 @@ class Section_Class(object):
             if self.parameters['overlap_correction']:
                 m = destination>0
                 if torch.sum(m)>0:
+                    non_zero = incoming>0
                     overlap_constant = torch.median(incoming[m]-destination[m])
-                    incoming = incoming-overlap_constant
+                    incoming[non_zero] = incoming[non_zero]-overlap_constant
             destination[destination==0] = incoming[destination==0]
             stitched[(results[posname]['img_x_min']+results[posname]['translation_x']):(results[posname]['img_x_max']+results[posname]['translation_x']),
                      (results[posname]['img_y_min']+results[posname]['translation_y']):(results[posname]['img_y_max']+results[posname]['translation_y']),:] = destination
