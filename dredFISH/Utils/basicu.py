@@ -603,30 +603,75 @@ def normalize_fishdata_robust_regression(X):
 
     return Nrm
 
+# def quantile_matching(M1, M2):
+#     """
+#     function gets matrices M1 and M2 and for each pairs of cols, calculate the qq-plot and uses that to interpolate values 
+#     of M2 into M1 space. 
+#     """ 
+#     if not M1.shape[1]==M2.shape[1]: 
+#         raise ValueError("Matrices used to match quantile must have the same number of cols")
+
+#     interpolators = []
+#     quantiles = np.linspace(0, 1, 1000)  # 0.01 resolution from 0 to 1
+#     for i in range(M1.shape[1]):
+#         quantiles_M1 = np.quantile(M1[~np.isnan(M1[:,i]), i], quantiles)
+#         quantiles_M2 = np.quantile(M2[~np.isnan(M2[:,i]), i], quantiles)
+#         interpolators.append(interp1d(quantiles_M2, quantiles_M1, fill_value="extrapolate"))
+
+#     # Initialize an empty array for I_mms with the same number of rows as N_mms and 13 columns
+#     I = np.zeros(M2.shape)
+
+#     # Apply interpolators to each row in N_mms for the selected columns
+#     for i, interp in enumerate(interpolators):
+#         I[:, i] = interp(M2[:, i])
+
+#     # Replace any nans with the median of the column
+#     I = np.nan_to_num(I, nan=np.nanmedian(I, axis=0))
+
+#     return I
+
 def quantile_matching(M1, M2):
     """
-    function gets matrices M1 and M2 and for each pairs of cols, calculate the qq-plot and uses that to interpolate values 
-    of M2 into M1 space. 
-    """ 
-    if not M1.shape[1]==M2.shape[1]: 
-        raise ValueError("Matrices used to match quantile must have the same number of cols")
+    Matches quantiles between matrices M1 and M2, minimizing NaNs.
+    """
+
+    if M1.shape[1] != M2.shape[1]:
+        raise ValueError("Matrices must have the same number of columns.")
+
+    # Prepare data: Replace NaNs with column-specific values (median or mean)
+    M1_filled = np.nan_to_num(M1, nan=np.nanmedian(M1, axis=0))
+    M2_filled = np.nan_to_num(M2, nan=np.nanmedian(M2, axis=0))
+    
+    # Optionally consider scaling the data using StandardScaler before interpolating:
+    # from sklearn.preprocessing import StandardScaler
+    # scaler = StandardScaler()
+    # M1_scaled = scaler.fit_transform(M1_filled)
+    # M2_scaled = scaler.transform(M2_filled)
+    # M1_filled = M1_scaled
+    # M2_filled = M2_scaled
 
     interpolators = []
-    quantiles = np.linspace(0, 1, 1000)  # 0.01 resolution from 0 to 1
+    quantiles = np.linspace(0, 1, np.min([M1.shape[1], M2.shape[1],1000]))
     for i in range(M1.shape[1]):
-        quantiles_M1 = np.quantile(M1[~np.isnan(M1[:,i]), i], quantiles)
-        quantiles_M2 = np.quantile(M2[~np.isnan(M2[:,i]), i], quantiles)
-        interpolators.append(interp1d(quantiles_M2, quantiles_M1, fill_value="extrapolate"))
+        quantiles_M1 = np.quantile(M1_filled[:, i], quantiles)
+        quantiles_M2 = np.quantile(M2_filled[:, i], quantiles)
+        
+        quantiles_M1 += np.random.normal(0, 1e-8, quantiles_M1.shape) 
+        quantiles_M2 += np.random.normal(0, 1e-8, quantiles_M2.shape)
 
-    # Initialize an empty array for I_mms with the same number of rows as N_mms and 13 columns
+        # Use linear interpolation for better NaN handling
+        interpolators.append(interp1d(quantiles_M2, quantiles_M1, kind='linear', 
+                                      bounds_error=False, fill_value="extrapolate"))
+        
+        # Optionally clip extrapolated values:
+        # upper_bound = np.quantile(M1_filled[:, i], 0.99)
+        # lower_bound = np.quantile(M1_filled[:, i], 0.01)
+        # interp = lambda x: np.clip(interp(x), lower_bound, upper_bound)
+
     I = np.zeros(M2.shape)
-
-    # Apply interpolators to each row in N_mms for the selected columns
     for i, interp in enumerate(interpolators):
-        I[:, i] = interp(M2[:, i])
-
-    # Replace any nans with the median of the column
-    I = np.nan_to_num(I, nan=np.nanmedian(I, axis=0))
+        interpolated = interp(M2_filled[:, i])
+        I[:, i] = np.nan_to_num(interpolated, nan=np.nanmedian(interpolated))
 
     return I
 
