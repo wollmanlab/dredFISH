@@ -25,7 +25,7 @@ from dredFISH.Utils import fileu
 import shutil
 from skimage.segmentation  import watershed
 from skimage import morphology
-import dredFISH.Processing as Processing
+from dredFISH.Utils import imageu
 from skimage.feature import peak_local_max
 import math
 from dredFISH.Utils import basicu
@@ -141,7 +141,7 @@ class Section_Class(object):
                         self.pull_vectors()
             if not isinstance(self.data,type(None)):
                 self.generate_report()
-                self.remove_temporary_files()
+                # self.remove_temporary_files()
                 # self.qc_score()
                 # self.copy_to_drive()
         else:
@@ -263,14 +263,14 @@ class Section_Class(object):
         :type type: str, optional
         :param model_type: segmentation Type ('total','nuclei','cytoplasm')
         :type model_type: str, optional
-        :return : True of file exists, False otherwise
+        :return : True of file exists, False otherwises
         :rtype : bool
         """
         if isinstance(path,type(None)):
             path = self.path
         # if file_type in ['FF','constant','image_FF','image_constant']:
         #     path = self.well_path
-        if file_type in ['stitched']:
+        if (file_type in ['stitched'])&(self.parameters['use_scratch']):
             path = self.scratch_path
         return fileu.check_existance(path=path,fname=fname,hybe=hybe,channel=channel,section=section,file_type=file_type,model_type=model_type,logger=self.log)
 
@@ -295,7 +295,7 @@ class Section_Class(object):
             path = self.path
         # if file_type in ['FF','constant','image_FF','image_constant']:
         #     path = self.well_path
-        if file_type in ['stitched']:
+        if (file_type in ['stitched'])&(self.parameters['use_scratch']):
             path = self.scratch_path
         return fileu.generate_filename(path=path,hybe=hybe,channel=channel,section=section,file_type=file_type,model_type=model_type,logger=self.log)
 
@@ -320,7 +320,7 @@ class Section_Class(object):
             path = self.path
         # if file_type in ['FF','constant','image_FF','image_constant']:
         #     path = self.well_path
-        if file_type in ['stitched']:
+        if (file_type in ['stitched'])&(self.parameters['use_scratch']):
             path = self.scratch_path
         fileu.save(data,fname=fname,path=path,hybe=hybe,channel=channel,file_type=file_type,section=section,model_type=model_type,logger=self.log)
 
@@ -568,8 +568,16 @@ class Section_Class(object):
         
         if (isinstance(FF,type(None))|isinstance(constant,type(None))):
             if imaging_batch == 'acq':
-                self.update_user(f" {acq} FF and Constants should have already been precomputed",level=40)
-                return FF,constant,1,None
+                # self.update_user(f" {acq} FF and Constants should have already been precomputed",level=40)
+                # """ Maybe now is a good time to make them"""
+                self.update_user(f" {acq} Computing FF and Constant Now",level=40)
+                file_list = self.image_metadata.stkread(Channel=channel,acq=acq,groupby='Channel',fnames_only = True)
+                (FF, constant) = imageu.estimate_flatfield_and_constant(file_list)
+                fileu.save(FF,section=self.dataset.split('_')[0],path=path,hybe=acq,channel=channel,file_type='FF')
+                fileu.save(FF*1000,section=self.dataset.split('_')[0],path=path,hybe=acq,channel=channel,file_type='image_FF')
+                fileu.save(constant,section=self.dataset.split('_')[0],path=path,hybe=acq,channel=channel,file_type='constant')
+                fileu.save(constant,section=self.dataset.split('_')[0],path=path,hybe=acq,channel=channel,file_type='image_constant')
+                return FF,constant
             elif imaging_batch == 'hybe':
                 """ load all FF for this hybe and average """
                 acq_list = [i for i in self.image_metadata.acqnames if acq+'_' in i]
@@ -580,6 +588,7 @@ class Section_Class(object):
                 self.update_user(f"Unknown imaging batch {imaging_batch}",level=50)
             FF = []
             constant = []
+            np.random.shuffle(acq_list)
             for temp_acq in acq_list:
                 temp_ff,temp_constant = self.load_image_parameters(temp_acq,channel,imaging_batch='acq',fname=False)
                 if not isinstance(temp_ff,type(None)):
@@ -1002,9 +1011,12 @@ class Section_Class(object):
             """ Reference Hasnt been Imaged"""
             self.any_incomplete_hybes = True
         else:
-            for r,h,c in self.parameters['bitmap']:
+            order = np.array(range(len(self.parameters['bitmap'])))
+            np.random.shuffle(order)
+            for i in order:
                 # try:
-                stitched = self.stitcher(h,self.parameters['total_channel'])
+                r,h,c = self.parameters['bitmap'][i]
+                stitched = self.stitcher(h,c)
                 if isinstance(stitched,type(None)):
                     self.update_user(f"Stitching of {h} Failed",level=40)
                     self.any_incomplete_hybes = True
@@ -1727,7 +1739,8 @@ def generate_FF(image_metadata,acq,channel,posnames=[],bkg_acq='',parameters={},
             # try:
             img = image_metadata.stkread(Position=posname,Channel=channel,acq=acq).min(2).astype(parameters['numpy_dtype'])
             if parameters['bin']>1:
-                img = block_reduce(image_filter(img,'median',2), tuple([parameters['bin'],parameters['bin']]), np.mean)
+                img = imageu.fast_median_bin(img,bin=parameters['bin'])
+                # img = block_reduce(image_filter(img,'median',2), tuple([parameters['bin'],parameters['bin']]), np.mean)
             # img = np.array(Image.fromarray(image_filter(img,'median',2)).resize(parameters['n_pixels'],Image.BICUBIC),dtype=parameters['numpy_dtype'])
             if parameters['process_img_before_FF']:
                 img = subtract_background(img,parameters)
@@ -1735,7 +1748,8 @@ def generate_FF(image_metadata,acq,channel,posnames=[],bkg_acq='',parameters={},
             if bkg_acq!='':
                 bkg = image_metadata.stkread(Position=posname,Channel=channel,acq=bkg_acq).min(2).astype(parameters['numpy_dtype'])
                 if parameters['bin']>1:
-                    bkg = block_reduce(image_filter(bkg,'median',2), tuple([parameters['bin'],parameters['bin']]), np.mean)
+                    bkg = imageu.fast_median_bin(bkg,bin=parameters['bin'])
+                    # bkg = block_reduce(image_filter(bkg,'median',2), tuple([parameters['bin'],parameters['bin']]), np.mean)
                 # bkg = np.array(Image.fromarray(image_filter(bkg,'median',2)).resize(parameters['n_pixels'],Image.BICUBIC),dtype=parameters['numpy_dtype'])
                 if parameters['process_img_before_FF']:
                     bkg = subtract_background(bkg,parameters)
@@ -2032,7 +2046,8 @@ def load_image(img,FF,constant,parameters):
     if isinstance(constant,str):
         constant = fileu.load(fname=constant,file_type='constant')
     if parameters['bin']>1:
-        img = block_reduce(image_filter(img,'median',2), tuple([parameters['bin'],parameters['bin']]), np.mean)
+        # img = block_reduce(image_filter(img,'median',2), tuple([parameters['bin'],parameters['bin']]), np.mean)
+        img = imageu.fast_median_bin(img,bin=parameters['bin'])
     img = process_img(img,parameters,FF=FF,constant=constant)
     return img
 
