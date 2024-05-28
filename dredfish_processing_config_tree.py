@@ -142,7 +142,7 @@ parameters = {}
 
 """ New Microscope Setup"""
 
-parameters['fishdata']='Processing_2024May01'
+parameters['fishdata']='Processing_2024May13'
 parameters['hard_overwrite'] = False
 
 # Orange
@@ -180,8 +180,8 @@ parameters['n_pixels']=[2448, 2048]
 # parameters['n_pixels']=[int(float(i)*ratio) for i in parameters['n_pixels']]
 # parameters['border'] = int(np.min(parameters['n_pixels']))
 
-parameters['highpass_function'] = 'none'#'gaussian_robust[1,60]'#'spline_min_robust_smooth'#'spline_min_smooth'#'spline_robust_min'#'downsample_quantile_0.1' _smooth
-parameters['highpass_sigma'] = 0
+parameters['highpass_function'] = 'rolling_ball'#'gaussian_robust[1,60]'#'spline_min_robust_smooth'#'spline_min_smooth'#'spline_robust_min'#'downsample_quantile_0.1' _smooth
+parameters['highpass_sigma'] = 25
 parameters['highpass_smooth_function'] = 'median'
 parameters['highpass_smooth'] = 3
 
@@ -197,7 +197,7 @@ parameters['overlap'] = 0.02 # 2% overlap
 parameters['overwrite_report']= False
 parameters['overwrite_louvain'] = False
 parameters['fileu_version'] = 2
-
+parameters['overlap_correction'] = True
 
 parameters['ncpu'] = 10
 parameters['set_min_zero'] = True # Post Strip bkg subtract

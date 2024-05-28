@@ -881,7 +881,7 @@ class SpatialAssistedLabelTransfer(Classifier):
                             verbose=False,
                             )
             elif model == 'knn':
-                self.model = KNN(train_k=50,predict_k=500,max_distance=np.inf,metric='euclidean')
+                self.model = KNN(train_k=15,predict_k=100,max_distance=np.inf,metric='euclidean')
             else:
                 raise ValueError("Need to choose from: `nb`,`mlp`,`knn`")
         else:
@@ -913,7 +913,7 @@ class SpatialAssistedLabelTransfer(Classifier):
         
 
         self.update_user("Training Spatial Model")
-        self.spatial_model = KNN(train_k=50,predict_k=1000,max_distance=0.5,metric='euclidean')
+        self.spatial_model = KNN(train_k=15,predict_k=1000,max_distance=0.5,metric='euclidean')
         idxes = np.array(self.measured.obs.index)
         self.priors = {}
         for level in self.ref_levels:
@@ -980,11 +980,12 @@ class SpatialAssistedLabelTransfer(Classifier):
             else:
                 previous_round_measured_labels = self.measured.obs[self.ref_levels[i-1]]
                 previous_round_reference_labels = self.reference.obs[self.ref_levels[i-1]]
-                for cell_type in np.unique(previous_round_measured_labels):
-                    self.update_user(f"{level} Performing Quantile Normalization on {cell_type}")
+                for cell_type in tqdm(np.unique(previous_round_measured_labels),desc='Performing Quantile Normalization '):
+                    # self.update_user(f"{level} Performing Quantile Normalization on {cell_type}")
                     measured_m = previous_round_measured_labels==cell_type
                     reference_m = previous_round_reference_labels==cell_type
-                    self.measured.layers['harmonized'][measured_m,:] = basicu.quantile_matching(np.array(self.reference.layers['initial_harmonized'][reference_m,:]).copy(),np.array(self.measured.layers['initial_harmonized'][measured_m,:]).copy())
+                    if measured_m.sum()>10 and reference_m.sum()>10:
+                        self.measured.layers['harmonized'][measured_m,:] = basicu.quantile_matching(np.array(self.reference.layers['initial_harmonized'][reference_m,:]).copy(),np.array(self.measured.layers['initial_harmonized'][measured_m,:]).copy())
 
             self.update_user(f"{level} Calculating Likelihoods")
             idxes = self.likelihoods[level]['indexes']
@@ -1118,7 +1119,7 @@ class LabelTransfer(Classifier):
                             verbose=False,
                             )
             elif model == 'knn':
-                self.model = KNN(train_k=50,predict_k=50,max_distance=np.inf,metric='euclidean')
+                self.model = KNN(train_k=15,predict_k=50,max_distance=np.inf,metric='euclidean')
             else:
                 raise ValueError("Need to choose from: `nb`,`mlp`,`knn`")
         else:
@@ -1170,7 +1171,8 @@ class LabelTransfer(Classifier):
                     # self.update_user(f"{level} Performing Quantile Normalization on {cell_type}")
                     measured_m = previous_round_measured_labels==cell_type
                     reference_m = previous_round_reference_labels==cell_type
-                    self.measured.layers['harmonized'][measured_m,:] = basicu.quantile_matching(np.array(self.reference.layers['initial_harmonized'][reference_m,:]).copy(),np.array(self.measured.layers['initial_harmonized'][measured_m,:]).copy())
+                    if measured_m.sum()>10 and reference_m.sum()>10:
+                        self.measured.layers['harmonized'][measured_m,:] = basicu.quantile_matching(np.array(self.reference.layers['initial_harmonized'][reference_m,:]).copy(),np.array(self.measured.layers['initial_harmonized'][measured_m,:]).copy())
 
             self.update_user(f"{level} Calculating Likelihoods")
             idxes = self.likelihoods[level]['indexes']
