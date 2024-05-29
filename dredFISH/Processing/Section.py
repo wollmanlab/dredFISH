@@ -345,7 +345,7 @@ class Section_Class(object):
             path = self.path
         # if file_type in ['FF','constant','image_FF','image_constant']:
         #     path = self.well_path
-        if file_type in ['stitched']:
+        if (file_type in ['stitched'])&(self.parameters['use_scratch']):
             path = self.scratch_path
         return fileu.load(path=path,fname=fname,hybe=hybe,channel=channel,section=section,file_type=file_type,model_type=model_type,logger=self.log)
 
@@ -1103,7 +1103,7 @@ class Section_Class(object):
                     else:
                         if 'all' in self.parameters['total_acq']:
                             total = ''
-                            for r,h,c in self.generate_iterable(self.parameters['bitmap'],'Loading Total by Averaging All Measurements'):
+                            for r,h,c in self.generate_iterable(self.parameters['bitmap'],f"Loading Total by {self.parameters['total_acq']} All Measurements"):
                                 if self.check_existance(hybe=h,channel=c,file_type='stitched'):
                                     temp = self.load(hybe=h,channel=c,file_type='stitched')
                                     if isinstance(total,str):
@@ -1160,14 +1160,17 @@ class Section_Class(object):
                         nuc = nucstain[(x*x_step):((x+1)*x_step),(y*y_step):((y+1)*y_step)].numpy()
                         if 'total' in self.model_type:
                             tot = total[(x*x_step):((x+1)*x_step),(y*y_step):((y+1)*y_step)].numpy()
+                            nuc = np.clip(nuc - gaussian_filter(nuc,10),0,None)
+                            tot = np.clip(tot - gaussian_filter(tot,10),0,None)
                             stk = np.dstack([nuc,tot,np.zeros_like(nuc)])
-                            diameter = int(self.parameters['segment_diameter']*1.5)
-                            min_size = int(self.parameters['segment_diameter']*10*1.5)
+                            diameter = int(self.parameters['segment_diameter'])
+                            min_size = int(self.parameters['segment_diameter']**1.5)#0#int(self.parameters['segment_diameter']*10*1.5)
                             channels = [1,2]
                         else:
+                            nuc = np.clip(nuc - gaussian_filter(nuc,10),0,None)
                             stk = nuc
                             diameter = int(self.parameters['segment_diameter'])
-                            min_size = int(self.parameters['segment_diameter']*10)
+                            min_size = int(self.parameters['segment_diameter']**1.5)#int(self.parameters['segment_diameter']*10)
                             channels = [0,0]
                         if stk.max()==0:
                             continue
@@ -1183,19 +1186,24 @@ class Section_Class(object):
                                                             batch_size=16)
                         mask = torch.tensor(raw_mask_image.astype(int),dtype=self.parameters['pytorch_dtype'])
                         updated_mask = mask.numpy().copy()
+                        if 'total' in self.model_type:
+                            tot = total[(x*x_step):((x+1)*x_step),(y*y_step):((y+1)*y_step)].numpy()
+                        nuc = nucstain[(x*x_step):((x+1)*x_step),(y*y_step):((y+1)*y_step)].numpy()
+
                         # Use Watershed to find missing cells 
                         if 'total' in self.model_type:
-                            image = stk[:,:,1]
+                            img = tot
                         else:
-                            image = stk
+                            img = nuc
                         # Define Cell Borders
-                        img = gaussian_filter(image.copy(),2)
-                        cell_mask = img>thresh
+                        # img = gaussian_filter(img.copy(),2)
+                        cell_mask = morphology.binary_dilation(updated_mask>0,footprint=create_circle_array(5, 5))
+                        cell_mask = (img>thresh)&(cell_mask==0)
                         cell_mask = morphology.remove_small_holes(cell_mask, 20)
                         cell_mask = morphology.remove_small_objects(cell_mask, int(self.parameters['segment_diameter']**1.5))
                         cell_mask = morphology.binary_dilation(cell_mask,footprint=create_circle_array(5, 5))
                         # Call Cell Centers
-                        img = gaussian_filter(image.copy(),5)
+                        # img = gaussian_filter(img.copy(),5)
                         img[~cell_mask]=0
                         if (np.sum(cell_mask)>1)&(mask.max().numpy()>5):
                             min_peak_height = np.percentile(img[cell_mask],5)
