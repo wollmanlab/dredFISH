@@ -196,8 +196,6 @@ parameters['stain_correction_downsample'] = 10
 parameters['stain_correction_kernel'] = 1000
 parameters['overlap'] = 0.02 # 2% overlap
 # parameters['segment_min_size'] = parameters['segment_diameter']*10
-parameters['overwrite_report']= False
-parameters['overwrite_louvain'] = False
 parameters['fileu_version'] = 2
 parameters['overlap_correction'] = False #Problematic
 
@@ -244,8 +242,11 @@ parameters['debug'] = False
 
 parameters['config_overwrite'] = True
 parameters['overwrite'] = False #False
-parameters['segment_overwrite'] = False #False
-parameters['vector_overwrite'] = False #False
+parameters['segment_overwrite'] = True #False
+parameters['vector_overwrite'] = True #False
+
+parameters['overwrite_report']= True
+parameters['overwrite_louvain'] = True
 
 parameters['scratch_path_base'] = '/scratchdata2/Processing_tmp'
 
