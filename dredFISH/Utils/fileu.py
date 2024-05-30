@@ -345,3 +345,62 @@ def load_config_module(inputpath):
     module_name = os.path.basename(cword_config).replace('.py', '')
     config = importlib.import_module(module_name)
     return config
+
+
+def create_input_df(project_path, animal): 
+    sections = {}
+    for dataset in os.listdir(project_path):
+        if not os.path.isdir(os.path.join(project_path,dataset)):
+            continue
+        if not animal in dataset:
+            continue
+        if animal==dataset.split('_')[0]:
+            wells = [i.split('.')[-1] for i in dataset.split('_') if '.' in i]
+        else:
+            wells = [i.split('.')[-1] for i in dataset.split('_') if ('.' in i)&(animal in i)]
+        if len(wells)==0:
+            continue
+        dataset_sections = []
+        processing_paths = [i for i in os.listdir(os.path.join(project_path,dataset)) if 'Processing_' in i]
+        processing_date = [os.path.getctime(os.path.join(project_path,dataset,processing)) for processing in processing_paths]
+        sorted_processing_paths = [x for _, x in reversed(sorted(zip(processing_date, processing_paths)))]
+        for processing in sorted_processing_paths:
+            for section in [i for i in os.listdir(os.path.join(project_path,dataset,processing)) if i.split('-')[0].split('Well')[-1] in wells]:
+                if section in sections.keys():
+                    continue
+                if not os.path.exists(os.path.join(project_path,dataset,processing,section)):
+                    continue
+                if check_existance(os.path.join(project_path,dataset,processing,section),file_type='anndata'):
+                    sections[section] = {
+                        'animal':animal,
+                        'processing':processing,
+                        'processing_path':os.path.join(project_path,dataset,processing),
+                        'dataset':dataset,
+                        'dataset_path':project_path}
+                    dataset_sections.append(section)
+        registration_paths = [i for i in os.listdir(os.path.join(project_path,dataset)) if 'Registration_' in i]
+        registration_date = [os.path.getctime(os.path.join(project_path,dataset,registration)) for registration in registration_paths]
+        sorted_registration_paths = [x for _, x in reversed(sorted(zip(registration_date, registration_paths)))]
+        for registration in sorted_registration_paths:
+            for section in dataset_sections:
+                if 'registration_path' in sections[section].keys():
+                    continue
+                if not os.path.exists(os.path.join(project_path,dataset,registration,section)):
+                    continue
+                if check_existance(os.path.join(project_path,dataset,registration,section),channel='X',file_type='Model'):
+                    sections[section]['registration_path'] = os.path.join(project_path,dataset,registration)
+                    sections[section]['registration'] = registration
+    incomplete_sections = []
+    for section,items in sections.items():
+        if not 'registration_path' in items.keys():
+            incomplete_sections.append(section)
+    for section in incomplete_sections:
+        del sections[section]
+
+    # Convert the sections dictionary to a DataFrame
+    input_df = pd.DataFrame.from_dict(sections, orient='index')
+    input_df['section_acq_name']  = input_df.index
+    input_df.reset_index(drop=True, inplace=True)
+    input_df = input_df[['animal', 'section_acq_name','processing','registration','dataset', 'registration_path', 'processing_path', 'dataset_path']]
+
+    return input_df
