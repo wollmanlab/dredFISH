@@ -103,7 +103,8 @@ class TissueMultiGraph:
         basepath = None,
         input_df = None,
         redo = False,
-        mem_only = False, 
+        mem_only = False,
+        keep_geoms = True,  
         ):
         """Create a TMG object
         
@@ -136,6 +137,15 @@ class TissueMultiGraph:
             self._load()
             return 
         
+        if keep_geoms and os.path.exists(os.path.join(self.basepath,"TMG.json")): 
+            with open(os.path.join(self.basepath,"TMG.json"),encoding="utf-8") as fh:
+                _config = json.load(fh)
+                self.geom_to_layer_type_mapping = _config["geom_to_layer_type_mapping"]
+                self.layer_to_geom_type_mapping = _config["layer_to_geom_type_mapping"]
+        else: 
+            # conf dict to map geoms to layer types
+            self.geom_to_layer_type_mapping = { 'voronoi' : 'cell'}
+            self.layer_to_geom_type_mapping = {'cell' : 'voronoi'}
 
         # create a new TMG object from inputs
         self.input_df = input_df
@@ -257,7 +267,45 @@ class TissueMultiGraph:
                 layer_id = all_layer_types.index(layer_id)
             except ValueError:
                 raise ValueError(f"Layer '{layer_id}' not found in available Layers.")
-        return self.layer_taxonomy_mapping[layer_id]
+        curr_type = self.tax_names[self.layer_taxonomy_mapping[layer_id]]
+        return curr_type
+
+    def get_layer_type_vec(self,layer_id,tax_id = None):
+        if isinstance(layer_id,str): 
+            all_layer_types = [L.layer_type for L in self.Layers]
+            try:
+                layer_id = all_layer_types.index(layer_id)
+            except ValueError:
+                raise ValueError(f"Layer '{layer_id}' not found in available Layers.")
+        type_ixs = self.Layers[layer_id].Type
+        if tax_id is None:
+            tax_id = self.layer_taxonomy_mapping[layer_id]
+        Tax = self.get_tax(tax_id)
+        type_vec = Tax.Type[type_ixs]
+        return type_vec
+    
+    def get_layer_upstream_type_vec(self,layer_id): 
+        if isinstance(layer_id,str): 
+            all_layer_types = [L.layer_type for L in self.Layers]
+            try:
+                layer_id = all_layer_types.index(layer_id)
+            except ValueError:
+                raise ValueError(f"Layer '{layer_id}' not found in available Layers.")
+        tax_id = self.layer_taxonomy_mapping[layer_id]
+        upstream_tax = self.Taxonomies[tax_id].upstream_tax
+        if upstream_tax is None: 
+            return None
+        upstream_tax = self.get_tax(upstream_tax)
+        
+        type_vec = self.get_layer_type_vec(layer_id)
+        unq_types = self.Taxonomies[tax_id].Types
+        upstream_types = upstream_tax.Types
+
+        # Create a mapping between unique types and their corresponding upstream types
+        unq_type_to_upstream_type_map = dict(zip(unq_types, upstream_types))
+        # convert
+        upstream_type_vec = [unq_type_to_upstream_type_map[typ] for typ in type_vec]
+
 
     def update_current_type(self,layer_id,tax_id): 
         # if layer_id or tax_id are not numeric, find which id they are
@@ -306,10 +354,9 @@ class TissueMultiGraph:
 
         if isinstance(tax,str):
             if tax in self.tax_names:
-                tax_id = self.tax_names.index(tax)
+                tax = self.get_tax(tax)
             else: 
                 raise ValueError(f"taxonomy {tax} not found in {self.tax_names}")
-            tax = self.Taxonomies[tax_id]
 
         if any(isinstance(item, str) for item in type_vec):
             type_vec = tax.get_type_ix(type_vec)
@@ -524,51 +571,6 @@ class TissueMultiGraph:
             Env = self.Layers[base_layer_id].extract_environments(typevec=self.Layers[merged_layer_id].Upstream)
             self.Layers[merged_layer_id].feature_mat = Env
     
-    # def create_region_layer(self, topics, region_tax, cell_layer=0):
-    #     """Add region layor given cells' region types (topics)
-        
-    #     Parameters
-    #     ----------
-    #     topics : numpy array / list
-    #         An array with local type environment (a number for each cell) 
-    #     region_tax : Taxonomy
-    #         A Taxonomy object that contains the region classification scheme
-    #     cell_layer : int (default,0)
-    #         Which layer in TMG is the cell layer?          
-
-    #     """
-    #     for TG in self.Layers:
-    #         if TG.layer_type == "region":
-    #             print("!!`region` layer already exists; return...")
-    #             return 
-
-    #     # create region layers through graph contraction
-    #     CG = self.Layers[cell_layer].contract_graph(topics) # contract the cell layer by topics
-        
-    #     # contraction assumes that the feature_mat and taxonomy of the contracted layers are
-    #     # inherited from the layer used for contraction. This is not true for regions so we need to update these
-    #     # feature_mat is updated here and tax is updated by calling add_type_information
-    #     Env = self.Layers[cell_layer].extract_environments(typevec=CG.Upstream)
-    #     row_sums = Env.sum(axis=1)
-    #     row_sums = row_sums[:,None]
-    #     Env = Env/row_sums
-        
-    #     # create the region layer merging information from contracted graph and environments
-    #     RegionLayer = TissueGraph(feature_mat=Env, basepath=self.basepath, 
-    #                               layer_type="region", redo=True)
-    #     RegionLayer.SG = CG.SG.copy()
-    #     RegionLayer.node_size = CG.node_size.copy()
-    #     RegionLayer.Upstream = CG.Upstream.copy()
-    #     RegionLayer.XY = CG.XY.copy()
-    #     RegionLayer.Section = CG.Section.copy()
-
-    #     self.Layers.append(RegionLayer)
-    #     current_layer_id = len(self.Layers)-1
-    #     self.add_type_information(current_layer_id, CG.Type, region_tax)
-
-    #     # update the layers graph to show that regions are created from cells
-    #     self.layers_graph.append((cell_layer, current_layer_id))
-
     def fill_holes(self,lvl_to_fill,min_node_size):
         """EXPERIMENTAL: merges small biospatial units with their neighbors. 
 
@@ -661,6 +663,14 @@ class TissueMultiGraph:
     def get_N(self, section=None): 
         return([L.get_N(section=section) for L in self.Layers])
     
+    def get_tax(self,tax_name): 
+        tax_id = self.tax_names.index(tax_name)
+        return self.Taxonomies[tax_id]
+
+    def get_layer(self,layer_type): 
+        layer_id = self.layer_names.index(layer_type)
+        return self.Layers[layer_id]
+
     @property
     def Ntypes(self):
         """list : Number of types in each layer of TMG."""
@@ -837,6 +847,7 @@ class TissueGraph:
                               "node_size": "node_size", #obs
                               "name" : "label", #obs
                               "XY" : "XY", #obsm
+                              "Z"  : "ccf_x", #obs
                               "Section" : "Slice"} #obs
         # Note: a these mapping are not used for few attributes such as SG/FG/Upstream that are "hard coded" 
         # as much as possible, the only memory footprint is in the anndata object, the exceptions are SG/FG that 
@@ -853,6 +864,9 @@ class TissueGraph:
         
         if not redo:
             self.adata = anndata.read_h5ad(os.path.join(self.basepath,'Layer',f"{self.layer_type}_layer.h5ad"))
+            
+            if 'adata_mapping' in self.adata.uns:
+                self.adata_mapping = self.adata.uns["adata_mapping"]
             # SG is saved as a list of spatial graphs (one per section)
             if "SG" in self.adata.obsp.keys():
                 # create SG and FG from Anndata
@@ -920,6 +934,8 @@ class TissueGraph:
             self.FG = None
 
     def save(self):
+        """ add stuff to adata"""
+        self.adata.uns["adata_mapping"]=self.adata_mapping
         """save TG to file"""
         layer_path = os.path.join(self.basepath, 'Layer')
         if not os.path.exists(layer_path):
@@ -1094,16 +1110,24 @@ class TissueGraph:
         
     @property    
     def X(self):
-        """
-            X : dependent property - will query info from Graph and return
-        """
         return(self.XY[:,0])
         
     @property
     def Y(self):
-        """Y : dependent property - will query info from Graph and return
-        """
         return(self.XY[:,1])
+    
+    @property
+    def Z(self): 
+        if self.adata is None:
+            return None
+        elif self.adata_mapping["Z"] not in self.adata.obs.keys(): 
+            raise ValueError("Mapping of Z to AnnData is broken, please check!")
+        else: 
+            return self.adata.obs[self.adata_mapping["Z"]]
+        
+    @Z.setter
+    def Z(self,Z): 
+        self.adata.obs[self.adata_mapping["Z"]]=Z
     
     @property    
     def Ntypes(self): 
@@ -1341,7 +1365,7 @@ class TissueGraph:
         
         return(ZoneGraph)
                              
-    def type_freq(self, max_val = None): 
+    def type_freq(self, max_val = None, section = None): 
         """return the catogorical probability for each type in TG
         
         Probabilities are weighted by the node_size
@@ -1351,8 +1375,13 @@ class TissueGraph:
         
         if max_val is None: 
             max_val = np.max(self.Type)
+
+        if section is not None: 
+            ix = self.Section==section
+        else: 
+            ix = np.ones(self.N,dtype=bool)
         
-        cnts = np.bincount(self.Type, weights=self.node_size, minlength=max_val+1) 
+        cnts = np.bincount(self.Type[ix], weights=self.node_size[ix], minlength=max_val+1) 
         Ptypes = cnts / np.sum(cnts) 
 
         
@@ -1547,7 +1576,8 @@ class Taxonomy:
     """
     
     def __init__(self, name=None, basepath = None,
-        Types=None, feature_mat=None,rgb_codes=None
+        Types=None, feature_mat=None,rgb_codes=None,
+        upstream_tax = None, upstream_types = None
         ): 
         """Create a Taxonomy object
 
@@ -1568,6 +1598,14 @@ class Taxonomy:
         # add RGB values if provided
         if rgb_codes is not None:
             self.adata.obs['RGB'] = list(rgb_codes)
+
+        if upstream_tax is not None: 
+            self.upstream_tax = upstream_tax
+        
+        if upstream_types is not None: 
+            if upstream_tax is None: 
+                raise ValueError("If you supply upstream types, you must supply upstream_tax as well")
+            self.upstream_type = upstream_types
 
         return None
     
@@ -1629,7 +1667,31 @@ class Taxonomy:
         else: 
             warnings.warn(f"Taxonomy file {filename} not found")
     
-    
+    @property
+    def upstream_tax(self): 
+        if "upstream_tax" in self.adata.uns:
+            return self.adata.uns["upstream_tax"]
+        else:
+            return None
+
+    @upstream_tax.setter
+    def upstream_tax(self,upstream_tax):
+        self.adata.uns["upstream_tax"]=upstream_tax
+
+    @property
+    def upstream_type(self): 
+        if "upstream_type" in self.adata.obs:
+            return self.adata.obs["upstream_type"]
+        else: 
+            return None
+        
+    @upstream_type.setter
+    def upstream_type(self,upstream_type):
+        if "upstream_tax" not in self.adata.uns:
+            raise ValueError("Set upstream_tax before adding a type")
+        
+        self.adata.obs["upstream_type"] = upstream_type
+
     @property
     def N(self):
         return len(self.Type)
@@ -1656,6 +1718,8 @@ class Taxonomy:
     def get_type_ix(self,typ_str):
         Type_ix_dict = {item: i for i, item in enumerate(self.Type)}
         index_positions = [Type_ix_dict.get(item) for item in typ_str]
+        if any(pos is None for pos in index_positions):
+            raise ValueError("One or more specified types are not found in the Type dictionary.")
         return index_positions
 
 class Geom:
