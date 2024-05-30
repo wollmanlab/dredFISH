@@ -794,7 +794,7 @@ class KNN(object):
     def fit(self,X,y):
         self.feature_tree_dict = {}
         self.feature_tree_dict['labels'] = y
-        self.feature_tree_dict['tree'] = NNDescent(X, metric=self.metric, n_neighbors=self.train_k,n_trees=10,verbose=False,parallel_batch_queries=True)
+        self.feature_tree_dict['tree'] = NNDescent(X, metric=self.metric, n_neighbors=self.train_k,n_trees=10,verbose=False)
         self.cts = np.array(sorted(np.unique(self.feature_tree_dict['labels'])))
         self.converter = dict(zip(self.cts,np.array(range(self.cts.shape[0]))))
         self.feature_tree_dict['labels_index'] = np.array([self.converter[i] for i in y])
@@ -1074,6 +1074,23 @@ class SpatialAssistedLabelTransfer(Classifier):
                 self.measured.obs[temp_level+'_color'] = self.measured.obs[temp_level].map(pallette)
             """ Add metrics for downstream QC """
         return self.measured
+
+class SpatialOnlyLabelTransfer(Classifier): 
+    """
+    Predicts label using only X,Y,Z position to transfer label between two TG objects
+    """
+    def __init__(self, ref_TG, label_to_transfer,k=15):
+        self.model =  KNN(train_k=k,predict_k=k,metric='euclidean')
+        self.ref_XYZ = np.abs(np.hstack((ref_TG.XY,ref_TG.Z)))
+        self.ref_label = ref_TG.adata.obs["label_to_transfer"]
+
+    def train(self):
+        self.model.fit(self.ref_XYZ,self.ref_label)
+
+    def classify(self,new_TG):
+        new_XYZ = np.abs(np.hstack((new_TG.XY,new_TG.Z)))
+        labels = self.model.predict(new_XYZ)
+        return labels
 
 class LabelTransfer(Classifier): 
     """
