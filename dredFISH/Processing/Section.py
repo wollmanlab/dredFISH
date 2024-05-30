@@ -25,7 +25,7 @@ from dredFISH.Utils import fileu
 import shutil
 from skimage.segmentation  import watershed
 from skimage import morphology
-import dredFISH.Processing as Processing
+from dredFISH.Utils import imageu
 from skimage.feature import peak_local_max
 import math
 from dredFISH.Utils import basicu
@@ -141,7 +141,7 @@ class Section_Class(object):
                         self.pull_vectors()
             if not isinstance(self.data,type(None)):
                 self.generate_report()
-                self.remove_temporary_files()
+                # self.remove_temporary_files()
                 # self.qc_score()
                 # self.copy_to_drive()
         else:
@@ -263,14 +263,14 @@ class Section_Class(object):
         :type type: str, optional
         :param model_type: segmentation Type ('total','nuclei','cytoplasm')
         :type model_type: str, optional
-        :return : True of file exists, False otherwise
+        :return : True of file exists, False otherwises
         :rtype : bool
         """
         if isinstance(path,type(None)):
             path = self.path
         # if file_type in ['FF','constant','image_FF','image_constant']:
         #     path = self.well_path
-        if file_type in ['stitched']:
+        if (file_type in ['stitched'])&(self.parameters['use_scratch']):
             path = self.scratch_path
         return fileu.check_existance(path=path,fname=fname,hybe=hybe,channel=channel,section=section,file_type=file_type,model_type=model_type,logger=self.log)
 
@@ -295,7 +295,7 @@ class Section_Class(object):
             path = self.path
         # if file_type in ['FF','constant','image_FF','image_constant']:
         #     path = self.well_path
-        if file_type in ['stitched']:
+        if (file_type in ['stitched'])&(self.parameters['use_scratch']):
             path = self.scratch_path
         return fileu.generate_filename(path=path,hybe=hybe,channel=channel,section=section,file_type=file_type,model_type=model_type,logger=self.log)
 
@@ -320,7 +320,7 @@ class Section_Class(object):
             path = self.path
         # if file_type in ['FF','constant','image_FF','image_constant']:
         #     path = self.well_path
-        if file_type in ['stitched']:
+        if (file_type in ['stitched'])&(self.parameters['use_scratch']):
             path = self.scratch_path
         fileu.save(data,fname=fname,path=path,hybe=hybe,channel=channel,file_type=file_type,section=section,model_type=model_type,logger=self.log)
 
@@ -345,7 +345,7 @@ class Section_Class(object):
             path = self.path
         # if file_type in ['FF','constant','image_FF','image_constant']:
         #     path = self.well_path
-        if file_type in ['stitched']:
+        if (file_type in ['stitched'])&(self.parameters['use_scratch']):
             path = self.scratch_path
         return fileu.load(path=path,fname=fname,hybe=hybe,channel=channel,section=section,file_type=file_type,model_type=model_type,logger=self.log)
 
@@ -568,8 +568,16 @@ class Section_Class(object):
         
         if (isinstance(FF,type(None))|isinstance(constant,type(None))):
             if imaging_batch == 'acq':
-                self.update_user(f" {acq} FF and Constants should have already been precomputed",level=40)
-                return FF,constant,1,None
+                # self.update_user(f" {acq} FF and Constants should have already been precomputed",level=40)
+                # """ Maybe now is a good time to make them"""
+                self.update_user(f" {acq} Computing FF and Constant Now",level=40)
+                file_list = self.image_metadata.stkread(Channel=channel,acq=acq,groupby='Channel',fnames_only = True)
+                (FF, constant) = imageu.estimate_flatfield_and_constant(file_list)
+                fileu.save(FF,section=self.dataset.split('_')[0],path=path,hybe=acq,channel=channel,file_type='FF')
+                fileu.save(FF*1000,section=self.dataset.split('_')[0],path=path,hybe=acq,channel=channel,file_type='image_FF')
+                fileu.save(constant,section=self.dataset.split('_')[0],path=path,hybe=acq,channel=channel,file_type='constant')
+                fileu.save(constant,section=self.dataset.split('_')[0],path=path,hybe=acq,channel=channel,file_type='image_constant')
+                return FF,constant
             elif imaging_batch == 'hybe':
                 """ load all FF for this hybe and average """
                 acq_list = [i for i in self.image_metadata.acqnames if acq+'_' in i]
@@ -580,6 +588,7 @@ class Section_Class(object):
                 self.update_user(f"Unknown imaging batch {imaging_batch}",level=50)
             FF = []
             constant = []
+            np.random.shuffle(acq_list)
             for temp_acq in acq_list:
                 temp_ff,temp_constant = self.load_image_parameters(temp_acq,channel,imaging_batch='acq',fname=False)
                 if not isinstance(temp_ff,type(None)):
@@ -1002,9 +1011,12 @@ class Section_Class(object):
             """ Reference Hasnt been Imaged"""
             self.any_incomplete_hybes = True
         else:
-            for r,h,c in self.parameters['bitmap']:
+            order = np.array(range(len(self.parameters['bitmap'])))
+            np.random.shuffle(order)
+            for i in order:
                 # try:
-                stitched = self.stitcher(h,self.parameters['total_channel'])
+                r,h,c = self.parameters['bitmap'][i]
+                stitched = self.stitcher(h,c)
                 if isinstance(stitched,type(None)):
                     self.update_user(f"Stitching of {h} Failed",level=40)
                     self.any_incomplete_hybes = True
@@ -1091,7 +1103,7 @@ class Section_Class(object):
                     else:
                         if 'all' in self.parameters['total_acq']:
                             total = ''
-                            for r,h,c in self.generate_iterable(self.parameters['bitmap'],'Loading Total by Averaging All Measurements'):
+                            for r,h,c in self.generate_iterable(self.parameters['bitmap'],f"Loading Total by {self.parameters['total_acq']} All Measurements"):
                                 if self.check_existance(hybe=h,channel=c,file_type='stitched'):
                                     temp = self.load(hybe=h,channel=c,file_type='stitched')
                                     if isinstance(total,str):
@@ -1148,14 +1160,17 @@ class Section_Class(object):
                         nuc = nucstain[(x*x_step):((x+1)*x_step),(y*y_step):((y+1)*y_step)].numpy()
                         if 'total' in self.model_type:
                             tot = total[(x*x_step):((x+1)*x_step),(y*y_step):((y+1)*y_step)].numpy()
+                            nuc = np.clip(nuc - gaussian_filter(nuc,10),0,None)
+                            tot = np.clip(tot - gaussian_filter(tot,10),0,None)
                             stk = np.dstack([nuc,tot,np.zeros_like(nuc)])
-                            diameter = int(self.parameters['segment_diameter']*1.5)
-                            min_size = int(self.parameters['segment_diameter']*10*1.5)
+                            diameter = int(self.parameters['segment_diameter'])
+                            min_size = int(self.parameters['segment_diameter']**1.5)#0#int(self.parameters['segment_diameter']*10*1.5)
                             channels = [1,2]
                         else:
+                            nuc = np.clip(nuc - gaussian_filter(nuc,10),0,None)
                             stk = nuc
                             diameter = int(self.parameters['segment_diameter'])
-                            min_size = int(self.parameters['segment_diameter']*10)
+                            min_size = int(self.parameters['segment_diameter']**1.5)#int(self.parameters['segment_diameter']*10)
                             channels = [0,0]
                         if stk.max()==0:
                             continue
@@ -1171,19 +1186,24 @@ class Section_Class(object):
                                                             batch_size=16)
                         mask = torch.tensor(raw_mask_image.astype(int),dtype=self.parameters['pytorch_dtype'])
                         updated_mask = mask.numpy().copy()
+                        if 'total' in self.model_type:
+                            tot = total[(x*x_step):((x+1)*x_step),(y*y_step):((y+1)*y_step)].numpy()
+                        nuc = nucstain[(x*x_step):((x+1)*x_step),(y*y_step):((y+1)*y_step)].numpy()
+
                         # Use Watershed to find missing cells 
                         if 'total' in self.model_type:
-                            image = stk[:,:,1]
+                            img = tot
                         else:
-                            image = stk
+                            img = nuc
                         # Define Cell Borders
-                        img = gaussian_filter(image.copy(),2)
-                        cell_mask = img>thresh
+                        # img = gaussian_filter(img.copy(),2)
+                        cell_mask = morphology.binary_dilation(updated_mask>0,footprint=create_circle_array(5, 5))
+                        cell_mask = (img>thresh)&(cell_mask==0)
                         cell_mask = morphology.remove_small_holes(cell_mask, 20)
                         cell_mask = morphology.remove_small_objects(cell_mask, int(self.parameters['segment_diameter']**1.5))
                         cell_mask = morphology.binary_dilation(cell_mask,footprint=create_circle_array(5, 5))
                         # Call Cell Centers
-                        img = gaussian_filter(image.copy(),5)
+                        # img = gaussian_filter(img.copy(),5)
                         img[~cell_mask]=0
                         if (np.sum(cell_mask)>1)&(mask.max().numpy()>5):
                             min_peak_height = np.percentile(img[cell_mask],5)
@@ -1727,7 +1747,8 @@ def generate_FF(image_metadata,acq,channel,posnames=[],bkg_acq='',parameters={},
             # try:
             img = image_metadata.stkread(Position=posname,Channel=channel,acq=acq).min(2).astype(parameters['numpy_dtype'])
             if parameters['bin']>1:
-                img = block_reduce(image_filter(img,'median',2), tuple([parameters['bin'],parameters['bin']]), np.mean)
+                img = imageu.fast_median_bin(img,bin=parameters['bin'])
+                # img = block_reduce(image_filter(img,'median',2), tuple([parameters['bin'],parameters['bin']]), np.mean)
             # img = np.array(Image.fromarray(image_filter(img,'median',2)).resize(parameters['n_pixels'],Image.BICUBIC),dtype=parameters['numpy_dtype'])
             if parameters['process_img_before_FF']:
                 img = subtract_background(img,parameters)
@@ -1735,7 +1756,8 @@ def generate_FF(image_metadata,acq,channel,posnames=[],bkg_acq='',parameters={},
             if bkg_acq!='':
                 bkg = image_metadata.stkread(Position=posname,Channel=channel,acq=bkg_acq).min(2).astype(parameters['numpy_dtype'])
                 if parameters['bin']>1:
-                    bkg = block_reduce(image_filter(bkg,'median',2), tuple([parameters['bin'],parameters['bin']]), np.mean)
+                    bkg = imageu.fast_median_bin(bkg,bin=parameters['bin'])
+                    # bkg = block_reduce(image_filter(bkg,'median',2), tuple([parameters['bin'],parameters['bin']]), np.mean)
                 # bkg = np.array(Image.fromarray(image_filter(bkg,'median',2)).resize(parameters['n_pixels'],Image.BICUBIC),dtype=parameters['numpy_dtype'])
                 if parameters['process_img_before_FF']:
                     bkg = subtract_background(bkg,parameters)
@@ -2032,7 +2054,8 @@ def load_image(img,FF,constant,parameters):
     if isinstance(constant,str):
         constant = fileu.load(fname=constant,file_type='constant')
     if parameters['bin']>1:
-        img = block_reduce(image_filter(img,'median',2), tuple([parameters['bin'],parameters['bin']]), np.mean)
+        # img = block_reduce(image_filter(img,'median',2), tuple([parameters['bin'],parameters['bin']]), np.mean)
+        img = imageu.fast_median_bin(img,bin=parameters['bin'])
     img = process_img(img,parameters,FF=FF,constant=constant)
     return img
 

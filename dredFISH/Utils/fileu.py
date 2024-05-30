@@ -176,9 +176,7 @@ def save(data,path='',hybe='',channel='',file_type='',model_type='',dataset='',s
     elif file_type == 'image':
         if not isinstance(data,np.ndarray):
             data = data.numpy()
-        data = data.copy()
-        data[data<np.iinfo('uint16').min] = np.iinfo('uint16').min
-        data[data>np.iinfo('uint16').max] = np.iinfo('uint16').max
+        data = np.clip(data.copy(),np.iinfo('uint16').min,np.iinfo('uint16').max)
         # pylint: disable=no-member
         try:
             cv2.imwrite(fname, data.astype('uint16'))
