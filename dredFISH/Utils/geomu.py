@@ -51,13 +51,6 @@ from matplotlib.path import Path
 
 import pdb
 
-def create_voronoi(XY):
-    points = MultiPoint(XY)
-    regions = voronoi_diagram(points)
-    vor_polygons = list(regions.geoms)
-    return vor_polygons
-
-
 def voronoi_polygons(XY):
     """
     Creates voronoi as list of Shapely polygons
