@@ -376,7 +376,7 @@ class TissueMultiGraph:
         return 
     
     def create_cell_layer(self,  
-                          norm='robust_regression', 
+                          norm='none', 
                           register_to_ccf = True,
                           metric='cosine',
                           build_spatial_graph = False,
@@ -447,14 +447,14 @@ class TissueMultiGraph:
 
 
         """ Filter Out Non Cells and Batch Correct"""
-        adata.layers['dapi_score'] = np.zeros_like(adata.layers['raw'])
+        dapi_score = np.zeros_like(adata.layers['raw'].copy())
         for section in adata.obs[self.adata_mapping['Section']].unique():
             m = adata.obs[self.adata_mapping['Section']]==section
             X = adata.layers['nuc_raw'][m,:].copy()
             X = np.clip(X,1,None)
             X = np.log10(X/np.mean(X,axis=1,keepdims=True))
-            adata.layers['dapi_score'][m,:] = X.copy() # Values above 0.5 are within normal range 
-        X = adata.layers['dapi_score'].copy()
+            dapi_score[m,:] = X.copy() # Values above 0.5 are within normal range 
+        X = dapi_score
         X = X/(2*np.std(X))
         X = np.abs(X)
         X = stats.norm.pdf(X)/stats.norm.pdf(0)
