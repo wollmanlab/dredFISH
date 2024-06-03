@@ -24,6 +24,9 @@ import logging
 import os.path
 import json
 
+import pickle
+import base64
+
 import igraph
 import pynndescent
 
@@ -249,8 +252,10 @@ class TissueMultiGraph:
         if not isinstance(self.Geoms, list) or len(self.Geoms) != len(self.unqS):
             raise ValueError("self.Geoms must be a list with length equal to the number of unique sections (self.unqS)")
 
-        if geom_types is None: 
-            geom_types = list(self.geom_to_layer_type_mapping.keys())
+        if geom_types is None:
+            geom_path = os.path.join(self.basepath,'Geom',self.unqS[0])
+            wkt_files = [f for f in os.listdir(geom_path) if f.endswith('.wkt')]
+            geom_types = [file[:-4] for file in wkt_files]  # Remove the '.wkt' extension from each filename
 
         for s in sections: 
             ix = self.unqS.index(s)
@@ -277,22 +282,24 @@ class TissueMultiGraph:
                 layer_id = all_layer_types.index(layer_id)
             except ValueError:
                 raise ValueError(f"Layer '{layer_id}' not found in available Layers.")
-        type_ixs = self.Layers[layer_id].Type
+        type_ixs = self.Layers[layer_id].Type.astype(int)
         if tax_id is None:
             tax_id = self.layer_taxonomy_mapping[layer_id]
         Tax = self.get_tax(tax_id)
         type_vec = Tax.Type[type_ixs]
         return type_vec
     
-    def get_layer_upstream_type_vec(self,layer_id): 
+    def get_layer_upstream_type_vec(self,layer_id, tax_id = None): 
         if isinstance(layer_id,str): 
             all_layer_types = [L.layer_type for L in self.Layers]
             try:
                 layer_id = all_layer_types.index(layer_id)
             except ValueError:
                 raise ValueError(f"Layer '{layer_id}' not found in available Layers.")
-        tax_id = self.layer_taxonomy_mapping[layer_id]
-        upstream_tax = self.Taxonomies[tax_id].upstream_tax
+        if tax_id is None:
+            tax_id = self.layer_taxonomy_mapping[layer_id]
+        Tax = self.get_tax(tax_id)
+        upstream_tax = Tax.upstream_tax
         if upstream_tax is None: 
             return None
         upstream_tax = self.get_tax(upstream_tax)
@@ -305,6 +312,7 @@ class TissueMultiGraph:
         unq_type_to_upstream_type_map = dict(zip(unq_types, upstream_types))
         # convert
         upstream_type_vec = [unq_type_to_upstream_type_map[typ] for typ in type_vec]
+        return upstream_type_vec
 
 
     def update_current_type(self,layer_id,tax_id): 
@@ -528,11 +536,14 @@ class TissueMultiGraph:
         logging.info('done with create_cell_layer')
         return
 
-    def create_merged_layer(self, base_layer_id = 0, replace = False, layer_type = None, tax_name = None, tax_composition_name = None):
-        """Creates an "iso-layer" from existing layer. 
-        As "iso-layer" is a layer created by merging neighboring units of the same type. 
+    def create_merged_layer(self, base_layer_id = 0, replace = False, layer_type = None, tax_name = None, tax_composition_name = None, Labels=None):
+        """
+        Creates an merged_layer from existing layer. The merged layer could be an "iso" layer
+        using existing Type and ensuring merges of only connected components 
+        Or, it could be any labeling of original graph, if Labels are provided
+
         replace = True (default false) allow overwriting existing layer
-        Since we are only merging things of the same type, 
+
         """
         if layer_type is None: 
             raise ValueError("what is the name (layer_type) of the new layer?")
@@ -548,15 +559,13 @@ class TissueMultiGraph:
             self.update_current_type(base_layer_id,tax_name)
 
         # Contract graph. 
+        MergedLayer = self.Layers[base_layer_id].contract_graph(Labels=Labels)
+
         # if this is a composition based merge, first determine the size of feature_mat
         if tax_composition_name is not None:
             all_tax_names = [tx.name for tx in self.Taxonomies]
             composition_tax_id = all_tax_names.index(tax_composition_name)
-            feature_dim = self.Taxonomies[composition_tax_id].N
-            MergedLayer = self.Layers[base_layer_id].contract_graph(feature_dim = feature_dim)
-        else: 
-            MergedLayer = self.Layers[base_layer_id].contract_graph()
-
+            
         MergedLayer.layer_type = layer_type
         if merged_layer_id is None: 
             self.Layers.append(MergedLayer)
@@ -571,52 +580,7 @@ class TissueMultiGraph:
             Env = self.Layers[base_layer_id].extract_environments(typevec=self.Layers[merged_layer_id].Upstream)
             self.Layers[merged_layer_id].feature_mat = Env
     
-    def fill_holes(self,lvl_to_fill,min_node_size):
-        """EXPERIMENTAL: merges small biospatial units with their neighbors. 
-
-        The goal of this method is to allow filling up "holes", i.e. chunks in the tissue graph that we 
-        are unhappy about their type using local neighbor types. 
-
-        Note
-        ----
-        As of 6/8/2022 this method is not ready for production use. 
-        """
-        update_feature_mat_flag=False
-        if self.Layers[lvl_to_fill].feature_mat is not None: 
-            feature_mat = self.Layers[lvl_to_fill].feature_mat.copy()
-            update_feature_mat_flag = True
-
-        # get types (with holes)
-        region_types = self.Layers[lvl_to_fill].Type.copy()
-
-        # mark all verticies with small node size
-        region_types[self.Layers[lvl_to_fill].node_size < min_node_size]=-1
-        fixed = region_types > -1
-
-        # renumber region types in case removing some made numbering discontinuous
-        _,ix = np.unique(region_types[fixed],return_inverse=True)
-        cont_region_types = region_types.copy()
-        cont_region_types[fixed] = ix
-
-        # map to level-0 to do the label propagation at the cell level: 
-        fixed_celllvl = self.map_to_cell_level(lvl_to_fill,fixed)
-        contregion_celllvl = self.map_to_cell_level(lvl_to_fill,cont_region_types)
-
-        # fill holes through label propagation
-        lblprp = self.Layers[0].SG.community_label_propagation(weights=None, initial=contregion_celllvl, fixed=fixed_celllvl)
-        region_type_filled = np.array(lblprp.membership)
-
-        # shrink indexes from level-0 to requested level-1 
-        _,ix = self.map_to_cell_level(lvl_to_fill-1,return_ix=True)
-        _, ix_zero_to_two = np.unique(ix, return_index=True)
-        new_type = region_type_filled[ix_zero_to_two]
-
-        # recreate the layer
-        NewLayer = self.Layers[lvl_to_fill-1].contract_graph(new_type)
-        self.Layers[lvl_to_fill] = NewLayer
-        if update_feature_mat_flag:
-            self.Layers[lvl_to_fill].feature_mat = feature_mat[fixed,:]
-
+    
     def find_upstream_layer(self, layer_id):
         """
         We addume that cell is always 0 ("root"). 
@@ -877,7 +841,25 @@ class TissueGraph:
             if "FG" in self.adata.obsp.keys():
                 fg = self.adata.obsp["FG"] # csr matrix
                 self.FG = tmgu.adjacency_to_igraph(fg, directed=False, simplify = False)
-            
+
+            if "SG_knn" in self.adata.uns:
+                try: 
+                    with open(self.adata.uns["SG_knn"],'rb') as file: 
+                        knn = pickle.load(file)
+                    self.SG_knn = knn
+                except Exception:
+                    warnings.warn("Failed to load SG_knn - please check")
+                    self.SG_knn = None
+
+            if "FG_knn" in self.adata.uns: 
+                try:
+                    with open(self.adata.uns["FG_knn"],'rb') as file: 
+                        knn = pickle.load(file)
+                    self.FG_knn = knn
+                except Exception:
+                    warnings.warn("Failed to load FG_knn - please check")
+                    self.FG_knn = None
+
         else: # create an object from given feature_mat data
 
             # if feautre_mat is a tuple, replace with an empty sparse matrix
@@ -922,22 +904,38 @@ class TissueGraph:
 
         # rebuild igraph layers (that are only saved as adj matrix within anndata)
         if rebuild_SG and self.SG != None: 
-            self.build_spatial_graph()
+            if self.SG_knn is None: 
+                self.build_spatial_graph()
+            else: 
+                self.build_spatial_graph(keep_knn=True)
         else:
             # after filtering, need to rebuild SG, if it existed (and rebuild_SG was False) zeros it out
             self.SG = None
+            self.SG_knn = None
         
         if rebuild_FG and self.FG != None: 
             self.build_feature_graph()
         else: 
             # after filtering, need to rebuild FG, if it existed (and rebuild_FG was False) zeros it out
             self.FG = None
+            self.FG_knn = None
 
     def save(self):
         """ add stuff to adata"""
         self.adata.uns["adata_mapping"]=self.adata_mapping
+
         """save TG to file"""
         layer_path = os.path.join(self.basepath, 'Layer')
+        if hasattr(self, 'SG_knn'):
+            filename = os.path.join(layer_path, f"{self.layer_type}_SG_knn.pkl")
+            with open(filename, 'wb') as file:
+                pickle.dump(self.SG_knn,file)
+            self.adata.uns["SG_knn"] = filename
+        if hasattr(self, 'FG_knn'):
+            filename = os.path.join(layer_path, f"{self.layer_type}_FG_knn.pkl")
+            with open(filename, 'wb') as file:
+                pickle.dump(self.FG_knn,file)
+            self.adata.uns["FG_knn"] = filename 
         if not os.path.exists(layer_path):
             os.makedirs(layer_path)
         if not self.is_empty():
@@ -1001,7 +999,23 @@ class TissueGraph:
     
     @feature_mat.setter
     def feature_mat(self,X):
-        self.adata.X = X
+        """ update feature_mat (adata.X)
+        Key issue is that anndata doesn't allow changing number of cols
+        if we need to, remake adata
+        """
+        if self.adata.shape[1] == X.shape[1]:
+            self.adata.X = X
+        else: 
+            obs = self.adata.obs
+            obsm = self.adata.obsm
+            obsp = self.adata.obsp
+            uns = self.adata.uns
+            if isinstance(X, pd.DataFrame):
+                var = X.columns
+                X = X.values
+                self.adata = anndata.AnnData(X=X, obs=obs, obsm=obsm, obsp=obsp,var=var,uns=uns)
+            else: 
+                self.adata = anndata.AnnData(X=X, obs=obs, obsm=obsm, obsp=obsp,uns=uns)
     
     def get_feature_mat(self,section = None):
         if section is None: 
@@ -1124,7 +1138,14 @@ class TissueGraph:
             raise ValueError("Mapping of Z to AnnData is broken, please check!")
         else: 
             return self.adata.obs[self.adata_mapping["Z"]]
-        
+
+    @property
+    def XYZ(self): 
+        XY = self.XY
+        Z = np.array(self.Z)
+        XYZ = np.hstack((XY,Z[:,np.newaxis]))
+        return XYZ
+
     @Z.setter
     def Z(self,Z): 
         self.adata.obs[self.adata_mapping["Z"]]=Z
@@ -1147,7 +1168,7 @@ class TissueGraph:
         return(len(unqS))
     
     def build_feature_graph(self, 
-        X = None, n_neighbors=15, metric=None, accuracy={'prob':1, 'extras':1.5}, metric_kwds={}, return_graph=False):
+        X = None, n_neighbors=15, metric='cosine', accuracy={'prob':1, 'extras':1.5}, metric_kwds={}, return_graph=False):
         """construct k-graph based on feature similarity
 
         Create a kNN graph (an igraph object) based on feature similarity. The core of this method is the calculation on how to find neighbors. 
@@ -1185,45 +1206,29 @@ class TissueGraph:
         if X is None: 
             X = self.feature_mat
 
-        # checks if we have enough rows 
-        n_neighbors = min(X.shape[0]-1,n_neighbors)
+        (G,knn) = tmgu.build_knn_graph(X,metric,n_neighbors=n_neighbors,accuracy=accuracy,metric_kwds=metric_kwds)
 
-        if metric == 'precomputed':
-            indices = np.argsort(X,axis=1)
-            distances = np.sort(X,axis=1)
-        elif metric == 'random': 
-            indices = np.random.randint(X.shape[0],size=(X.shape[0],n_neighbors+1))
-            distances = np.ones((X.shape[0],n_neighbors+1))
-        else:
-            # perform nn search (using accuracy x number of neighbors to improve accuracy)
-            knn = pynndescent.NNDescent(X,n_neighbors = n_neighbors,
-                                          metric = metric,
-                                          diversify_prob = accuracy['prob'],
-                                          pruning_degree_multiplier = accuracy['extras'],
-                                          metric_kwds = metric_kwds)
-
-            # get indices and remove self. 
-            (indices,distances) = knn.neighbor_graph
-
-        # take the first K values remove first self similarities    
-        indices = indices[:,1:]
-        distances = distances[:,1:]
-
-        id_from = np.tile(np.arange(indices.shape[0]),indices.shape[1])
-        id_to = indices.flatten(order='F')
-
-        # build graph
-        edgeList = np.vstack((id_from,id_to)).T
-        G = igraph.Graph(n=X.shape[0], edges=edgeList)
-        G.simplify()
-
-        # register
         self.adata.obsp["FG"] = G.get_adjacency_sparse()
+        self.FG_knn = knn
         self.FG = G
         if return_graph:
             return G
+
+    def knn_query(self,X,k=15,graph = 'spatial'):
+        if graph == 'spatial': 
+            knn = self.SG_knn
+        elif graph == 'feature': 
+            knn = self.FG_knn
+        else: 
+            raise ValueError("Graph type must be 'spatial' of 'feature")
+
+        if knn is None: 
+                raise ValueError(f"{graph} graph not defined")
+
+        indices,distances = knn.query(X,k)
+        return (indices,distances)
     
-    def build_spatial_graph(self,max_dist = 300):
+    def build_spatial_graph(self,max_dist = 300,save_knn = False):
         """construct graph based on Delaunay neighbors
         
         build_spatial_graph will create an igrah using Delaunay triangulation
@@ -1235,6 +1240,7 @@ class TissueGraph:
         sorted by section. This happens naturally when using create_cell_layer with input_df of one 
         per section. If not - adjust it while you build the cell layer
 
+        in addition to the "per section" graphs, also build the knn graph to store for future queries
 
         """
         unqS = self.unqS
@@ -1256,21 +1262,55 @@ class TissueGraph:
         logging.info("updating anndata")
         self.adata.obsp["SG"] = self.SG.get_adjacency_sparse()
         self.adata.obs[self.adata_mapping["node_size"]] = np.ones(self.XY.shape[0])
+
+        # get XYZ data
+        if save_knn:
+            logging.info("building knn query object")
+            XYZ = self.XYZ
+            _,knn = tmgu.build_knn_graph(self.XYZ,'euclidean')
+            self.SG_knn = knn
         logging.info("done building spatial graph")
+
+
+    def add_spatial_graph_edges(self,min_distance=2,max_distance=3):
+        """
+        creates additional connection between nodes that are proximate (between min,max) and are the same type 
+        """
+        # get list of candidate edges to add, i.e. they are between distance min and max of each other
+        EL = tmgu.find_node_pairs_by_distance(self.SG, min_distance, max_distance)        
+        TypeVec = self.Type
+        
+        # only keep such edges that are across unconnected type components
+        ELself = self.spatial_edge_list
+        ELself = ELself[np.take(TypeVec,ELself[:,0]) == np.take(TypeVec,ELself[:,1]),:]
+        TypeGraph = igraph.Graph(n=self.N, edges=ELself, directed = False)
+        cmp = TypeGraph.components().membership
+        # make sure that they are the same type
+
+        edge_to_keep = np.logical_and(np.take(TypeVec,EL[:,0]) == np.take(TypeVec,EL[:,1]),
+                              np.take(cmp,EL[:,0]) != np.take(cmp,EL[:,1]))
+
+        EL = EL[edge_to_keep,:]
+
+        self.SG.add_edges(EL)
+        # reset spatial_edge_list so that we get it from SG next time
+        self._spatial_edge_list = None
+
     
-    def contract_graph(self, TypeVec=None, return_useful_layer = True, feature_dim = 0):
-        """find zones/region, i.e. spatially continous areas in the graph the same (cell/microenvironment) type
-        
-        reduce graph size by merging spatial neighbors of same type. 
-        Given a vector of types, will contract the graph to merge vertices that are both next to each other and of the same type. 
-        
-        to deal with sections, i.e. discontinous spatial graphs, it first merges the SG list into a large grpah 
-        does all the calculations, and then splits it again. 
+    def contract_graph(self, Labels = None, feature_mat_calc = 'mean',return_useful_layer = True):
+        """ create a new TG that is a contraction of current one. 
+        Two types of contractions are supported: 
+        1. Using Type - when Labels is None will use self.Type 
+                        using spatially aware, i,e, will only merge connected components that have the same type
+        2. Using Labels - when Labels are provided, will just use these to merge nodes. 
+                          Doesn't care if they are/aren't connected, they still get merged
+
+        To speed calculation, can skip some steps if return_useful_layer is False
 
         Parameters
         ----------
-        TypeVec : 1D numpy array with dtype int (default value is self.Type)
-            a vector of Types for each node. If None, will use self.Type
+        Labels : 1D numpy array with dtype int (default value is self.Type)
+                 a vector of Types for each node. If None, will use self.Type
 
         Note
         ----
@@ -1282,51 +1322,40 @@ class TissueGraph:
             A TG object after vertices merging. 
         """
 
-        # Figure out which type to use
-        if TypeVec is None: 
-            TypeVec = self.Type
-
-        # convert to int if needed
-        if isinstance(TypeVec[0],str): 
-            _,TypeVec = np.unique(TypeVec,return_inverse = True)
-
-        # Merge the spatial graphs from multiple sections into one large 
+        # If Labels are non, use Type on connected component manner
+        if Labels is None:
+            Labels = self.Type 
+            # get edge list - note that Spatial graphs work with indexes not cell names      
+            EL = self.spatial_edge_list
         
-        # get edge list - note that Spatial graphs work with indexes not cell names      
-        EL = self.spatial_edge_list
+            # only keep edges where neighbors are of same types
+            EL = EL[np.take(Labels,EL[:,0]) == np.take(Labels,EL[:,1]),:]
         
-        # only keep edges where neighbors are of same types
-        EL = EL[np.take(TypeVec,EL[:,0]) == np.take(TypeVec,EL[:,1]),:]
-        
-        # remake a graph with potentially many components
-        IsoZonesGraph = igraph.Graph(n=self.N, edges=EL, directed = False)
+            # remake a graph with potentially many components
+            IsoZonesGraph = igraph.Graph(n=self.N, edges=EL, directed = False)
 
-        # commented next line for perfornace as it shouldn't be needed
-        # the input graph is simnple and we're only removing edges
-        #IsoZonesGraph = IsoZonesGraph.as_undirected().simplify()
-
-        # because we used both type and proximity, the original graph (based only on proximity)
-        # that was a single component graph will be broken down to multiple components 
-        # finding clusters for each component. 
-        cmp = IsoZonesGraph.components()
+            # because we used both type and proximity, the original graph (based only on proximity)
+            #  will be broken down to multiple components (for each original component)
+            # finding clusters for each component. 
+            cmp = IsoZonesGraph.components()
         
-        IxMapping = np.asarray(cmp.membership)
+            IxMapping = np.asarray(cmp.membership)
+        else: 
+            _,IxMapping = np.unique(Labels,return_inverse=True)
         
         ZoneName, ZoneSingleIx, ZoneSize = np.unique(IxMapping, return_index=True, return_counts = True)
         
         # calculate zones feature_mat
-        # if it's an empty sparse matrix of if np.ndarray with all values are Nan, 
+        # if Labels where provided, , 
         # just replace with tuple of the required size
-        if not return_useful_layer or self.feature_mat is None:
-            zone_feat_mat = (len(ZoneSize),feature_dim)
-        elif scipy.sparse.issparse(self.feature_mat) and self.feature_mat.nnz==0:
-            zone_feat_mat = (len(ZoneSize),self.feature_mat_shape[1])
-        elif isinstance(self.feature_mat,np.ndarray) and np.all(np.isnan(self.feature_mat)):
-            zone_feat_mat = (len(ZoneSize),self.feature_mat_shape[1])
-        else: 
+        if not return_useful_layer or feature_mat_calc is None:
+            zone_feat_mat = (len(ZoneSize),1)
+        elif feature_mat_calc == 'mean':
             df = pd.DataFrame(data = self.feature_mat)
             df['type']=IxMapping
             zone_feat_mat = np.array(df.groupby(['type']).mean())
+        else: 
+            raise ValueError(f"unknown value {feature_mat_calc} for feature_mat_calc")
             
         # create new SG for zones 
         ZSG = self.SG.copy()
@@ -1360,7 +1389,7 @@ class TissueGraph:
         ZoneGraph.SG = ZSG
         ZoneGraph.names = ZoneName
         ZoneGraph.node_size = ZoneSize
-        ZoneGraph.Type = TypeVec[ZoneSingleIx]
+        ZoneGraph.Type = Labels[ZoneSingleIx]
         ZoneGraph.Upstream = IxMapping
         
         return(ZoneGraph)
@@ -1654,7 +1683,7 @@ class Taxonomy:
         """save to basepath using Taxonomy name
         """
         if not os.path.exists(self.basepath):
-            os.makedirs(self.basepath)
+            os.makedirs(self.basepath)   
         if not self.is_empty():
             self.adata.write_h5ad(os.path.join(self.basepath, f"{self.name}.h5ad"))
                 
