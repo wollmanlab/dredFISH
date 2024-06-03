@@ -3,11 +3,15 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from matplotlib.gridspec import GridSpec
 
+from scipy.sparse import csr_matrix
+from scipy.spatial import cKDTree
 
 import seaborn as sns
 import os
 
 import igraph
+import pynndescent
+
 from scipy import sparse
 from sklearn.neighbors import NearestNeighbors
 
@@ -57,6 +61,153 @@ def edge_list_from_XY_with_k(XY,k,include_dist = False):
         ELK = np.hstack((ELK,dists[:,np.newaxis]))
     return ELK
 
+"""
+The following functions (connect_type_components x2, find_node_pairs_by_distance) 
+are attempts to fix fragmentation of merged layers by adding more edges. 
+For Allen brain data these turned to be too computationaly expensive so I 
+moved to using SDK directly. Keeping them here commented for any future interest 
+in approaches on adding edges. The connect_type_components using epsilon distance
+and does lots of kdtree searches. The find_node_pairs_by_distance works on the graph and 
+find short distances by taking the power of Adj matrix. It kind of worked for ~4 millions
+cells up to 3 distance away, but I couldn't get the 10 to work... 
+"""
+
+# def connect_type_components(graph, points, types, sections, distance_threshold):
+#     # Find all components
+#     components = graph.components()
+#     section_type_to_components = {}
+#     component_details = {}
+
+#     # Organize components by section and type, calculate centroids and ranges directly
+#     for idx, comp in enumerate(components):
+#         if comp:
+#             comp_points = points[comp]
+#             centroid = np.mean(comp_points, axis=0)
+#             max_distance = np.max(np.linalg.norm(comp_points - centroid, axis=1))
+#             section = sections[comp[0]]
+#             node_type = types[comp[0]]
+#             key = (section, node_type)
+#             if key not in section_type_to_components:
+#                 section_type_to_components[key] = []
+#             section_type_to_components[key].append(idx)
+#             if idx not in component_details or 'tree' not in component_details[idx]:
+#                 tree = cKDTree(comp_points)
+#                 component_details[idx] = {'centroid': centroid, 'max_distance': max_distance, 'nodes': comp, 'tree': tree}
+#             else:
+#                 # Update details but reuse the existing tree
+#                 component_details[idx].update({'centroid': centroid, 'max_distance': max_distance, 'nodes': comp})
+
+#     # Connect components within the same section and type
+#     for (section, t), comp_indices in section_type_to_components.items():
+#         if len(comp_indices) > 1:
+#             for i in range(len(comp_indices)):
+#                 for j in range(i + 1, len(comp_indices)):
+#                     idx_i, idx_j = comp_indices[i], comp_indices[j]
+#                     details_i = component_details[idx_i]
+#                     details_j = component_details[idx_j]
+                    
+#                     # Preliminary check using centroids and ranges
+#                     if np.linalg.norm(details_i['centroid'] - details_j['centroid']) <= details_i['max_distance'] + details_j['max_distance'] + distance_threshold:
+#                         # Detailed check using cached KD-Tree on nodes
+#                         tree_i = details_i['tree']
+#                         for node_j in details_j['nodes']:
+#                             indices_within_threshold = tree_i.query_ball_point(points[node_j], distance_threshold)
+#                             if indices_within_threshold:
+#                                 # Connect the first valid node pair found
+#                                 graph.add_edge(details_i['nodes'][indices_within_threshold[0]], node_j)
+#                                 # Break after the first connection to avoid multiple connections between the same components
+#                                 break
+
+#     return graph
+
+# def connect_type_components(graph, points, types, sections, distance_threshold):
+#     # Build KD-tree for efficient distance queries
+#     tree = cKDTree(points)
+    
+#     # Find all components
+#     components = graph.components()
+    
+#     # Group components by section and type
+#     section_to_components = {}
+#     for idx, comp in enumerate(components):
+#         if comp:  # Ensure the component is not empty
+#             section = sections[comp[0]]  # Assuming all nodes in a component have the same section
+#             node_type = types[comp[0]]  # Assuming all nodes in a component have the same type
+#             if section not in section_to_components:
+#                 section_to_components[section] = {}
+#             if node_type not in section_to_components[section]:
+#                 section_to_components[section][node_type] = []
+#             section_to_components[section][node_type].append(comp)
+    
+#     # Connect components of the same type within the same section
+#     for section, type_to_comps in section_to_components.items():
+#         for comps in type_to_comps.values():
+#             if len(comps) > 1:
+#                 for i in range(len(comps)):
+#                     for j in range(i + 1, len(comps)):
+#                         # Get nodes in both components
+#                         nodes_i = comps[i]
+#                         nodes_j = comps[j]
+                        
+#                         # Query all points in nodes_i against all points in nodes_j using query_ball_point
+#                         for node_i in nodes_i:
+#                             indices_within_threshold = tree.query_ball_point(points[node_i], distance_threshold)
+#                             # Filter indices to only include those in nodes_j
+#                             valid_indices = [idx for idx in indices_within_threshold if idx in nodes_j]
+                            
+#                             if valid_indices:
+#                                 # Connect the first valid node pair found
+#                                 graph.add_edge(node_i, valid_indices[0])
+#                                 # No need to break or update components here
+#     return graph
+
+# def find_node_pairs_by_distance(G, min_length, max_length):
+#     # Convert igraph to scipy CSR format sparse matrix
+#     all_pairs = []
+
+#     # Identify the components
+#     components = G.components()
+
+#     # Process each component separately
+#     for cnt,component in enumerate(components):
+#         print(f"components={cnt}")
+#         # Get the subgraph for the current component
+#         subgraph = G.subgraph(component)
+        
+#         # Check if the subgraph has at least two nodes and at least one edge
+#         if subgraph.vcount() > 1 and subgraph.ecount() > 0:
+#             # Convert subgraph to scipy CSR format sparse matrix
+#             adj_list = subgraph.get_adjacency_sparse(attribute=None)
+#             A = csr_matrix(adj_list)
+
+#             # Initialize a sparse matrix to keep track of paths of acceptable lengths
+#             result_matrix = csr_matrix((A.shape[0], A.shape[0]), dtype=bool)
+
+#             # Current power of A (start with A itself, which is A^1)
+#             A_power = A.copy()
+
+#             for length in range(1, max_length + 1):
+#                 if length >= min_length:
+#                     # Update result matrix to include paths of the current length
+#                     result_matrix += (A_power != 0)
+
+#                 # Compute the next power of A if needed
+#                 if length < max_length:
+#                     A_power = A_power.dot(A)
+
+#             # Convert result_matrix to boolean
+#             result_matrix = result_matrix.astype(bool)
+
+#             # Extract indices from the result matrix where there is a path within the range
+#             result_pairs = np.transpose(result_matrix.nonzero())
+
+#             # Adjust indices to global graph indices and filter out self-loops
+#             final_pairs = [(component[i], component[j]) for i, j in result_pairs if i != j]
+            
+#             # Append to the list of all pairs
+#             all_pairs.extend(final_pairs)
+
+#     return np.array(all_pairs)
 
 def adjacency_to_igraph(adj_mtx, weighted=False, directed=True, simplify=True):
     """
@@ -161,6 +312,34 @@ def get_local_type_abundance(
     env_mat = np.nan_to_num(env_mat, 0)
     
     return env_mat
+
+def build_knn_graph(X, metric, n_neighbors=15, accuracy={'prob':1, 'extras':1.5}, metric_kwds={}): 
+    
+    # checks if we have enough rows 
+    n_neighbors = min(X.shape[0]-1,n_neighbors)
+
+    knn = pynndescent.NNDescent(X,n_neighbors = n_neighbors,
+                                metric = metric,
+                                diversify_prob = accuracy['prob'],
+                                pruning_degree_multiplier = accuracy['extras'],
+                                metric_kwds = metric_kwds)
+
+    # get indices and remove self. 
+    (indices,distances) = knn.neighbor_graph
+
+    # take the first K values remove first self similarities    
+    indices = indices[:,1:]
+    distances = distances[:,1:]
+
+    id_from = np.tile(np.arange(indices.shape[0]),indices.shape[1])
+    id_to = indices.flatten(order='F')
+
+    # build graph
+    edgeList = np.vstack((id_from,id_to)).T
+    G = igraph.Graph(n=X.shape[0], edges=edgeList, edge_attrs={'weight': distances.flatten(order='F')})
+    G.simplify()
+
+    return (G,knn)
 
 class GraphPercolation:
     def __init__(self, XY, type_vec, maxK = None):
