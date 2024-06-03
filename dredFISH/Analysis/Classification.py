@@ -109,7 +109,7 @@ class KNNClassifier(Classifier):
         What metric to use to determine similarity
         
     """
-    def __init__(self,k=1,approx_nn= 30,metric = 'correlation'):
+    def __init__(self,k=1,approx_nn= 30,metric = 'correlation', tax = None):
         """Define a KNN classifier
         
         Parameters
@@ -121,7 +121,7 @@ class KNNClassifier(Classifier):
         metric : str
             what distance metric to use? 
         """
-        super().__init__(tax = None)
+        super().__init__(tax = tax)
         self.k = k
         self.approx_nn = approx_nn
         self.metric = metric
