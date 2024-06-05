@@ -145,8 +145,11 @@ def MultiSectionMapView(TMG, sections=None, level_type="cell", map_type="type", 
     for i, section in enumerate(sections):
 
         # Create a SingleMapView for the current section
-        
-        V = SingleMapView(TMG, section=section, level_type=level_type, map_type=map_type, **kwargs)
+        if map_type=='colorpleth':
+            val_to_map = TMG.Layers[0].get_feature_mat(section=section)[:,kwargs.get('basis',0)]
+            V = SingleMapView(TMG, section=section, level_type=level_type, map_type=map_type, **kwargs,val_to_map=val_to_map)
+        elif map_type=='type':
+            V = SingleMapView(TMG, section=section, level_type=level_type, map_type=map_type, **kwargs)
 
         # Plot the map on the corresponding axis
         V.show()
@@ -154,7 +157,7 @@ def MultiSectionMapView(TMG, sections=None, level_type="cell", map_type="type", 
         V.Panels[0].plot()  # Replot on the assigned axis
         plt.close(V.fig)
 
-        # Remove axis labels and ticks for cleaner appearance
+        # Remove axis labels and ticks for cleaner appearances
         axes[i].set_xticks([])
         axes[i].set_yticks([])
 
@@ -1016,3 +1019,123 @@ def frequency_table(df, col1_name, col2_name):
         # Update the result DataFrame with the counts
         result_df.loc[val1, value_counts.index] = value_counts.values
     return result_df.fillna(0)  # Fill missing values with 0
+
+def MultiSectionScatter(TMG,sections=None,layer=None,bit=None,n_columns=4,facecolor='black',cmap='jet',global_contrast=True,quantile=[0.05,0.95],vmin=None,vmax=None,sort_order=True,s=0.01):
+    """
+    Generate a scatter plot for each section in the given TMG object.
+
+    Parameters
+    ----------
+    TMG : object
+        The TMG object containing the data to be plotted.
+    sections : list, optional
+        The sections to be plotted. If None, all unique sections in TMG will be plotted.
+    layer : str, optional
+        The layer of the TMG object to be used. If None, 'X' will be used.
+    bit : str, optional
+        The bit to be used. If None, the first index of the adata.var in the first layer of TMG will be used.
+    n_columns : int, optional
+        The number of columns in the plot grid. Default is 4.
+    facecolor : str, optional
+        The face color of the plot. Default is 'black'.
+    cmap : str, optional
+        The color map to be used for the scatter plots. Default is 'jet'.
+    global_contrast : bool, optional
+        Whether to use global contrast for the color scale. If False, local contrast will be used. Default is True.
+    percentile : list, optional
+        The percentiles to be used for calculating the vmin and vmax for the color scale. Default is [5, 95].
+
+    Returns
+    -------
+    None
+
+    """
+    set_vmin = vmin
+    set_vmax = vmax
+
+    # If layer is not None, copy the corresponding layer to adata.X
+    X = TMG.Layers[0].adata.X.copy()
+    if not isinstance(layer,type(None)):
+        TMG.Layers[0].adata.X = TMG.Layers[0].adata.layers[layer].copy()
+    else:
+        layer = 'X'
+
+    # If bit is None, set it to the first index of the adata.var in the first layer of TMG
+    if isinstance(bit,type(None)):
+        bit = TMG.Layers[0].adata.var.index[0]
+    elif isinstance(bit,int):
+        bit = TMG.Layers[0].adata.var.index[bit]
+    else:
+        if not bit in TMG.Layers[0].adata.var.index:
+            print(f"{bit} is not in the adata.var index.")
+            return
+
+    # Set the text color based on the face color
+    if facecolor=='black':
+        textcolor='white'
+    else:
+        textcolor='black'
+
+    # If sections is None, set it to the unique sections in TMG
+    if isinstance(sections,type(None)):
+        sections = TMG.unqS
+
+    # Calculate the number of rows for the plot
+    n_rows = math.ceil(len(sections)/n_columns)
+
+    # Set the figure size
+    figsize = (5*n_columns, 3.5*n_rows)
+
+    # Create a subplot with the calculated number of rows and columns
+    fig, axs = plt.subplots(n_rows, n_columns, figsize=figsize)
+
+    # Set the face color of the figure
+    fig.patch.set_facecolor(facecolor)
+
+    # Flatten the axes array
+    axs = axs.flatten()
+
+    # If global_contrast is True, calculate the vmin and vmax for the color scale
+    if global_contrast:
+        C = TMG.Layers[0].get_feature_mat()[:,np.isin(TMG.Layers[0].adata.var.index,[bit])]
+        if not isinstance(set_vmin,type(None)):
+            vmin = set_vmin
+        else:
+            vmin = np.quantile(C,quantile[0])
+        if not isinstance(set_vmax,type(None)):
+            vmax = set_vmax
+        else:
+            vmax = np.quantile(C,quantile[1])
+        fig.suptitle(f"{layer} {bit} vmin{vmin:.2f}|vmax{vmax:.2f}",color=textcolor)
+    else:
+        fig.suptitle(f"{layer} {bit}",color=textcolor)
+
+    # Turn off the axis for each subplot
+    for ax in axs:
+        ax.axis('off')
+
+    # For each section, plot the scatter plot
+    for i, section in enumerate(sections):
+        ax = axs[i]
+        XY = TMG.Layers[0].get_XY(section=section)
+        C = TMG.Layers[0].get_feature_mat(section=section)[:,np.isin(TMG.Layers[0].adata.var.index,[bit])].ravel()
+        if not global_contrast:
+            if not isinstance(set_vmin,type(None)):
+                vmin = set_vmin
+            else:
+                vmin = np.quantile(C,quantile[0])
+            if not isinstance(set_vmax,type(None)):
+                vmax = set_vmax
+            else:
+                vmax = np.quantile(C,quantile[1])
+        if sort_order:
+            order = np.argsort(C)
+        else:
+            order = np.array(range(C.shape[0]))
+        ax.scatter(XY[order,0], XY[order,1], c=C[order], s=s,cmap=cmap,vmin=vmin,vmax=vmax)
+        if not global_contrast:
+            ax.set_title(f"{section} {vmin:.2f}|{vmax:.2f}",color=textcolor)
+        else:
+            ax.set_title(f"{section}",color=textcolor)
+
+    TMG.Layers[0].adata.X = X.copy()
