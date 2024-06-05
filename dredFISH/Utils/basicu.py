@@ -8,7 +8,7 @@ from scipy import stats
 from scipy import sparse
 from scipy.interpolate import interp1d
 from sklearn.linear_model import LinearRegression,RANSACRegressor
-
+import matplotlib.pyplot as plt
 import logging
 
 def reset_logging(**kwargs):
@@ -802,4 +802,187 @@ def zscore(X,allow_nan=False, ignore_zero=False, zero_threshold=1e-10,balancedX=
         if kwargs['axis'] ==1:
             outX = outX.T
     return outX
+
+def filter_cells_nuc(adata, thresh=10, vis=False, inplace=False):
+    """
+    This function masks cells that have too big of a change in nuclear stain across rounds.
+
+    Parameters:
+    adata: The AnnData object containing the data.
+    thresh: The threshold for masking cells. Default is 10.
+    vis: A boolean indicating whether to visualize the data. Default is True.
+    inplace: A boolean indicating whether to modify the original AnnData object. Default is False.
+
+    Returns:
+    If inplace is True, returns the modified AnnData object.
+    If inplace is False, returns the mask array.
+    """
+    
+    # Copy the AnnData object
+    adata = adata.copy()
+    
+    # Get the 'nuc_raw' layer data
+    nuc = np.array(adata.layers['nuc_raw']).copy()
+    
+    # Get the minimum value of nuc across the second axis
+    nuc_min = np.min(nuc, axis=1)
+    
+    # Scale the nuc data so that the median of each column is equal to the global median
+    nuc_scaled = nuc * np.median(np.median(nuc, axis=0, keepdims=True)) / np.median(nuc, axis=0, keepdims=True)
+    
+    # Copy the scaled nuc data
+    zscored = nuc_scaled.copy()
+    
+    # Subtract the median of each row from the corresponding row
+    zscored = zscored - np.median(zscored, axis=1, keepdims=True)
+    
+    # Get the global standard deviation
+    std = np.median(np.median(np.abs(zscored), axis=1, keepdims=True))
+    
+    # Normalize the zscored data
+    zscored = zscored / std
+    
+    # Create a mask where the absolute value of zscored is greater than the threshold
+    mask = np.abs(zscored) > thresh
+    
+    # Set the mask to False where the minimum value of nuc is less than the threshold
+    mask[nuc_min < thresh, :] = False
+    
+    # If vis is True, visualize the data
+    if vis:
+        vmin = -20
+        vmax = 20
+        plt.figure(figsize=(10, 10))
+        for i in range(zscored.shape[1]):
+            plt.hist(np.clip(zscored[:, i], vmin, vmax), bins=np.linspace(vmin, vmax, 100), label=i, alpha=0.1)
+        plt.show()
+    
+    # If inplace is True, modify the original AnnData object
+    if inplace:
+        adata.layers['nuc_mask'] = mask
+        return adata
+    
+    # If inplace is False, return the mask array
+    else:
+        return mask
+
+def correct_linear_staining_patterns(X, XY, Section=None):
+    """
+    This function corrects for linear staining patterns in the data.
+
+    Parameters:
+    X: A 2D numpy array where each row is a cell and each column is a feature.
+    XY: A 2D numpy array where each row is a cell and the columns are the x and y coordinates of the cell.
+    Section: A 1D numpy array indicating the section each cell belongs to. If None, all cells are assumed to belong to the same section.
+
+    Returns:
+    out_X: A 2D numpy array with the same shape as X, but with corrected values.
+    """
+    
+    # Initialize the output array with zeros
+    out_X = np.zeros(X.shape, dtype=X.dtype)
+    
+    # If Section is None, assume all cells belong to the same section
+    if isinstance(Section, type(None)):
+        Section = np.ones(X.shape[0])
+    
+    # For each unique section
+    for section in np.unique(Section):
+        # Get a boolean mask where each cell belongs to the current section
+        m = Section == section
+        
+        # Get the x and y coordinates of the cells in the current section
+        xy = XY[m, :]
+        
+        # For each feature
+        for i in range(X.shape[1]):
+            # Get the values of the current feature for the cells in the current section
+            x = np.array(X[m, i]).copy()
+            
+            # Initialize a linear regression model
+            model = LinearRegression()
+            
+            # Fit the model to the data
+            model.fit(xy, x)
+            
+            # Get the predicted values of the model
+            predicted_values = model.predict(xy)
+            
+            # Calculate the scalar to correct the values
+            scalar = predicted_values.mean() / predicted_values
+            
+            # Correct the values of the current feature for the cells in the current section
+            out_X[m, i] = x * scalar
+    
+    # Return the corrected data
+    return out_X
+
+def batch_bit_scaling(X, Section=None):
+    """
+    This function scales each bit (feature) in each batch (section) so that the median value is the same across batches.
+
+    Parameters:
+    X: A 2D numpy array where each row is a cell and each column is a feature.
+    Section: A 1D numpy array indicating the section each cell belongs to. If None, all cells are assumed to belong to the same section.
+
+    Returns:
+    out_X: A 2D numpy array with the same shape as X, but with scaled values.
+    """
+    
+    # Initialize the output array with zeros
+    out_X = np.zeros(X.shape, dtype=X.dtype)
+    
+    # If Section is None, assume all cells belong to the same section
+    if isinstance(Section, type(None)):
+        Section = np.ones(X.shape[0])
+    
+    # For each feature
+    for i in range(X.shape[1]):
+        # Get the values of the current feature
+        x = np.array(X[:, i]).copy()
+        
+        # Calculate the median of the clipped values
+        median = np.median(np.clip(x, 1, None))
+        
+        # For each unique section
+        for section in np.unique(Section):
+            # Get a boolean mask where each cell belongs to the current section
+            m = Section == section
+            
+            # Get the values of the current feature for the cells in the current section
+            x = np.array(X[m, i]).copy()
+            
+            # Scale the values of the current feature for the cells in the current section
+            out_X[m, i] = x * median / np.median(np.clip(x, 1, None))
+    
+    # Return the scaled data
+    return out_X
+
+
+def robust_zscore(X, axis=0):
+    """
+    This function applies a robust z-score normalization to the data along the specified axis.
+
+    Parameters:
+    X: A numpy array to be normalized.
+    axis: The axis along which the normalization is applied. Default is 0.
+
+    Returns:
+    X: A numpy array with the same shape as the input, but with normalized values.
+    """
+    
+    # Copy the input array
+    X = np.array(X).copy()
+    
+    # Subtract the median of the specified axis from the corresponding axis
+    X = X - np.median(X, axis=axis, keepdims=True)
+    
+    # Calculate the median absolute deviation along the specified axis
+    std = np.median(np.abs(X), axis=axis, keepdims=True)
+    
+    # Divide the specified axis by its corresponding median absolute deviation
+    X = X / std
+    
+    # Return the normalized data
+    return X
 
