@@ -326,7 +326,6 @@ def get_polygons_vertices(polygons,return_inner_verts = True):
 
 def plot_polygon_collection(verts_or_polys,
                             rgb_faces = None, # one per polygon
-                            rgb_edges = None, # 
                             ax = None,
                             xlm = None,
                             ylm = None,
@@ -363,19 +362,14 @@ def plot_polygon_collection(verts_or_polys,
         verts_rot = [np.matmul(v,rot_mat) for v in verts_cntr]
         # add back the centroids. 
         verts = [v+xy_cntr for v in verts_rot]
-
-
-        
+   
 
     # verify rgb inputs and deal with cases where we only want edges
-    assert rgb_edges is not None or rgb_faces is not None,"To plot either pleaes provide RGB array (nx3) for either edges or faces "
-    if rgb_edges is not None and rgb_faces is None:
-        bck_color = np.array(background_color)
-        rgb_faces = np.repeat(bck_color.T,len(verts),0)
+    assert rgb_faces is not None,"To plot provide RGB array (nx3)"
 
     # Create the PolyCollection from vertices and set face/edge colors
     p = PolyCollection(verts)
-    p.set(array=None, facecolors=rgb_faces,edgecolors = rgb_edges)
+    p.set(array=None, facecolors=rgb_faces,edgecolors = 'none')
     if ax is None: 
         fig = plt.figure(figsize = (8,10))
         ax = fig.add_subplot()
@@ -691,7 +685,7 @@ def in_graph_large_connected_components(XY,Section = None,max_dist = 300,large_c
 
     return(in_large_comp)
 
-def merge_polygons_by_ids(polys,ids,max_buff = 0.01,dbuffer=0.001, smooth_telerance = 0.05):
+def merge_polygons_by_ids(polys,ids,max_buff = 0.01,dbuffer=0.001, smooth_telerance = None):
     """
     merges nearby poygons based on id vectors. 
     if polygons are not really touching, it will expand them slightsly until they do. 
@@ -703,6 +697,11 @@ def merge_polygons_by_ids(polys,ids,max_buff = 0.01,dbuffer=0.001, smooth_telera
     for uid in unq_id:
         ix = np.flatnonzero(ids == uid)
         poly_list = [polys[i] for i in ix]
+        for i,poly in enumerate(poly_list):
+            if not poly.is_valid:
+                new_exterior = poly.exterior
+                new_holes = [hole for hole in poly.interiors if Polygon(new_exterior).contains(Polygon(hole))]
+                poly_list[i] = Polygon(new_exterior, new_holes)
         merged_poly = unary_union(poly_list)
         # if merging didn't work, i.e. it is still a multipolygon 
         # first try to increase buffer and after that just take biggest
@@ -713,6 +712,7 @@ def merge_polygons_by_ids(polys,ids,max_buff = 0.01,dbuffer=0.001, smooth_telera
                 merged_poly = merged_poly.buffer(bf).buffer(-bf)
             if isinstance(merged_poly, MultiPolygon):  # Fallback if still a MultiPolygon
                 merged_poly = max(merged_poly.geoms, key=lambda p: p.area)  # Select the largest polygon
+
         all_merged_polys.append(merged_poly)
 
     if smooth_telerance is not None: 

@@ -505,7 +505,6 @@ class Map(Panel):
         else: 
             geomu.plot_polygon_collection(self.geom_collection,
                                           rgb_faces = self.rgb_faces,
-                                          rgb_edges = self.rgb_edges, 
                                           ax = self.ax,
                                           xlm = self.xlim,ylm = self.ylim,
                                           rotation = self.rotation)
