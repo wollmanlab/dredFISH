@@ -19,6 +19,7 @@ from scipy.interpolate import Rbf
 import math
 import time
 import anndata
+import warnings
 
 class Registration_Class(object):
     def __init__(self, XYZC, 
@@ -30,6 +31,8 @@ class Registration_Class(object):
         self.verbose=verbose
         self.window = 0.1
         self.overwrite = False
+
+        warnings.filterwarnings('ignore', category=UserWarning, message='Trying to unpickle estimator LinearRegression*')
 
         for handler in logging.root.handlers[:]:
             logging.root.removeHandler(handler)

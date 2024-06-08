@@ -387,7 +387,7 @@ class TissueMultiGraph:
         return 
     
     def create_cell_layer(self,  
-                          norm='none', 
+                          norm='scalar_then_regression', 
                           register_to_ccf = True,
                           metric='cosine',
                           build_spatial_graph = False,
@@ -403,9 +403,9 @@ class TissueMultiGraph:
 
          
         """
-        allowed_options = ['logrowmedian','log','none','logregress','robust_regression']
-        if norm not in allowed_options:
-            raise ValueError(f"Choose norm param from {allowed_options}")
+        # allowed_options = ['logrowmedian','log','none','logregress','robust_regression']
+        # if norm not in allowed_options:
+        #     raise ValueError(f"Choose norm param from {allowed_options}")
         
         for TG in self.Layers:
             if TG.layer_type == "cell":
@@ -413,6 +413,7 @@ class TissueMultiGraph:
                 return
         # find list of sections
         adatas = []
+        shared_bits = ''
         for index,row in self.input_df.iterrows():
             animal = row['animal']
             section_acq_name = row['section_acq_name']
@@ -448,35 +449,17 @@ class TissueMultiGraph:
                 section_name = section_acq_name
             adata.obs['section_name'] = section_name
             adata.obs[self.adata_mapping['Section']] = section_name
+            if isinstance(shared_bits,str):
+                shared_bits = list(adata.var.index)
+            else:
+                shared_bits = [i for i in shared_bits if i in list(adata.var.index)]
             adatas.append(adata)
 
-        adata = anndata.concat(adatas)
-        print(f"{adata.shape[0]} cells across {adata.obs[self.adata_mapping['Section']].unique().shape[0]} sections")
+        adata = anndata.concat([temp[:,np.isin(temp.var.index,shared_bits)] for temp in adatas])
+        logging.info(f"{adata.shape[0]} cells across {adata.obs[self.adata_mapping['Section']].unique().shape[0]} sections")
 
         """ Sort adata by section name """
-        adata = adata[adata.obs[self.adata_mapping['Section']].argsort()]
-
-
-        """ Filter Out Non Cells and Batch Correct"""
-        dapi_score = np.zeros_like(adata.layers['raw'].copy())
-        for section in adata.obs[self.adata_mapping['Section']].unique():
-            m = adata.obs[self.adata_mapping['Section']]==section
-            X = adata.layers['nuc_raw'][m,:].copy()
-            X = np.clip(X,1,None)
-            X = np.log10(X/np.mean(X,axis=1,keepdims=True))
-            dapi_score[m,:] = X.copy() # Values above 0.5 are within normal range 
-        X = dapi_score
-        X = X/(2*np.std(X))
-        X = np.abs(X)
-        X = stats.norm.pdf(X)/stats.norm.pdf(0)
-        adata.layers['dapi_score'] = X.copy()
-
-        cell_mask = np.ones(adata.shape[0])>0
-        cell_mask = cell_mask & (np.log10(np.clip(adata.X.sum(1),1,None))>2) 
-        cell_mask = cell_mask & (np.log10(np.clip(adata.obs['dapi'],1,None))>2)
-        adata = adata[cell_mask,:].copy()
-
-        print(f"{adata.shape[0]} cells across {adata.obs[self.adata_mapping['Section']].unique().shape[0]} sections")
+        adata = adata[adata.obs[self.adata_mapping['Section']].argsort()].copy()
 
         if register_to_ccf: 
             XY = np.array(adata.obs[["ccf_z","ccf_y"]])
@@ -484,31 +467,34 @@ class TissueMultiGraph:
             XY = np.array(adata.obs[["stage_x","stage_y"]])
         S = np.array(adata.obs[self.adata_mapping['Section']])
 
-        """ Normalize """
-        X = XY
-        adata.layers['normalized'] = adata.layers['raw'].copy()
-        """ First Correct for linear spatial patterns"""
-        for i,bit in tqdm(enumerate(adata.var.index),desc='Stain Correction'):
-            bit_mask = np.array(adata.layers['dapi_score'][:,np.array(adata.var.index)==bit]>0.3).ravel()
-            for batch in adata.obs[self.adata_mapping['Section']].unique():
-                m = adata.obs[self.adata_mapping['Section']]==batch
-                c = adata.layers['normalized'][m&bit_mask,i].copy()
-                model = LinearRegression()
-                model.fit(X[m&bit_mask,:], c)
-                predicted_values = model.predict(X[m,:])
-                scalar = predicted_values.mean()/predicted_values
-                c = adata.layers['normalized'][m,i].copy()
-                adata.layers['normalized'][m,i] = c*scalar
-        """  Second Assume that there is a batch scalar for each bit (assume median cell is roughly the same across batches )"""
-        for i,bit in tqdm(enumerate(adata.var.index),desc='Batch Correction'):
-            bit_mask = np.array(adata.layers['dapi_score'][:,np.array(adata.var.index)==bit]>0.3).ravel()
-            median = np.median(adata.layers['normalized'][bit_mask,i])
-            for batch in adata.obs[self.adata_mapping['Section']].unique():
-                m = adata.obs[self.adata_mapping['Section']]==batch
-                c = adata.layers['normalized'][m,i].copy()
-                adata.layers['normalized'][m,i] = c*(median/np.clip(np.median(c),1,None))
+        """ Filter Out Non Cells Spatially""" #Parameterize
+        logging.info('Filtering Cells By Spatial Proximity')
+        M = np.ones(adata.shape[0])==1
+        for section in np.unique(S):
+            m = S==section
+            M[m] = geomu.in_graph_large_connected_components(XY[m,:],Section = None,max_dist = 0.05,large_comp_def = 0,plot_comp = False)
+        adata.obs['in_large_comp'] = M#geomu.in_graph_large_connected_components(XY,Section = S,max_dist = 0.05,large_comp_def = 0,plot_comp = False)
+        adata = adata[adata.obs['in_large_comp']==True].copy()
+        logging.info(f"{adata.shape[0]} cells across {adata.obs[self.adata_mapping['Section']].unique().shape[0]} sections")
 
-        FISHbasis = adata.layers['normalized'].copy()
+        """ Filter Out Non Cells By Nuc Stain""" #Parameterize
+        logging.info('Filtering Cells By Nuc Stain')
+        adata.layers['nuc_mask'] = basicu.filter_cells_nuc(adata)
+        adata = adata[np.sum(adata.layers['nuc_mask']==False,axis=1)>0].copy() # Harshest possible filter get rid of any cells that are bad in any bit
+        logging.info(f"{adata.shape[0]} cells across {adata.obs[self.adata_mapping['Section']].unique().shape[0]} sections")
+
+        """ Minimum Sum Filter """ #Parameterize
+        logging.info('Filtering Cells By Minimum Raw Sum')
+        adata = adata[np.clip(np.array(adata.layers['raw']).copy().sum(1),1,None)>100].copy()
+        logging.info(f"{adata.shape[0]} cells across {adata.obs[self.adata_mapping['Section']].unique().shape[0]} sections")
+
+        if register_to_ccf: 
+            XY = np.array(adata.obs[["ccf_z","ccf_y"]])
+        else: 
+            XY = np.array(adata.obs[["stage_x","stage_y"]])
+        S = np.array(adata.obs[self.adata_mapping['Section']])
+
+        FISHbasis = np.array(adata.layers['raw'].copy()).copy()
         if norm == 'robust_regression':
             FISHbasis_norm = basicu.normalize_fishdata_robust_regression(FISHbasis)
         elif norm == 'logrowmedian':
@@ -517,8 +503,14 @@ class TissueMultiGraph:
             FISHbasis_norm = basicu.normalize_fishdata_log(FISHbasis)
         elif norm == 'logregress': 
             FISHbasis_norm = basicu.normalize_fishdata_log_regress(FISHbasis)
+        elif norm == 'none':
+            FISHbasis_norm = FISHbasis.copy()
+        elif norm == 'scalar_then_regression':
+            FISHbasis_norm = basicu.correct_linear_staining_patterns(FISHbasis.copy(),XY,Section=S)
+            FISHbasis_norm = basicu.batch_bit_scaling(FISHbasis_norm.copy(),Section=S)
+            FISHbasis_norm = basicu.normalize_fishdata_robust_regression(FISHbasis_norm.copy())
         else:
-            FISHbasis_norm = FISHbasis
+            raise ValueError(f"Norm {norm} is not a valid option")
         adata.X = FISHbasis_norm
         adata.layers['normalized'] = FISHbasis_norm.copy()
 
@@ -1129,6 +1121,14 @@ class TissueGraph:
             return [self.XY[self.Section == sec, :] for sec in section]
         else: 
             return(self.XY[self.Section == section,:])
+
+    def get_obs(self,column,section = None):
+        if section is None: 
+            return(self.adata.obs[column])
+        elif isinstance(section, list):
+            return [self.adata.obs[column][self.Section == sec, :] for sec in section]
+        else: 
+            return(self.adata.obs[column][self.Section == sec, :])
         
     def get_N(self, section=None): 
         if section is None: 
