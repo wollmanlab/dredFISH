@@ -130,6 +130,9 @@ class TissueMultiGraph:
 
         """
 
+        # set hidden attribute _unqS to None to reduce future calls for np.unique
+        self._unqS = None
+
         # check if file exist in basepath
         self.basepath = basepath
 
@@ -174,7 +177,8 @@ class TissueMultiGraph:
                               "name" : "label", #obs
                               "XY" : "XY", #obsm
                               "Section" : "Slice"} #obs
-             
+
+
         return 
 
     def _load(self):
@@ -213,7 +217,9 @@ class TissueMultiGraph:
         Mapping between layers and layers/taxonomies are saved in a simple TMG.json file. 
         
         """
-
+        # make sure layers_graph is all int
+        for i,lg in enumerate(self.layers_graph): 
+            self.layers_graph[i]=(int(lg[0]),int(lg[1]))
         input_df_dict = self.input_df.to_dict('list')
         self._config = { "layers_graph" : self.layers_graph, 
                          "layer_taxonomy_mapping" : self.layer_taxonomy_mapping, 
@@ -223,6 +229,7 @@ class TissueMultiGraph:
                          "tax_paths" : [tx.basepath for tx in self.Taxonomies],
                          "layer_types" : [tg.layer_type for tg in self.Layers],
                          "input_dfs" : input_df_dict}
+        
         
         with open(os.path.join(self.basepath, "TMG.json"), 'w',encoding="utf-8") as json_file:
             json.dump(self._config, json_file)
@@ -243,7 +250,7 @@ class TissueMultiGraph:
         # get section names 
         if sections is None: 
             sections = self.unqS
-        elif not isinstance(sections,list):
+        elif isinstance(sections,str):
             sections = [sections]
 
         if not hasattr(self, 'Geoms') or self.Geoms is None:
@@ -252,10 +259,14 @@ class TissueMultiGraph:
         if not isinstance(self.Geoms, list) or len(self.Geoms) != len(self.unqS):
             raise ValueError("self.Geoms must be a list with length equal to the number of unique sections (self.unqS)")
 
+        # if geom_types not provided, load all (determined by drive)
         if geom_types is None:
             geom_path = os.path.join(self.basepath,'Geom',self.unqS[0])
             wkt_files = [f for f in os.listdir(geom_path) if f.endswith('.wkt')]
             geom_types = [file[:-4] for file in wkt_files]  # Remove the '.wkt' extension from each filename
+
+        if isinstance(geom_types,str): 
+            geom_types = [geom_types]
 
         for s in sections: 
             ix = self.unqS.index(s)
@@ -583,10 +594,14 @@ class TissueMultiGraph:
     
     def find_upstream_layer(self, layer_id):
         """
-        We addume that cell is always 0 ("root"). 
-        #TODO: deal with cases where the upstream layer is not cell (future layers beyong isozone / regions) 
+        Use the layer graph to find the layer_id's upstream layer
+
         """
-        upstream_layer_id = 0
+        upstream_layer_id = None
+        for layer_pair in self.layers_graph:
+            if layer_pair[1] == layer_id:
+                upstream_layer_id = layer_pair[0]
+                break
         return upstream_layer_id
     
     def map_to_cell_level(self, lvl, VecToMap=None, return_ix=False):
@@ -664,10 +679,12 @@ class TissueMultiGraph:
 
     @property
     def unqS(self):
-        assert len(self.Layers)
-        Sections = self.Layers[0].Section
+        if self._unqS is None:
+            assert len(self.Layers)
+            Sections = self.Layers[0].Section
+            self._unqS = list(np.unique(Sections))
         # return a list of (unique) sections 
-        return(list(np.unique(Sections)))
+        return(self._unqS)
 
     @property
     def tax_names(self): 
@@ -1010,12 +1027,13 @@ class TissueGraph:
             obsm = self.adata.obsm
             obsp = self.adata.obsp
             uns = self.adata.uns
+            layers = self.adata.layers
             if isinstance(X, pd.DataFrame):
                 var = X.columns
                 X = X.values
-                self.adata = anndata.AnnData(X=X, obs=obs, obsm=obsm, obsp=obsp,var=var,uns=uns)
+                self.adata = anndata.AnnData(X=X, obs=obs, obsm=obsm, obsp=obsp,var=var,uns=uns,layers=layers)
             else: 
-                self.adata = anndata.AnnData(X=X, obs=obs, obsm=obsm, obsp=obsp,uns=uns)
+                self.adata = anndata.AnnData(X=X, obs=obs, obsm=obsm, obsp=obsp,uns=uns,layers=layers)
     
     def get_feature_mat(self,section = None):
         if section is None: 
@@ -1102,7 +1120,7 @@ class TissueGraph:
         elif self.adata_mapping["XY"] not in self.adata.obsm.keys(): 
             raise ValueError("Mapping of XY to AnnData is broken, please check!")
         else: 
-            return self.adata.obsm[self.adata_mapping["XY"]]
+            return self.adata.obsm[self.adata_mapping["XY"]].copy()
 
     def get_XY(self,section = None):
         if section is None: 
@@ -1644,7 +1662,7 @@ class Taxonomy:
         
         Setter verify that there are no duplications. 
         """
-        return(list(self.adata.obs["Type"]))
+        return(np.array(self.adata.obs["Type"]))
     
     @Type.setter
     def Type(self,Types):
@@ -1785,11 +1803,15 @@ class Geom:
         if polys is None and os.path.exists(self.filename): 
             polys = fileu.load_polygon_list(self.filename)
         self.polys = polys
-        self._verts = geomu.get_polygons_vertices(polys)
+        self._verts = None
+        
 
 
     @property
     def verts(self):
+        # convert poly to verts on first use
+        if self._verts is None: 
+            self._verts = geomu.get_polygons_vertices(self.polys)
         return self._verts
 
     def save(self):
