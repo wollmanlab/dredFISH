@@ -301,8 +301,8 @@ def vectorize_labeled_matrix_to_polygons(imgmat,tolerance = 2):
 
 def get_polygons_vertices(polygons,return_inner_verts = True):
     """
-    simple utility to create list of verticies (that can be drawn with matplotlib PolygonColleciton)
-    from alist of shapely polygons. 
+    simple utility to create list of verticies. Multipolygons are returns as lists of vertices
+    which are compatible with plotting functions in this package. 
     The methods returns a tuple of exterior vertices for all polygons (one per polygon) and another list of all the holes. 
     It also returns a list of lists for the "holes", i.e. inner vertices. 
     The size of lists within the main list is variable and depends on data input. 
@@ -311,14 +311,28 @@ def get_polygons_vertices(polygons,return_inner_verts = True):
     verts=[];
     inner_verts = []; 
     for i,poly in enumerate(polygons):
-        xy = poly.exterior.xy
-        verts.append(np.array(xy).T)
-        if return_inner_verts:
-            inner_verts.append(list())
-            for LinearRing in poly.interiors:
-                xi,yi = LinearRing.xy
-                xy = np.transpose(np.vstack((xi,yi)))
-                inner_verts[i].append(xy)
+        if isinstance(poly, shapely.geometry.MultiPolygon):
+            multi_verts = list()
+            if return_inner_verts:
+                inner_verts.append(list())
+            for poly2 in poly.geoms:
+                xy = poly2.exterior.xy
+                multi_verts.append(np.array(xy).T)
+                if return_inner_verts:
+                    for LinearRing in poly2.interiors:
+                        xi,yi = LinearRing.xy
+                        xy = np.transpose(np.vstack((xi,yi)))
+                        inner_verts[i].append(xy)
+            verts.append(multi_verts)
+        else:
+            xy = poly.exterior.xy
+            verts.append(np.array(xy).T)
+            if return_inner_verts:
+                inner_verts.append(list())
+                for LinearRing in poly.interiors:
+                    xi,yi = LinearRing.xy
+                    xy = np.transpose(np.vstack((xi,yi)))
+                    inner_verts[i].append(xy)
     if return_inner_verts: 
         return (verts,inner_verts)
     else: 
@@ -344,6 +358,21 @@ def plot_polygon_collection(verts_or_polys,
     else: 
         verts = verts_or_polys[0]
         hole_verts = verts_or_polys[1]
+
+    # verts / hole_verts could have lists of verts in them if poly was multipolygons
+    # merge them and increase rgb_faces accordingly
+    for i in range(len(verts)):
+        if isinstance(verts[i], np.ndarray):
+            verts[i] = [verts[i]]
+    # Create an index vector for each list (item) in verts and tile the item index the length of the list
+    index_vectors = [np.full(len(v), i) for i, v in enumerate(verts)]
+    index_vectors = np.hstack(index_vectors)
+    # expand the colors as needed
+    rgb_faces = np.array(rgb_faces)
+    rgb_faces = rgb_faces[index_vectors]
+    # Flatten the list of verts to a single list containing all vertices
+    flattened_verts = [vertex for sublist in verts for vertex in sublist]
+    verts = flattened_verts
 
     if transpose:
         verts = [np.fliplr(v) for v in verts]
@@ -425,20 +454,26 @@ def plot_polygon_boundaries(verts_or_polys, rgb_edges=None, ax=None, xlm=None, y
     """
 
     # Convert verts_or_polys to just be verts, applying inward offset if specified
-    if isinstance(verts_or_polys[0], shapely.geometry.Polygon):
+    if isinstance(verts_or_polys[0], (shapely.geometry.Polygon, shapely.geometry.MultiPolygon)):
         buffered_polys = [poly.buffer(-inward_offset) for poly in verts_or_polys if poly.area > 0]
-        # Handle cases where buffering results in MultiPolygons
-        single_polys = []
-        for poly in buffered_polys:
-            if isinstance(poly, shapely.geometry.MultiPolygon):
-                # Select the largest polygon from the MultiPolygon
-                largest_poly = max(poly.geoms, key=lambda p: p.area)
-                single_polys.append(largest_poly)
-            else:
-                single_polys.append(poly)
-        verts = [np.array(poly.exterior.xy).T for poly in single_polys]
+        verts = get_polygons_vertices(buffered_polys,return_inner_verts=False)
     else:
         verts = verts_or_polys
+
+    # verts / hole_verts could have lists of verts in them if poly was multipolygons
+    # merge them and increase rgb_faces accordingly
+    for i in range(len(verts)):
+        if isinstance(verts[i], np.ndarray):
+            verts[i] = [verts[i]]
+    # Create an index vector for each list (item) in verts and tile the item index the length of the list
+    index_vectors = [np.full(len(v), i) for i, v in enumerate(verts)]
+    index_vectors = np.hstack(index_vectors)
+    # expand the colors as needed
+    rgb_edges = np.array(rgb_edges)
+    rgb_edges = rgb_edges[index_vectors]
+    # Flatten the list of verts to a single list containing all vertices
+    flattened_verts = [vertex for sublist in verts for vertex in sublist]
+    verts = flattened_verts
 
     if transpose:
         verts = [np.fliplr(v) for v in verts]
@@ -703,16 +738,6 @@ def merge_polygons_by_ids(polys,ids,max_buff = 0.01,dbuffer=0.001, smooth_telera
                 new_holes = [hole for hole in poly.interiors if Polygon(new_exterior).contains(Polygon(hole))]
                 poly_list[i] = Polygon(new_exterior, new_holes)
         merged_poly = unary_union(poly_list)
-        # if merging didn't work, i.e. it is still a multipolygon 
-        # first try to increase buffer and after that just take biggest
-        if isinstance(merged_poly, MultiPolygon):
-            bf = 0
-            while not isinstance(merged_poly, Polygon) and bf < max_buff:
-                bf += dbuffer
-                merged_poly = merged_poly.buffer(bf).buffer(-bf)
-            if isinstance(merged_poly, MultiPolygon):  # Fallback if still a MultiPolygon
-                merged_poly = max(merged_poly.geoms, key=lambda p: p.area)  # Select the largest polygon
-
         all_merged_polys.append(merged_poly)
 
     if smooth_telerance is not None: 

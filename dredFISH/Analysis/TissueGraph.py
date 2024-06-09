@@ -1791,6 +1791,9 @@ class Geom:
         recomputing this every time the geomtry is used (mostly for plotting). This does add one-time cost during 
         __init__ to create this cached precomputed representation. 
 
+        NOTE (6/8/2024): enhancing Geom to allow representation of multipolygons as basic geom shape. 
+        This mostly means that verts 
+
     """
 
     def __init__(self,geom_type = None,polys = None,basepath = None,section = None, redo = False):
