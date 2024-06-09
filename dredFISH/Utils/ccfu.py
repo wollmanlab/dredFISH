@@ -7,19 +7,21 @@ import sys
 
 # the gloval path where CCF reference is saved. 
 ccf_path = "/scratchdata1/MouseBrainAtlases/Taxonomies/CCF_Ref"
-
+ccf_version = "ccf_2022"
+ccf_annotation_volume_file = 'ccf_2022_annotation_10.nrrd'
+ccf_ontology_file = "ccf_2022_ontology.csv"
 
 def get_annotation_matrix():
     " the CCF volume annotation, after a little bit of cleanup "
-    ccf_annotation_volume_2017_25, header = nrrd.read(os.path.join(ccf_path,'ccf_2017','annotation_25.nrrd'))
+    ccf_annotation_volume, header = nrrd.read(os.path.join(ccf_path,ccf_version,ccf_annotation_volume_file))
     
     onto = get_ccf_term_onthology()
 
-    missing_ids = np.setdiff1d(ccf_annotation_volume_2017_25,onto.index)
+    missing_ids = np.setdiff1d(ccf_annotation_volume,onto.index)
     missing_ids = np.setdiff1d(missing_ids,[0])
-    ccf_annotation_volume_2017_25[np.isin(ccf_annotation_volume_2017_25,missing_ids)]=0
+    ccf_annotation_volume[np.isin(ccf_annotation_volume,missing_ids)]=0
 
-    return ccf_annotation_volume_2017_25
+    return ccf_annotation_volume
 
 def get_ccf_term_onthology():
     """ 
@@ -33,10 +35,13 @@ def get_ccf_term_onthology():
     labels_int_2017 = labels_str.str.replace("AllenCCF-Ontology-2017-", "").astype(int)
     map_df_2017["id_2017"]=labels_int_2017
 
-    onto = pd.read_csv(os.path.join(ccf_path,"allen_ontology.csv"))
+    onto = pd.read_csv(os.path.join(ccf_path,ccf_version,ccf_ontology_file))
     onto.set_index('id', inplace=True)
+    
     # Drop rows from 'onto' DataFrame where the index is not in 'map_df_2017["id_2017"]'
     onto = onto[onto.index.isin(map_df_2017["id_2017"])]
+    
+    # add parcellation levels
     onto["id_paths"] = onto["structure_id_path"].apply(lambda x: [int(i) for i in x.strip('/').split('/') if i])
     # Filter each list in the 'id_paths' column to only include ids that are present in the index of 'onto'
     onto["id_paths"] = onto["id_paths"].apply(lambda path: [id for id in path if id in onto.index])
