@@ -440,12 +440,13 @@ class LayeredMap(Panel):
                                               rgb_edges = geom_to_plot["rgb_edges"],
                                               linewidths=geom_to_plot["linewidths"], 
                                               inward_offset = geom_to_plot["inward_offset"],
-                                              ax=self.ax)
+                                              ax=self.ax,
+                                              xlm = self.xlim,ylm = self.ylim,
+                                              rotation = self.rotation)
                 
             elif geom_to_plot["plot_type"] == "polygons": 
                 self.ax = geomu.plot_polygon_collection(geom_to_plot["geom"],
-                                            rgb_faces = geom_to_plot["rgb_faces"],
-                                            rgb_edges = geom_to_plot["rgb_edges"], 
+                                            rgb_faces = geom_to_plot["rgb_faces"], 
                                             ax = self.ax,
                                             xlm = self.xlim,ylm = self.ylim,
                                             rotation = self.rotation)    
