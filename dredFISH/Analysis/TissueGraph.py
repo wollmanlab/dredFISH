@@ -178,7 +178,6 @@ class TissueMultiGraph:
                               "XY" : "XY", #obsm
                               "Section" : "Slice"} #obs
 
-<<<<<<< HEAD
         logging.basicConfig(
                     filename=os.path.join(self.basepath,'tmg_log.txt'),filemode='a',
                     format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
@@ -186,9 +185,6 @@ class TissueMultiGraph:
         self.log = logging.getLogger("Processing")
         self.verbose = True
              
-=======
-
->>>>>>> c8edc6dddc3e0865bff2167e6a8be6d15d2f3909
         return 
 
     def update_user(self,message,level=20):
