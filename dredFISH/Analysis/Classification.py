@@ -781,18 +781,25 @@ class SpatialPriorAssistedClassifier(Classifier):
             self.measured.layers[f"{self.level}_harmonized"]  = self.measured.layers['harmonized'].copy()
         return self.measured
     
-
-
+from dredFISH.Analysis.Classification import *
+from tqdm import trange
+import gc
+from sklearn.feature_selection import f_classif
 
 class KNN(object):
-    def __init__(self,train_k=50,predict_k=500,max_distance=np.inf,metric='euclidean',verbose=False):
+    def __init__(self,train_k=50,predict_k=500,max_distance=np.inf,metric='euclidean',verbose=False,weighted=False):
         self.train_k = train_k
         self.predict_k = predict_k
         self.max_distance = max_distance
         self.metric = metric
         self.verbose = verbose
+        self.weighted = weighted
 
     def fit(self,X,y):
+        if self.weighted:
+            F, p = f_classif(X, y)
+            self.weights = F
+            X = X*self.weights
         self.feature_tree_dict = {}
         self.feature_tree_dict['labels'] = y
         self.feature_tree_dict['tree'] = NNDescent(X, metric=self.metric, n_neighbors=self.train_k,n_trees=10,verbose=self.verbose)
@@ -801,6 +808,8 @@ class KNN(object):
         self.feature_tree_dict['labels_index'] = np.array([self.converter[i] for i in y])
 
     def predict(self,X,y=None):
+        if self.weighted:
+            X = X*self.weights
         if not isinstance(y,type(None)):
             self.feature_tree_dict['labels'] = y
             self.converter = dict(zip(self.cts,np.array(range(self.cts.shape[0]))))
@@ -816,6 +825,8 @@ class KNN(object):
         return self.cts[likelihoods.max(1).indices]
     
     def predict_proba(self,X,y=None):
+        if self.weighted:
+            X = X*self.weights
         if not isinstance(y,type(None)):
             self.feature_tree_dict['labels'] = y
             self.converter = dict(zip(self.cts,np.array(range(self.cts.shape[0]))))
@@ -833,7 +844,8 @@ class KNN(object):
     @property
     def classes_(self):
         return self.cts
-    
+
+
 class SpatialAssistedLabelTransfer(Classifier): 
     """
     """
@@ -844,7 +856,7 @@ class SpatialAssistedLabelTransfer(Classifier):
         ref_levels=['class', 'subclass','supertype','cluster'], 
         model='knn',
         out_path='',
-        batch_name='section_index',
+        batch_name='section_index',save_fig=False,neuron=None,weighted=False,
         ):
         """
         Parameters
@@ -863,12 +875,14 @@ class SpatialAssistedLabelTransfer(Classifier):
             adata = adata.adata.copy()
 
         super().__init__(tax=None)
+        self.save_fig = save_fig
         self.tax.name = tax_name
         self.ref_path = pathu.get_path(ref, check=True) # refdata
         self.spatial_ref_path = pathu.get_path(spatial_ref, check=True) # refdata
         self.ref_levels = ref_levels 
         self.out_path = out_path
         self.batch_name = batch_name
+        self.neuron=neuron
 
         # model could be a string or simply sklearn classifier (many kinds)
         if isinstance(model, str):
@@ -879,7 +893,7 @@ class SpatialAssistedLabelTransfer(Classifier):
                             hidden_layer_sizes=(50,),  # Adjust number and size of hidden layers as needed
                             activation='relu',  # Choose a suitable activation function
                             max_iter=500,  # Set maximum iterations for training
-                            verbose=False,
+                            verbose=False,weighted=weighted
                             )
             elif model == 'knn':
                 self.model = KNN(train_k=15,predict_k=100,max_distance=np.inf,metric='euclidean')
@@ -899,18 +913,18 @@ class SpatialAssistedLabelTransfer(Classifier):
         self.update_user("Initializing")
 
         self.update_user("Training Spatial Model")
-        kdesp = KDESpatialPriors(ref_levels=self.ref_levels)
+        kdesp = KDESpatialPriors(ref_levels=self.ref_levels,neuron=self.neuron)
         kdesp.train()
         self.update_user("Generating Spatial Priors")
         self.priors = {}
         priors,types = kdesp.classify(self.measured, level=self.ref_levels[-1],dim_labels=['ccf_x','ccf_y','ccf_z'])
-        self.priors[level] = {'columns':types,'indexes':np.array(self.measured.obs.index),'matrix':priors}
+        self.priors[self.ref_levels[-1]] = {'columns':types,'indexes':np.array(self.measured.obs.index),'matrix':priors}
         for level in self.ref_levels:
             if level == self.ref_levels[-1]:
                 continue
-            level_priors,level_types = self.convert_priors(priors,level)
-            self.priors[level] = {'columns':level_types,'indexes':idxes,'matrix':level_priors}
-
+            level_priors,level_types = kdesp.convert_priors(priors,level)
+            self.priors[level] = {'columns':level_types,'indexes':np.array(self.measured.obs.index),'matrix':level_priors}
+        del kdesp
         self.update_user("Generating Spatial Balanced Reference")
         self.reference = anndata.read(self.ref_path)
         self.reference.layers['raw'] = self.reference.X.copy()
@@ -920,7 +934,7 @@ class SpatialAssistedLabelTransfer(Classifier):
         self.Nbases = self.measured.shape[1]
         level = self.ref_levels[-1]
         idxes = []
-        total_cells = 1000000
+        total_cells = self.measured.shape[0]
         weights = np.mean(self.priors[level]['matrix'],axis=0)
         weights = weights/weights.sum()
         for i,label in enumerate(self.priors[level]['columns']):
@@ -941,61 +955,37 @@ class SpatialAssistedLabelTransfer(Classifier):
 
         """ Assume some size correction has been done to reference """
         self.reference.layers['classification_space'] = self.reference.layers['raw'].copy()
-
-        # """ Assume no size correction has been done to reference """
-        # self.reference.layers['harmonized'] = basicu.normalize_fishdata_robust_regression(self.reference.layers['raw'])
-        # self.reference.layers['harmonized'] = basicu.robust_zscore(self.reference.layers['harmonized'].copy())
-        # self.reference.layers['initial_harmonized'] = self.reference.layers['harmonized'].copy()
-
-        # self.update_user("Training Feature Model")
-        # self.model.fit(self.reference.layers['harmonized'].copy(),np.array(self.reference.obs[self.ref_levels[-1]]))
+        gc.collect()
 
     def classify(self):
-        self.train()
+        # self.train()
         self.update_user("Classifying")
         self.likelihoods = {}
         self.posteriors = {}
         for level in self.ref_levels:
             self.likelihoods[level] = {'columns':self.priors[level]['columns'],'indexes':self.priors[level]['indexes'],'matrix':np.zeros_like(self.priors[level]['matrix'])}
             self.posteriors[level] = {'columns':self.priors[level]['columns'],'indexes':self.priors[level]['indexes'],'matrix':np.zeros_like(self.priors[level]['matrix'])}
-        for i,level in enumerate(self.ref_levels):
-            measured_coordinates = self.measured.layers['classification_space'].copy()
-            reference_coordinates = self.reference.layers['classification_space'].copy()
-            if i==0:
-                self.update_user(f"{level} Performing Quantile Normalization on all cells")
-                measured_coordinates = basicu.robust_zscore(measured_coordinates)
-                reference_coordinates = basicu.robust_zscore(reference_coordinates)
-                model = self.model.copy()
-                model.fit(reference_coordinates,np.array(self.reference.obs[self.ref_levels[-1]]))
-                likelihoods = model.predict_proba(measured_coordinates)
-                for idx,ct in enumerate(model.classes_):
-                    jidx = np.where(self.likelihoods[self.ref_levels[-1]]['columns']==ct)[0][0]
-                    self.likelihoods[self.ref_levels[-1]]['matrix'][:,jidx] = likelihoods[:,idx]
-            else:
-                previous_round_measured_labels = self.measured.obs[self.ref_levels[i-1]]
-                previous_round_reference_labels = self.reference.obs[self.ref_levels[i-1]]
-                for cell_type in tqdm(np.unique(previous_round_measured_labels),desc='Performing Quantile Normalization '):
-                    # self.update_user(f"{level} Performing Quantile Normalization on {cell_type}")
-                    measured_m = previous_round_measured_labels==cell_type
-                    reference_m = previous_round_reference_labels==cell_type
-                    if measured_m.sum()>10 and reference_m.sum()>10:
-                        measured_coordinates[measured_m,:] = basicu.robust_zscore(measured_coordinates[measured_m,:])
-                        reference_coordinates[reference_m,:] = basicu.robust_zscore(reference_coordinates[reference_m,:])
 
-                        model = self.model.copy()
-                        model.fit(reference_coordinates[reference_m,:],np.array(self.reference.obs[self.ref_levels[-1]])[reference_m])
-                        likelihoods = model.predict_proba(measured_coordinates[measured_m,:])
-                        for idx,ct in enumerate(model.classes_):
-                            jidx = np.where(self.likelihoods[self.ref_levels[-1]]['columns']==ct)[0][0]
-                            self.likelihoods[self.ref_levels[-1]]['matrix'][measured_m,jidx] = likelihoods[:,idx]
+        measured_coordinates = self.measured.layers['classification_space'].copy()
+        reference_coordinates = self.reference.layers['classification_space'].copy()
+        level = self.ref_levels[-1]
+        self.update_user(f"{level} Classification")
+        measured_coordinates = basicu.robust_zscore(measured_coordinates)
+        reference_coordinates = basicu.robust_zscore(reference_coordinates)
+        model = self.model
+        self.update_user(f"{level} Training Feature Model")
+        model.fit(reference_coordinates,np.array(self.reference.obs[level]))
+        self.update_user(f"{level} Predicting From Features")
+        likelihoods = model.predict_proba(measured_coordinates)
+        for idx,ct in enumerate(model.classes_):
+            jidx = np.where(self.likelihoods[level]['columns']==ct)[0][0]
+            self.likelihoods[level]['matrix'][:,jidx] = likelihoods[:,idx]
 
-            self.measured.layers['classification_space'] = measured_coordinates
-            self.reference.layers['classification_space'] = reference_coordinates
                     
-            """ Propagate likelihoods to higher levels """
-            for temp_level in self.ref_levels:
-                if temp_level == self.ref_levels[-1]:
-                    continue
+        """ Propagate likelihoods to higher levels """
+        for temp_level in self.ref_levels:
+            self.update_user(f"{temp_level} Propogating {self.ref_levels[-1]} Likelihoods")
+            if temp_level != self.ref_levels[-1]:
                 converter = dict(zip(np.array(self.reference.obs[self.ref_levels[-1]]),np.array(self.reference.obs[temp_level])))
                 for ct in self.likelihoods[self.ref_levels[-1]]['columns']:
                     if not ct in converter.keys():
@@ -1003,28 +993,35 @@ class SpatialAssistedLabelTransfer(Classifier):
                 for idx,ct in enumerate(self.likelihoods[temp_level]['columns']):
                     ct_idxes = [i for i,c in enumerate(self.likelihoods[self.ref_levels[-1]]['columns']) if converter[c]==ct]
                     self.likelihoods[temp_level]['matrix'][:,idx] = np.sum(self.likelihoods[self.ref_levels[-1]]['matrix'][:,ct_idxes],axis=1)
+            self.posteriors[temp_level]['matrix'] = self.likelihoods[temp_level]['matrix']*self.priors[temp_level]['matrix']
 
-            self.update_user(f"{level} Calculating Posteriors")
-            likelihood = self.likelihoods[level]['matrix']/np.clip(np.sum(self.likelihoods[level]['matrix'],axis=1,keepdims=True),1,None)
-            prior = self.priors[level]['matrix']/np.clip(np.sum(self.priors[level]['matrix'],axis=1,keepdims=True),1,None)
-            self.posteriors[level]['matrix'] = likelihood*prior
-            
+            level = temp_level
 
             metrics = {'priors':self.priors,'likelihoods':self.likelihoods,'posteriors':self.posteriors}
             for metric_label,metric in metrics.items():
                 self.measured.obs[level] = metric[level]['columns'][np.argmax(metric[level]['matrix'],axis=1)]
                 bit = f"Supervised : {level} {metric_label}"
-                n_columns = 4
+                n_columns = np.min([4,self.measured.obs[self.batch_name].unique().shape[0]])
                 n_rows = math.ceil(self.measured.obs[self.batch_name].unique().shape[0]/n_columns)
                 fig,axs = plt.subplots(n_columns,n_rows,figsize=[n_rows*5,n_columns*5])
                 fig.patch.set_facecolor('black')
                 fig.suptitle(f"{self.dataset.split('_')[0]} {bit}", color='white')
-                axs = axs.ravel()
+                if self.measured.obs[self.batch_name].unique().shape[0]==1:
+                    axs = [axs]
+                else:
+                    axs = axs.ravel()
                 for ax in axs:
                     ax.axis('off')
                 pallette = dict(zip(self.reference.obs[level], self.reference.obs[level+'_color']))
+                for ct in self.measured.obs[level].unique():
+                    if not ct in pallette.keys():
+                        pallette[ct] = 'black'
+                    else:
+                        color = pallette[ct]
+                        if not isinstance(color,str):
+                            pallette[ct] = 'black'
                 self.measured.obs[level+'_color'] = self.measured.obs[level].map(pallette)
-                for i,section in tqdm(enumerate(sorted(self.measured.obs[self.batch_name].unique())),desc=f"{level} KNN Classification"):
+                for i,section in tqdm(enumerate(sorted(self.measured.obs[self.batch_name].unique())),desc=f"{level} Visualization"):
                     m = (self.measured.obs[self.batch_name]==section)
                     temp_data = self.measured[m,:].copy()
                     c = np.array(temp_data.obs[level+'_color'])
@@ -1032,26 +1029,27 @@ class SpatialAssistedLabelTransfer(Classifier):
                     ax.set_title(section, color='white')
                     ax.axis('off')
                     ax.axis('off')
-                    im = ax.scatter(temp_data.obs['ccf_z'],temp_data.obs['ccf_y'],c=c,s=0.1)
+                    im = ax.scatter(temp_data.obs['ccf_z'],temp_data.obs['ccf_y'],c=c,s=0.01,marker='x')
 
-                    ax.set_xlim([-5,5])
-                    ax.set_ylim([9,-1])
-                figure_path = os.path.join(self.out_path, 'Figure')
-                if not os.path.exists(figure_path):
-                    os.makedirs(figure_path)
-                plt.savefig(os.path.join(figure_path,f"{bit}.png"))
+                    # ax.set_xlim([-5,5])
+                    # ax.set_ylim([9,-1])
+                if self.save_fig:
+                    figure_path = os.path.join(self.out_path, 'Figure')
+                    if not os.path.exists(figure_path):
+                        os.makedirs(figure_path)
+                    plt.savefig(os.path.join(figure_path,f"{bit}.png"))
                 plt.show()
             pallette = dict(zip(self.reference.obs[level], self.reference.obs[level+'_color']))
             self.measured.obs[level] = self.posteriors[level]['columns'][np.argmax(self.posteriors[level]['matrix'],axis=1)]
             self.measured.obs[level+'_color'] = self.measured.obs[level].map(pallette)
-            """ Backpropagate upstream classification to match this level"""
-            for temp_level in self.ref_levels:
-                if temp_level==level:
-                    break
-                pallette = dict(zip(self.reference.obs[temp_level], self.reference.obs[temp_level+'_color']))
-                converter = dict(zip(self.reference.obs[level] ,self.reference.obs[temp_level]))
-                self.measured.obs[temp_level] = self.measured.obs[level].map(converter)
-                self.measured.obs[temp_level+'_color'] = self.measured.obs[temp_level].map(pallette)
+            # """ Backpropagate upstream classification to match this level"""
+            # for temp_level in self.ref_levels:
+            #     if temp_level==level:
+            #         break
+            #     pallette = dict(zip(self.reference.obs[temp_level], self.reference.obs[temp_level+'_color']))
+            #     converter = dict(zip(self.reference.obs[level] ,self.reference.obs[temp_level]))
+            #     self.measured.obs[temp_level] = self.measured.obs[level].map(converter)
+            #     self.measured.obs[temp_level+'_color'] = self.measured.obs[temp_level].map(pallette)
             """ Add metrics for downstream QC """
         return self.measured
 
@@ -1063,6 +1061,7 @@ class SpatialOnlyLabelTransfer(Classifier):
         self.model =  KNN(train_k=k,predict_k=k,metric='euclidean')
         self.ref_XYZ = np.abs(np.hstack((ref_TG.XY,ref_TG.Z)))
         self.ref_label = ref_TG.adata.obs["label_to_transfer"]
+        
 
     def train(self):
         self.model.fit(self.ref_XYZ,self.ref_label)
@@ -1072,16 +1071,16 @@ class SpatialOnlyLabelTransfer(Classifier):
         labels = self.model.predict(new_XYZ)
         return labels
 
-
 class KDESpatialPriors(Classifier):
     def __init__(self,
     ref='/scratchdata1/MouseBrainAtlases/Allen',
-    ref_levels=['class', 'subclass']):
+    ref_levels=['class', 'subclass'],neuron=None):
         if isinstance(ref,str):
-            self.ref = TissueMultiGraph(basepath = ref, input_df = None, redo = False).layers[0].adata
+            self.ref = TissueGraph.TissueMultiGraph(basepath = ref, input_df = None, redo = False).Layers[0].adata
         else:
             self.ref = ref
         self.ref_levels = ref_levels
+        self.neuron = neuron
 
     def train(self,dim_labels=['x_ccf','y_ccf','z_ccf'],border=1,binsize=0.1):
         XYZ = np.array(self.ref.obs[dim_labels])
@@ -1097,14 +1096,23 @@ class KDESpatialPriors(Classifier):
         labels = np.array(self.ref.obs[self.ref_levels[-1]])
         types = np.unique(labels)
 
+        if isinstance(self.neuron,bool):
+            if self.neuron:
+                print('Using Only Neurons')
+                types = np.array([i for i in types if not 'NN' in i])
+            else:
+                print('Using Only Non Neurons')
+                types = np.array([i for i in types if 'NN' in i])
+            # print(f" Using these Types only {types}")
         typedata = np.zeros([bins[0].shape[0],bins[1].shape[0],bins[2].shape[0],types.shape[0]])
-        for i in trange(types.shape[0]):
+        for i in trange(types.shape[0],desc='Calculating Spatial KDE'):
             label = types[i]
             m = labels==label
             if np.sum(m)==0:
                 continue
             hist, edges = np.histogramdd(XYZ[m,:], bins=gates)
-            stk = gaussian_filter(hist,(0.5/binsize,0.25/binsize,0.25/binsize))
+            # stk = gaussian_filter(hist,(0.5/binsize,0.25/binsize,0.25/binsize))
+            stk = gaussian_filter(hist,(0.25/binsize,0.1/binsize,0.1/binsize))
             typedata[:,:,:,i] = stk
         density = np.sum(typedata,axis=-1,keepdims=True)
         density[density==0] = 1
