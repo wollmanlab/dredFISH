@@ -178,6 +178,8 @@ class TissueMultiGraph:
                               "XY" : "XY", #obsm
                               "Section" : "Slice"} #obs
 
+        warnings.filterwarnings('ignore', category=anndata.ImplicitModificationWarning)
+        
         logging.basicConfig(
                     filename=os.path.join(self.basepath,'tmg_log.txt'),filemode='a',
                     format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
@@ -434,7 +436,8 @@ class TissueMultiGraph:
         adatas = []
         shared_bits = ''
         used_names = []
-        for index,row in self.input_df.iterrows():
+        self.update_user(f"Attempting To Load {self.input_df.shape[0]} Sections")
+        for index,row in tqdm(self.input_df.iterrows()):
             animal = row['animal']
             section_acq_name = row['section_acq_name']
             dataset = row['dataset']
@@ -521,6 +524,7 @@ class TissueMultiGraph:
         S = np.array(adata.obs[self.adata_mapping['Section']])
 
         FISHbasis = np.array(adata.layers['raw'].copy()).copy()
+        self.update_user(f"Normalizing using {norm}")
         if norm == 'robust_regression':
             FISHbasis_norm = basicu.normalize_fishdata_robust_regression(FISHbasis)
         elif norm == 'logrowmedian':
