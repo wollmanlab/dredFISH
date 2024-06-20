@@ -224,7 +224,7 @@ parameters['overlap'] = 0.02 # 2% overlap
 parameters['fileu_version'] = 2
 parameters['overlap_correction'] = False #Problematic
 
-parameters['ncpu'] = 10
+parameters['ncpu'] = 5
 parameters['set_min_zero'] = False#True # Post Strip bkg subtract ****
 parameters['metric'] = 'median'
 
