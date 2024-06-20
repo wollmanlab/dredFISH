@@ -141,7 +141,7 @@ class Section_Class(object):
                         self.pull_vectors()
             if not isinstance(self.data,type(None)):
                 self.generate_report()
-                # self.remove_temporary_files()
+                self.remove_temporary_files()
                 # self.qc_score()
                 # self.copy_to_drive()
         else:
@@ -920,38 +920,29 @@ class Section_Class(object):
 
 
             """Only replace 0's with incoming image"""
-            incoming = torch.dstack([nuc,signal])
+            
             destination = stitched[(results[posname]['img_x_min']+results[posname]['translation_x']):(results[posname]['img_x_max']+results[posname]['translation_x']),
                                    (results[posname]['img_y_min']+results[posname]['translation_y']):(results[posname]['img_y_max']+results[posname]['translation_y']),:]
+            mask = destination[:,:,0]==0
+            x,y = torch.where(mask)
+
             if self.parameters['overlap_correction']:
-                m = destination>0
-                if torch.sum(m)>0:
-                    non_zero = incoming>0
-                    overlap_constant = torch.median(incoming[m]-destination[m])
-                    incoming[non_zero] = incoming[non_zero]-overlap_constant
-            mask = destination==0
-            destination[mask] = incoming[mask]
+                if torch.sum(mask)>0:
+                    non_zero = (signal>0)&(mask==False)
+                    overlap_constant = torch.median(signal[non_zero]-destination[non_zero,1])
+                    signal = signal-overlap_constant
+            destination[x,y,0] = nuc[x,y]
+            destination[x,y,1] = signal[x,y]
             stitched[(results[posname]['img_x_min']+results[posname]['translation_x']):(results[posname]['img_x_max']+results[posname]['translation_x']),
                      (results[posname]['img_y_min']+results[posname]['translation_y']):(results[posname]['img_y_max']+results[posname]['translation_y']),:] = destination
             
 
             if isinstance(self.reference_stitched,str):
-                x,y = torch.where(mask.max(2)!=0)
-                dim1 = torch.tensor(np.stack([np.array(range(nuc.shape[1])) for i in range(nuc.shape[0])]))
-                dim2 = torch.tensor(np.stack([np.array(range(nuc.shape[0])) for i in range(nuc.shape[1])]).T)
-                dimpos = torch.ones_like(nuc)*self.posname_index_converter[posname]
-                dim1[mask.max(2)!=0] = 0
-                dim2[mask.max(2)!=0] = 0
-                dimpos[mask.max(2)!=0] = 0
-                incoming = torch.dstack([
-                        dim1,
-                        dim2,
-                        dimpos
-                        ])
                 destination = pixel_coordinates_stitched[(results[posname]['img_x_min']+results[posname]['translation_x']):(results[posname]['img_x_max']+results[posname]['translation_x']),
                                    (results[posname]['img_y_min']+results[posname]['translation_y']):(results[posname]['img_y_max']+results[posname]['translation_y']),:]
-                new_mask = (destination==0)
-                destination[new_mask] = incoming[new_mask]
+                destination[x,y,0] = torch.tensor(np.stack([np.array(range(nuc.shape[1])) for i in range(nuc.shape[0])]),dtype=destination.dtype)[x,y]
+                destination[x,y,1] = torch.tensor(np.stack([np.array(range(nuc.shape[0])) for i in range(nuc.shape[1])]).T,dtype=destination.dtype)[x,y]
+                destination[x,y,2] = (torch.ones_like(nuc,dtype=destination.dtype)*self.posname_index_converter[posname])[x,y]
                 pixel_coordinates_stitched[(results[posname]['img_x_min']+results[posname]['translation_x']):(results[posname]['img_x_max']+results[posname]['translation_x']),
                                            (results[posname]['img_y_min']+results[posname]['translation_y']):(results[posname]['img_y_max']+results[posname]['translation_y']),:] = destination
                 
