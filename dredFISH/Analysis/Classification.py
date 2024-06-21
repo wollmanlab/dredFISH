@@ -781,10 +781,10 @@ class SpatialPriorAssistedClassifier(Classifier):
             self.measured.layers[f"{self.level}_harmonized"]  = self.measured.layers['harmonized'].copy()
         return self.measured
     
-from dredFISH.Analysis.Classification import *
 from tqdm import trange
 import gc
 from sklearn.feature_selection import f_classif
+
 
 class KNN(object):
     def __init__(self,train_k=50,predict_k=500,max_distance=np.inf,metric='euclidean',verbose=False,weighted=False):
@@ -845,7 +845,6 @@ class KNN(object):
     def classes_(self):
         return self.cts
 
-
 class SpatialAssistedLabelTransfer(Classifier): 
     """
     """
@@ -856,7 +855,7 @@ class SpatialAssistedLabelTransfer(Classifier):
         ref_levels=['class', 'subclass','supertype','cluster'], 
         model='knn',
         out_path='',
-        batch_name='section_index',save_fig=False,neuron=None,weighted=False,
+        batch_name='section_index',save_fig=False,neuron=None,weighted=False,verbose=True,
         ):
         """
         Parameters
@@ -883,6 +882,7 @@ class SpatialAssistedLabelTransfer(Classifier):
         self.out_path = out_path
         self.batch_name = batch_name
         self.neuron=neuron
+        self.verbose=verbose
 
         # model could be a string or simply sklearn classifier (many kinds)
         if isinstance(model, str):
@@ -905,9 +905,7 @@ class SpatialAssistedLabelTransfer(Classifier):
         self.dataset = self.measured.obs['dataset'].iloc[0]
 
     def update_user(self,message):
-        time = datetime.now().strftime("%Y %B %d %H:%M:%S")
-        print(f"{time} | {message}")
-        logging.info(message)
+        fileu.update_user(message,verbose=self.verbose)
 
     def train(self):
         self.update_user("Initializing")
@@ -994,51 +992,51 @@ class SpatialAssistedLabelTransfer(Classifier):
                     ct_idxes = [i for i,c in enumerate(self.likelihoods[self.ref_levels[-1]]['columns']) if converter[c]==ct]
                     self.likelihoods[temp_level]['matrix'][:,idx] = np.sum(self.likelihoods[self.ref_levels[-1]]['matrix'][:,ct_idxes],axis=1)
             self.posteriors[temp_level]['matrix'] = self.likelihoods[temp_level]['matrix']*self.priors[temp_level]['matrix']
+            if self.verbose:
+                level = temp_level
 
-            level = temp_level
-
-            metrics = {'priors':self.priors,'likelihoods':self.likelihoods,'posteriors':self.posteriors}
-            for metric_label,metric in metrics.items():
-                self.measured.obs[level] = metric[level]['columns'][np.argmax(metric[level]['matrix'],axis=1)]
-                bit = f"Supervised : {level} {metric_label}"
-                n_columns = np.min([4,self.measured.obs[self.batch_name].unique().shape[0]])
-                n_rows = math.ceil(self.measured.obs[self.batch_name].unique().shape[0]/n_columns)
-                fig,axs = plt.subplots(n_columns,n_rows,figsize=[n_rows*5,n_columns*5])
-                fig.patch.set_facecolor('black')
-                fig.suptitle(f"{self.dataset.split('_')[0]} {bit}", color='white')
-                if self.measured.obs[self.batch_name].unique().shape[0]==1:
-                    axs = [axs]
-                else:
-                    axs = axs.ravel()
-                for ax in axs:
-                    ax.axis('off')
-                pallette = dict(zip(self.reference.obs[level], self.reference.obs[level+'_color']))
-                for ct in self.measured.obs[level].unique():
-                    if not ct in pallette.keys():
-                        pallette[ct] = 'black'
+                metrics = {'priors':self.priors,'likelihoods':self.likelihoods,'posteriors':self.posteriors}
+                for metric_label,metric in metrics.items():
+                    self.measured.obs[level] = metric[level]['columns'][np.argmax(metric[level]['matrix'],axis=1)]
+                    bit = f"Supervised : {level} {metric_label}"
+                    n_columns = np.min([4,self.measured.obs[self.batch_name].unique().shape[0]])
+                    n_rows = math.ceil(self.measured.obs[self.batch_name].unique().shape[0]/n_columns)
+                    fig,axs = plt.subplots(n_columns,n_rows,figsize=[n_rows*5,n_columns*5])
+                    fig.patch.set_facecolor('black')
+                    fig.suptitle(f"{self.dataset.split('_')[0]} {bit}", color='white')
+                    if self.measured.obs[self.batch_name].unique().shape[0]==1:
+                        axs = [axs]
                     else:
-                        color = pallette[ct]
-                        if not isinstance(color,str):
+                        axs = axs.ravel()
+                    for ax in axs:
+                        ax.axis('off')
+                    pallette = dict(zip(self.reference.obs[level], self.reference.obs[level+'_color']))
+                    for ct in self.measured.obs[level].unique():
+                        if not ct in pallette.keys():
                             pallette[ct] = 'black'
-                self.measured.obs[level+'_color'] = self.measured.obs[level].map(pallette)
-                for i,section in tqdm(enumerate(sorted(self.measured.obs[self.batch_name].unique())),desc=f"{level} Visualization"):
-                    m = (self.measured.obs[self.batch_name]==section)
-                    temp_data = self.measured[m,:].copy()
-                    c = np.array(temp_data.obs[level+'_color'])
-                    ax = axs[i]
-                    ax.set_title(section, color='white')
-                    ax.axis('off')
-                    ax.axis('off')
-                    im = ax.scatter(temp_data.obs['ccf_z'],temp_data.obs['ccf_y'],c=c,s=0.01,marker='x')
+                        else:
+                            color = pallette[ct]
+                            if not isinstance(color,str):
+                                pallette[ct] = 'black'
+                    self.measured.obs[level+'_color'] = self.measured.obs[level].map(pallette)
+                    for i,section in tqdm(enumerate(sorted(self.measured.obs[self.batch_name].unique())),desc=f"{level} Visualization"):
+                        m = (self.measured.obs[self.batch_name]==section)
+                        temp_data = self.measured[m,:].copy()
+                        c = np.array(temp_data.obs[level+'_color'])
+                        ax = axs[i]
+                        ax.set_title(section, color='white')
+                        ax.axis('off')
+                        ax.axis('off')
+                        im = ax.scatter(temp_data.obs['ccf_z'],temp_data.obs['ccf_y'],c=c,s=0.01,marker='x')
 
-                    # ax.set_xlim([-5,5])
-                    # ax.set_ylim([9,-1])
-                if self.save_fig:
-                    figure_path = os.path.join(self.out_path, 'Figure')
-                    if not os.path.exists(figure_path):
-                        os.makedirs(figure_path)
-                    plt.savefig(os.path.join(figure_path,f"{bit}.png"))
-                plt.show()
+                        # ax.set_xlim([-5,5])
+                        # ax.set_ylim([9,-1])
+                    if self.save_fig:
+                        figure_path = os.path.join(self.out_path, 'Figure')
+                        if not os.path.exists(figure_path):
+                            os.makedirs(figure_path)
+                        plt.savefig(os.path.join(figure_path,f"{bit}.png"))
+                    plt.show()
             pallette = dict(zip(self.reference.obs[level], self.reference.obs[level+'_color']))
             self.measured.obs[level] = self.posteriors[level]['columns'][np.argmax(self.posteriors[level]['matrix'],axis=1)]
             self.measured.obs[level+'_color'] = self.measured.obs[level].map(pallette)
@@ -1149,9 +1147,6 @@ class KDESpatialPriors(Classifier):
             priors,types = self.convert_priors(priors,level)
         return priors,types
     
-
-
-
 class LabelTransfer(Classifier): 
     """
     """
@@ -1333,3 +1328,214 @@ class LabelTransfer(Classifier):
             #     self.measured.obs[temp_level+'_color'] = self.measured.obs[temp_level].map(pallette)
             """ Add metrics for downstream QC """
         return self.measured
+
+import pynndescent
+import leidenalg
+import igraph as ig
+
+class graphLeiden(Classifier):
+    def __init__(self,adata,verbose=True):
+        self.adata = adata
+        self.verbose = verbose
+        self.train()
+        
+    def train(self):
+        adata = self.adata
+        X = np.array(adata.layers['classification_space'].copy()).copy()
+        fileu.update_user(f"Building Feature Graph",verbose=self.verbose)
+        G,knn = tmgu.build_knn_graph(X,metric='correlation')
+        self.G = G
+
+    def classify(self,resolution=5):
+        adata = self.adata
+        fileu.update_user(f"Unsupervised Clustering",verbose=self.verbose)
+        TypeVec = self.G.community_leiden(resolution=resolution,objective_function='modularity').membership
+        # Convert to PyTorch tensor
+        adata.obs['leiden'] =np.array(TypeVec).astype(str)
+        cts = np.array(adata.obs['leiden'].unique())
+        colors = np.random.choice(np.array(list(mcolors.XKCD_COLORS.keys())),cts.shape[0],replace=False)
+        pallette = dict(zip(cts, colors))
+        adata.obs['leiden_colors'] = adata.obs['leiden'].map(pallette)
+        if self.verbose:
+                sections = np.unique(adata.obs['Slice'])
+                x = adata.obs['ccf_z']
+                y = adata.obs['ccf_y']
+                c = np.array(adata.obs[f"leiden_colors"])
+                cl = np.array(adata.obs[f"leiden"])
+                pallette = dict(zip(cl,c))
+                cts = np.unique(cl)
+                n_columns = np.min([5,sections.shape[0]])
+                n_rows = math.ceil((1+sections.shape[0])/n_columns)
+                fig,axs  = plt.subplots(n_rows,n_columns,figsize=[5*n_columns,5*n_rows])
+                axs = axs.ravel()
+                for ax in axs:
+                    ax.axis('off')
+                plt.suptitle(f"Unsupervised Classification res:{resolution}")
+                for idx,section in enumerate(sections):
+                    m = np.isin(np.array(adata.obs['Slice']),[section])
+                    ax = axs[idx]
+                    ax.scatter(x[m],y[m],s=0.01,c=c[m],marker='x')
+                    ax.set_title(section)
+                    ax.set_aspect('equal')
+                    ax.axis('off')
+                handles = [plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=pallette[key], markersize=10, label=key) for key in cts]
+                axs[idx+1].legend(handles=handles, loc='center',ncol=3, fontsize=8)
+                axs[idx+1].axis('off')
+                plt.show()
+        return adata
+
+
+def filterUsingUnsupervised(adata,label='leiden',verbose=True):
+    """ First Remove Sections that dont agree at all"""
+    labels = np.array(adata.obs[label].copy()).astype(str)
+    section_labels = np.array(adata.obs['Slice'].copy()).astype(str)
+
+    # Convert labels and section_labels to pandas Series
+    labels_series = pd.Series(labels, name='Type')
+    section_labels_series = pd.Series(section_labels, name='Section')
+
+    # Generate the occupancy matrix
+    cm = pd.crosstab(labels_series, section_labels_series)
+
+    correlation_matrix = cm.corr(method='pearson')
+    avg_correlation = correlation_matrix.mean(1)
+    avg_correlation = avg_correlation-np.median(avg_correlation)
+    avg_correlation = avg_correlation/np.std(avg_correlation)
+    good_sections = np.array(avg_correlation[np.abs(avg_correlation)<2].index)
+    fileu.update_user(f" Removing Sections {np.array(section_labels_series.unique())[np.abs(avg_correlation)>2]}",verbose=verbose)
+    adata = adata[adata.obs['Slice'].isin(good_sections)].copy()
+
+    """ Next Remove Cells that are in outlier types """
+    
+    """ if 50% of the cells are in just 1 section toss it"""
+    good_types = cm.index[(cm/np.sum(np.array(cm),axis=1,keepdims=True)).max(1)<0.5]
+    bad_types = cm.index[(cm/np.sum(np.array(cm),axis=1,keepdims=True)).max(1)>0.5]
+    temp = cm[cm.index.isin(bad_types)]
+    temp.loc[:,temp.max(0)>0]
+    fileu.update_user(f" Removing Types {bad_types}",verbose=verbose)
+    adata = adata[adata.obs['leiden'].isin(good_types)].copy()
+
+    if verbose:
+        sections = np.unique(adata.obs['Slice'])
+        x = adata.obs['ccf_z']
+        y = adata.obs['ccf_y']
+        c = np.array(adata.obs[f"leiden_colors"])
+        cl = np.array(adata.obs[f"leiden"])
+        pallette = dict(zip(cl,c))
+        cts = np.unique(cl)
+        n_columns = np.min([5,sections.shape[0]])
+        n_rows = math.ceil((1+sections.shape[0])/n_columns)
+        fig,axs  = plt.subplots(n_rows,n_columns,figsize=[5*n_columns,5*n_rows])
+        axs = axs.ravel()
+        for ax in axs:
+            ax.axis('off')
+        plt.suptitle(f"Filtered Unsupervised Classification")
+        for idx,section in enumerate(sections):
+            m = np.isin(np.array(adata.obs['Slice']),[section])
+            ax = axs[idx]
+            ax.scatter(x[m],y[m],s=0.01,c=c[m],marker='x')
+            ax.set_title(section)
+            ax.set_aspect('equal')
+            ax.axis('off')
+        handles = [plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=pallette[key], markersize=10, label=key) for key in cts]
+        axs[idx+1].legend(handles=handles, loc='center',ncol=3, fontsize=8)
+        axs[idx+1].axis('off')
+        plt.show()
+    return adata
+
+from sklearn.linear_model import LogisticRegression
+import joblib
+class NeuronClassifier(Classifier):
+    def __init__(self,verbose=True,modeL_path=None):
+        self.verbose = verbose
+        self.train(modeL_path=modeL_path)
+
+    def train(self,modeL_path=None):
+        if isinstance(modeL_path,str):
+            if os.path.exists(modeL_path):
+                fileu.update_user(f"Loading Model",verbose=self.verbose)
+                self.model = joblib.load(modeL_path)
+                return
+        fileu.update_user(f"Training Model",verbose=self.verbose)
+        reference = anndata.read(pathu.get_path('allen_wmb_tree', check=True))
+        reference.layers['classification_space'] = basicu.robust_zscore(reference.X.copy())
+        converter = {True:'Non_Neuron', False:'Neuron'}
+        labels = np.array([converter[('NN' in i)] for i in reference.obs['subclass']])
+        reference_coordinates = np.array(reference.layers['classification_space'])
+
+        # Create a Logistic Regression model
+        model = LogisticRegression()
+
+        # Train the model using the reference coordinates and labels
+        model.fit(reference_coordinates, labels)
+
+        test = model.predict(reference_coordinates)
+        fileu.update_user(f"{str(np.mean(test == labels))} Accuracy",verbose=self.verbose)
+        self.model = model
+        if isinstance(modeL_path,str):
+            fileu.update_user(f"Saving Model",verbose=self.verbose)
+            joblib.dump(model,modeL_path)
+
+    def classify(self,adata):
+
+        # Convert to PyTorch tensor
+        # Predict the labels for the measured coordinates
+        measured_coordinates = np.array(adata.layers['classification_space'])
+        predicted_labels = self.model.predict(measured_coordinates)
+        fileu.update_user(f"Classifying Neurons",verbose=self.verbose)
+        adata.obs['neuron'] = predicted_labels
+        cts = np.array(adata.obs['neuron'].unique())
+        colors = np.random.choice(np.array(list(mcolors.XKCD_COLORS.keys())),cts.shape[0],replace=False)
+        pallette = dict(zip(cts, colors))
+        pallette = {'Non_Neuron': 'r', 'Neuron': 'k'}
+        adata.obs['neuron_colors'] = adata.obs['neuron'].map(pallette)
+        if self.verbose:
+            sections = np.unique(adata.obs['Slice'])
+            x = adata.obs['ccf_z']
+            y = adata.obs['ccf_y']
+            c = np.array(adata.obs[f"neuron_colors"])
+            cl = np.array(adata.obs[f"neuron"])
+            pallette = dict(zip(cl,c))
+            cts = np.unique(cl)
+            n_columns = 5
+            n_rows = math.ceil((1+sections.shape[0])/n_columns)
+            fig,axs  = plt.subplots(n_rows,n_columns,figsize=[5*n_columns,5*n_rows])
+            axs = axs.ravel()
+            for ax in axs:
+                ax.axis('off')
+            # plt.suptitle(f"Unsupervised Classification res:{resolution}")
+            for idx,section in enumerate(sections):
+                m = np.isin(np.array(adata.obs['Slice']),[section])
+                ax = axs[idx]
+                ax.scatter(x[m],y[m],s=0.01,c=c[m],marker='x')
+                ax.set_title(section)
+                ax.set_aspect('equal')
+                ax.axis('off')
+            handles = [plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=pallette[key], markersize=10, label=key) for key in cts]
+            axs[idx+1].legend(handles=handles, loc='center',ncol=3, fontsize=8)
+            axs[idx+1].axis('off')
+            plt.show()
+
+        return adata
+
+
+def splitClassification(adata,ref_levels=['class', 'subclass','supertype','cluster'],weighted=False,verbose=False):
+    for level in ref_levels:
+        adata.obs[level] = 'Unassigned'
+        adata.obs[level+'_color'] = 'Unassigned'
+    neuron_adata = adata[adata.obs['neuron']=='Neuron'].copy()
+    non_neuron_adata = adata[adata.obs['neuron']!='Neuron'].copy()
+
+    def wrapperClassification(adata,ref_levels=['class', 'subclass','supertype','cluster'],weighted=False,neuron=None,verbose=False):
+        salt = SpatialAssistedLabelTransfer(adata,ref_levels=ref_levels,batch_name='Slice',model='knn',weighted=weighted,neuron=neuron,verbose=verbose)
+        salt.train()
+        salt.classify()
+        return salt.measured
+    neuron_pfunc = partial(wrapperClassification,ref_levels=ref_levels,weighted=weighted,neuron=True,verbose=verbose)
+    non_neuron_pfunc = partial(wrapperClassification,ref_levels=ref_levels,weighted=weighted,neuron=False,verbose=verbose)
+    for pfunc,temp_adata in dict(zip([neuron_pfunc,non_neuron_pfunc],[neuron_adata,non_neuron_adata])).items():
+        temp_adata = pfunc(temp_adata)
+        adata.obs.loc[temp_adata.obs.index,level] = temp_adata.obs.loc[temp_adata.obs.index,level].copy()
+        adata.obs.loc[temp_adata.obs.index,level+'_color'] = temp_adata.obs.loc[temp_adata.obs.index,level+'_color'].copy()
+    return adata
+
