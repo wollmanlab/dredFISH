@@ -32,6 +32,7 @@ import pynndescent
 
 from scipy.sparse.csgraph import dijkstra
 import scipy.sparse
+from scipy.spatial import cKDTree
 
 from multiprocessing import Pool
 import warnings
@@ -828,7 +829,7 @@ class TissueGraph:
         
         # Key graphs - spatial and feature based
         self.SG = None # spatial graph (created by build_spatial_graph, or load in __init__)
-        self.FG = None # Feature graph (created by build_feature_graph, or load in __init__)
+        self.FG = dict() # Feature graph (created by build_feature_graph, or load in __init__)
         self._spatial_edge_list = None # for performance (of .contract_graph), going to save the edge list extermally from self.SG 
 
         # there are two mode of TG loading: 
@@ -836,39 +837,47 @@ class TissueGraph:
         # 2. from scratch : uses input arguments to rebuild the TG object from scratch, ignores anything in the drive. 
         
         if not redo:
-            self.adata = anndata.read_h5ad(os.path.join(self.basepath,'Layer',f"{self.layer_type}_layer.h5ad"))
+            layer_path = os.path.join(self.basepath, 'Layer')
+            self.adata = anndata.read_h5ad(os.path.join(layer_path,f"{self.layer_type}_layer.h5ad"))
             
             if 'adata_mapping' in self.adata.uns:
                 self.adata_mapping = self.adata.uns["adata_mapping"]
+            
+            # build all graphs
             # SG is saved as a list of spatial graphs (one per section)
-            if "SG" in self.adata.obsp.keys():
-                # create SG and FG from Anndata
-                sg = self.adata.obsp["SG"] # csr matrix
-                self.SG =  tmgu.adjacency_to_igraph(sg, directed=False, simplify = False)
-                
-            # FG - there is one feature graph for the whole TG object
-            if "FG" in self.adata.obsp.keys():
-                fg = self.adata.obsp["FG"] # csr matrix
-                self.FG = tmgu.adjacency_to_igraph(fg, directed=False, simplify = False)
+            for g_name in self.adata.obsp.keys():
+                if g_name=="SG":
+                    # create SG and FG from Anndata
+                    sg = self.adata.obsp["SG"] # csr matrix
+                    self.SG =  tmgu.adjacency_to_igraph(sg, directed=False, simplify = False)
+                else: 
+                    fg = self.adata.obsp[g_name] # csr matrix
+                    # self.FG[g_name] = dict()
+                    # self.FG[g_name]["G"] = tmgu.adjacency_to_igraph(fg, directed=False, simplify = False)
 
+            
             if "SG_knn" in self.adata.uns:
                 try: 
-                    with open(self.adata.uns["SG_knn"],'rb') as file: 
+                    filename = os.path.join(layer_path,self.adata.uns["SG_knn"])
+                    with open(filename,'rb') as file: 
                         knn = pickle.load(file)
                     self.SG_knn = knn
                 except Exception:
                     warnings.warn("Failed to load SG_knn - please check")
                     self.SG_knn = None
 
-            if "FG_knn" in self.adata.uns: 
-                try:
-                    with open(self.adata.uns["FG_knn"],'rb') as file: 
-                        knn = pickle.load(file)
-                    self.FG_knn = knn
-                except Exception:
-                    warnings.warn("Failed to load FG_knn - please check")
-                    self.FG_knn = None
-
+            for key in self.adata.uns.keys():
+                if key.startswith("FG_") and key.endswith("_knn"):
+                    fg_key = key[3:-4]  # Remove 'FG_' prefix and '_knn' suffix
+                    filename = os.path.join(layer_path,self.adata.uns[key])
+                    try:
+                        with open(filename, 'rb') as file:
+                            knn = pickle.load(file)
+                        self.FG[fg_key]["knn"] = knn
+                    except Exception:
+                        warnings.warn(f"Failed to load {key} - please check")
+                        self.FG[fg_key]["knn"] = None
+            
         else: # create an object from given feature_mat data
 
             # if feautre_mat is a tuple, replace with an empty sparse matrix
@@ -901,7 +910,7 @@ class TissueGraph:
         else: 
             return False
 
-    def filter(self,logical_vec,rebuild_SG = True, rebuild_FG = True): 
+    def filter(self,logical_vec,rebuild_SG = True): 
         """
         removes observations from TG. 
         can only work if layer_type==cells
@@ -916,18 +925,13 @@ class TissueGraph:
             if self.SG_knn is None: 
                 self.build_spatial_graph()
             else: 
-                self.build_spatial_graph(keep_knn=True)
+                self.build_spatial_graph(save_knn=True)
         else:
             # after filtering, need to rebuild SG, if it existed (and rebuild_SG was False) zeros it out
             self.SG = None
             self.SG_knn = None
         
-        if rebuild_FG and self.FG != None: 
-            self.build_feature_graph()
-        else: 
-            # after filtering, need to rebuild FG, if it existed (and rebuild_FG was False) zeros it out
-            self.FG = None
-            self.FG_knn = None
+        self.FG = dict()
 
     def save(self):
         """ add stuff to adata"""
@@ -935,16 +939,22 @@ class TissueGraph:
 
         """save TG to file"""
         layer_path = os.path.join(self.basepath, 'Layer')
+        if not os.path.exists(layer_path):
+            os.makedirs(layer_path)
         if hasattr(self, 'SG_knn'):
-            filename = os.path.join(layer_path, f"{self.layer_type}_SG_knn.pkl")
-            with open(filename, 'wb') as file:
+            filename =  f"{self.layer_type}_SG_knn.pkl" # 
+            fullfilename = os.path.join(layer_path,filename)
+            with open(fullfilename, 'wb') as file:
                 pickle.dump(self.SG_knn,file)
             self.adata.uns["SG_knn"] = filename
-        if hasattr(self, 'FG_knn'):
-            filename = os.path.join(layer_path, f"{self.layer_type}_FG_knn.pkl")
-            with open(filename, 'wb') as file:
-                pickle.dump(self.FG_knn,file)
-            self.adata.uns["FG_knn"] = filename 
+        for g in self.FG.keys():
+            if 'knn' in self.FG[g]:
+                filename = f"{self.layer_type}_{g}_knn.pkl"
+                fullfilename = os.path.join(layer_path,filename)
+                with open(fullfilename, 'wb') as file:
+                    pickle.dump(self.FG[g]['knn'], file)
+                self.adata.uns[f"{g}_knn"] = filename
+        
         if not os.path.exists(layer_path):
             os.makedirs(layer_path)
         if not self.is_empty():
@@ -1128,7 +1138,7 @@ class TissueGraph:
         elif isinstance(section, list):
             return [self.adata.obs[column][self.Section == sec, :] for sec in section]
         else: 
-            return(self.adata.obs[column][self.Section == sec, :])
+            return(self.adata.obs[column][self.Section == section, :])
         
     def get_N(self, section=None): 
         if section is None: 
@@ -1185,8 +1195,8 @@ class TissueGraph:
         unqS = np.unique(self.Section)
         return(len(unqS))
     
-    def build_feature_graph(self, 
-        X = None, n_neighbors=15, metric='cosine', accuracy={'prob':1, 'extras':1.5}, metric_kwds={}, return_graph=False):
+    def build_feature_graph(self, X = None, n_neighbors=15, name = None,
+                                  metric='cosine', accuracy={'prob':1, 'extras':1.5}, metric_kwds={}, return_graph=False,save_knn = False):
         """construct k-graph based on feature similarity
 
         Create a kNN graph (an igraph object) based on feature similarity. The core of this method is the calculation on how to find neighbors. 
@@ -1224,27 +1234,56 @@ class TissueGraph:
         if X is None: 
             X = self.feature_mat
 
+        # if name isn't provided, use metric for name
+        if name is None: 
+            name = metric
+
         (G,knn) = tmgu.build_knn_graph(X,metric,n_neighbors=n_neighbors,accuracy=accuracy,metric_kwds=metric_kwds)
 
-        self.adata.obsp["FG"] = G.get_adjacency_sparse()
-        self.FG_knn = knn
-        self.FG = G
+        self.adata.obsp[name] = G.get_adjacency_sparse()
+        # save new features graph as 
+        self.FG[name] = dict()
+        self.FG[name]["G"] = G
+        if save_knn: 
+            self.FG[name]["knn"] = knn
+
         if return_graph:
             return G
 
-    def knn_query(self,X,k=15,graph = 'spatial'):
+    def knn_query(self,X,k=15,graph = 'spatial',verbose = False):
+        """
+        performs knn query on feature/spatial graph. 
+
+        Feature graph uses standard knn
+
+        Spatial graph works "per section" so X needs to be a tuple with (XY,Section) of which 
+        section would each XY point belong to. 
+        """
         if graph == 'spatial': 
-            knn = self.SG_knn
-        elif graph == 'feature': 
-            knn = self.FG_knn
+            closest_sections=X[1]
+            XY_qry = X[0]
+            indices = np.zeros((XY_qry.shape[0],k))
+            distances = np.zeros((XY_qry.shape[0],k))
+            offset = 0
+            for i,s in enumerate(self.unqS):
+                if verbose: 
+                    print(f"querying neighbors for section {s} {i}/{len(self.unqS)}") 
+                ix = np.flatnonzero(closest_sections==s)
+                if isinstance(self.SG_knn[i], cKDTree):
+                    distances[ix,:],indices[ix,:] =  self.SG_knn[i].query(XY_qry[ix,:],k)
+                else: 
+                    indices[ix,:],distances[ix,:] =  self.SG_knn[i].query(XY_qry[ix,:],k)
+                indices[ix,:] += offset
+                offset += np.sum(self.Section == s)
+            return (indices,distances) 
+        elif graph in self.FG:
+            knn = self.FG[graph]["knn"]
+            indices,distances = knn.query(X,k)
+            return (indices,distances)
         else: 
-            raise ValueError("Graph type must be 'spatial' of 'feature")
+            raise ValueError("Graph type must be 'spatial' of a known feature graph")
 
-        if knn is None: 
-                raise ValueError(f"{graph} graph not defined")
-
-        indices,distances = knn.query(X,k)
-        return (indices,distances)
+        
     
     def build_spatial_graph(self,max_dist = 300,save_knn = False):
         """construct graph based on Delaunay neighbors
@@ -1258,7 +1297,7 @@ class TissueGraph:
         sorted by section. This happens naturally when using create_cell_layer with input_df of one 
         per section. If not - adjust it while you build the cell layer
 
-        in addition to the "per section" graphs, also build the knn graph to store for future queries
+        in addition to the "per section" graphs, also builds a list of knn graphs to store for future queries
 
         """
         unqS = self.unqS
@@ -1283,10 +1322,12 @@ class TissueGraph:
 
         # get XYZ data
         if save_knn:
-            logging.info("building knn query object")
-            XYZ = self.XYZ
-            _,knn = tmgu.build_knn_graph(self.XYZ,'euclidean')
-            self.SG_knn = knn
+            logging.info("building knn query objects")
+            self.SG_knn = list()
+            for s in self.unqS: 
+                XY_per_section = self.XY[self.Section==s,:]
+                _,knn = tmgu.build_knn_graph(XY_per_section,'euclidean')
+                self.SG_knn.append(knn)
         logging.info("done building spatial graph")
 
 
@@ -1392,6 +1433,7 @@ class TissueGraph:
             # use weighted bincount to calc XY fast
             newX = np.bincount(IxMapping,weights = self.XY[:,0]) / ZoneSize
             newY = np.bincount(IxMapping,weights = self.XY[:,1]) / ZoneSize
+            newZ = np.bincount(IxMapping,weights = self.Z) / ZoneSize
             new_XY = np.zeros((len(newX),2))
             new_XY[:,0] = newX
             new_XY[:,1] = newY
@@ -1401,6 +1443,7 @@ class TissueGraph:
             new_section = list(self.Section[unq_ix])
 
             ZoneGraph.XY = new_XY
+            ZoneGraph.Z = newZ
             ZoneGraph.Section = new_section
             
 
@@ -1457,13 +1500,13 @@ class TissueGraph:
         else: 
             return(cond_entropy)
     
-    def extract_environments(self,ordr = None,typevec = None):
+    def extract_environments(self,ordr = None,typevec = None, k=None):
         """returns the categorical distribution of neighbors. 
         
         Depending on input there could be two uses, 
             usage 1: if ordr is not None returns local neighberhood defined as nodes up to distance ordr on the graph for all vertices. 
             usage 2: if typevec is not None returns local env based on typevec, will return one env for each unique type in typevec
-            
+            usage 3: if k is not None, calcualte knn spatially per section and then calculate env based on that. 
         Return
         ------
         numpy array
@@ -1471,19 +1514,31 @@ class TissueGraph:
         """
         unqlbl = np.unique(self.Type)
         
+        if sum(x is not None for x in [ordr, typevec, k]) != 1:
+            raise ValueError('Exactly one of ordr, typevec, or k must be provided.')
+        
+
         # arrange the indexes for the environments. 
         # if we use ordr this is neighborhood defined by iGraph
         # if we provide types, than indexes of each type. 
-        if ordr is not None and typevec is None:
-            ind = self.SG.neighborhood(order = ordr)
-        elif typevec is not None and ordr is None:
+        if ordr is not None:
+            # ind = self.SG.neighborhood(order = ordr)
+            ind = tmgu.find_graph_neighborhoold_parallel_by_components(self.SG,ordr)
+        elif typevec is not None:
             ind = list()
             for i in range(len(np.unique(typevec))):
                 ind.append(np.flatnonzero(typevec==i))
         else: 
-            raise ValueError('either order or typevec must be provided, not both (or none)')
+            nbrs_ind,nbrs_dist = self.knn_query((self.XY,self.Section),k=k)
+            typ = self.Type
+            nbrs_types = typ[nbrs_ind.astype(int)]
+            N = self.Type.max()+1
+            Env = np.zeros((nbrs_types.shape[0], N), dtype=int)
+            # Use np.add.at to accumulate counts directly into the occurrence matrix
+            np.add.at(Env, (np.arange(nbrs_types.shape[0])[:, None], nbrs_types), 1)
+            return Env
+
         
-        unqlbl = np.unique(self.Type)
         Env = np.zeros((len(ind),len(unqlbl)),dtype=np.int64)
         ndsz = self.node_size.copy().astype(np.int64)
         int_types = self.Type.astype(np.int64)
@@ -1573,7 +1628,7 @@ class TissueGraph:
         Ntypes = np.zeros(Rvec.shape)
         for i in range(len(Rvec)):
             print(f"iter: {i}")
-            TypeVec = self.FG.community_leiden(resolution_parameter=Rvec[i],objective_function='modularity').membership
+            TypeVec = self.FG["G"].community_leiden(resolution_parameter=Rvec[i],objective_function='modularity').membership
             TypeVec = np.array(TypeVec).astype(np.int64)
             Ent[i] = self.contract_graph(TypeVec,return_useful_layer = False).cond_entropy()
             Ntypes[i] = len(np.unique(TypeVec))
