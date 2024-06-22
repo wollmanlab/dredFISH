@@ -10,6 +10,7 @@ ccf_path = "/scratchdata1/MouseBrainAtlases/Taxonomies/CCF_Ref"
 ccf_version = "ccf_2022"
 ccf_annotation_volume_file = 'ccf_2022_annotation_10.nrrd'
 ccf_ontology_file = "ccf_2022_ontology.csv"
+resolution = 10
 
 def get_annotation_matrix():
     " the CCF volume annotation, after a little bit of cleanup "
@@ -23,7 +24,7 @@ def get_annotation_matrix():
 
     return ccf_annotation_volume
 
-def get_ccf_term_onthology():
+def get_ccf_term_onthology(original = False):
     """ 
     get the CCF term onthology with added pacellation levels
     
@@ -37,6 +38,10 @@ def get_ccf_term_onthology():
 
     onto = pd.read_csv(os.path.join(ccf_path,ccf_version,ccf_ontology_file))
     onto.set_index('id', inplace=True)
+    # we can return the orignianl onthology or one modified to match Allen MERFISH atlas. 
+    # if original that just return the file
+    if original: 
+        return onto
     
     # Drop rows from 'onto' DataFrame where the index is not in 'map_df_2017["id_2017"]'
     onto = onto[onto.index.isin(map_df_2017["id_2017"])]
@@ -58,38 +63,10 @@ def get_ccf_term_onthology():
 
     return onto
 
-# def get_pivot_df():
-#     "reads pivot table for parcellation including colors"
-#     merged_df = pd.read_csv(os.path.join(ccf_path,"parcellation_to_parcellation_term_membership_acronym.csv"))
-#     for clr in ['red','blue','green']:
-#         clr_df = pd.read_csv(os.path.join(ccf_path,f"parcellation_to_parcellation_term_membership_{clr}.csv"))
-#         # Merge the 'pivot_ccf_df' and 'red_df' on the 'parcellation_index' column
-#         merged_df = pd.merge(merged_df, clr_df, on='parcellation_index', how='inner')
-#         # Rename all columns that end with 'color' to end with 'red'
-#         merged_df.columns = [col if not col.endswith('color') else col.replace('color', clr) for col in merged_df.columns]
 
-#     levels = ["organ","category","division","structure","substructure"]
-#     for lvl in levels: 
-#         # Read the three columns that start with the current level and end with _red, _green, _blue
-#         red_col = merged_df[f'{lvl}_red']
-#         green_col = merged_df[f'{lvl}_green']
-#         blue_col = merged_df[f'{lvl}_blue']
-        
-#         # Convert the RGB values to hex codes
-#         hex_colors = ['#%02x%02x%02x' % (r, g, b) for r, g, b in zip(red_col, green_col, blue_col)]
-        
-#         # Assign the hex colors as a new column to the dataframe
-#         merged_df[f'{lvl}_color'] = hex_colors
-
-#     # Drop all columns that end with 'red', 'green', or 'blue'
-#     columns_to_drop = [col for col in merged_df.columns if col.endswith(('red', 'green', 'blue'))]
-#     merged_df.drop(columns=columns_to_drop, inplace=True)
-
-#     # Add 'parcellation_' prefix to columns that don't already start with it
-#     merged_df.columns = [f'parcellation_{col}' if not col.startswith('parcellation_') else col for col in merged_df.columns]
-#     return merged_df
-
-def discretize_XYZ(XYZ,res=25):
+def discretize_XYZ(XYZ,res=None):
+    if res is None: 
+        res = resolution
     Xref = XYZ[:,0]
     Yref = XYZ[:,1]
     Zref = XYZ[:,2]
@@ -108,7 +85,7 @@ def discretize_XYZ(XYZ,res=25):
     return (Xref_int,Yref_int,Zref_int)
 
 def get_ccf_labeled_volume(structure = None):
-    label_file_path = os.path.join(ccf_path, 'ccf_labels.npy')
+    label_file_path = os.path.join(ccf_path, ccf_version,'ccf_labels.npy')
     if os.path.exists(label_file_path):
         labeled_volume = np.load(label_file_path)
     else: 
@@ -125,7 +102,7 @@ def get_ccf_labeled_volume(structure = None):
         (labeled_volume,n_lbls) = label(annotation_without_borders,structure=structure)
 
         labeled_volume = fill_borders_vectorized(labeled_volume,annotation_borders)
-        np.save(os.path.join(ccf_path,'ccf_labels.npy'),labeled_volume)
+        np.save(os.path.join(ccf_path,ccf_version,'ccf_labels.npy'),labeled_volume)
 
     return labeled_volume
     
@@ -170,7 +147,7 @@ def retrieve_CCF_info(XYZ, Section = None):
     additionaly output includes lowest level index + unique label per connected component region
 
     function loads data from drive for index, labels, and pivot table converted
-    data was created with resolytion of 25um (one of Allen SDK options)
+    data was created with resolution of 10um (one of Allen SDK options)
 
     Labeling is done in 2D (XY) taking into account section information
     """
@@ -181,13 +158,23 @@ def retrieve_CCF_info(XYZ, Section = None):
     annotation_volume = get_annotation_matrix()
     labeled_volume = get_ccf_labeled_volume()
     onto = get_ccf_term_onthology()
+    onto_org = get_ccf_term_onthology(original=True)
 
+    # infer parcellation index directly
     (Xref_int,Yref_int,Zref_int) = discretize_XYZ(XYZ)
-
     infered_parecl_id = annotation_volume[Zref_int,Yref_int,Xref_int]
     # anything we can't find, just assign "brain"
     infered_parecl_id[infered_parecl_id==0]=997
+    out_df["parcellation_index"] = infered_parecl_id
+    out_df["parcellation_index_acronym"] = onto_org.loc[infered_parecl_id,"acronym"].values
+    out_df["parcellation_index_name"] = onto_org.loc[infered_parecl_id,"name"].values
+    out_df["parcellation_index_color"] = onto_org.loc[infered_parecl_id,"color_hex_triplet"].values
 
+    # get labels
+    out_df["parcellation_label"] = labeled_volume[Zref_int,Yref_int,Xref_int]
+    
+
+    # map parcellation index to the level used by Allen
     parcilation_levels = ["parcellation_division",
                         "parcellation_structure",
                         "parcellation_substructure"]
@@ -201,8 +188,8 @@ def retrieve_CCF_info(XYZ, Section = None):
         out_df[f"{lvl}_color"] = selected_columns["color_hex_triplet"].values
         out_df[f"{lvl}_name"] = selected_columns["name"].values
 
-    out_df["parcellation_label"] = labeled_volume[Zref_int,Yref_int,Xref_int]
-
+    
+    
     # create the pivot table
     if Section is None:
         unq,lbl_ix = np.unique(out_df['parcellation_label'],return_index=True)
@@ -214,7 +201,7 @@ def retrieve_CCF_info(XYZ, Section = None):
     parcellation_label_type_df = pd.DataFrame()
     parcellation_label_type_df['parcellation_label']=unq
 
-    for tx in parcilation_levels:
+    for tx in parcilation_levels + ['parcellation_index']:
         parcellation_label_type_df[tx] = out_df[tx][lbl_ix].reset_index(drop=True)
 
     return (out_df,parcellation_label_type_df)
