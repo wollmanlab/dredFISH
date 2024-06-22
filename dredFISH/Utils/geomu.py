@@ -338,11 +338,117 @@ def get_polygons_vertices(polygons,return_inner_verts = True):
     else: 
         return verts
 
+# def plot_polygon_collection(verts_or_polys,
+#                             rgb_faces = None, # one per polygon
+#                             ax = None,
+#                             xlm = None,
+#                             ylm = None,
+#                             background_color = (1,1,1), # defaults to white background
+#                             transpose = False,
+#                             rotation = None,
+#                             rotation_center = None):
+#     """
+#     utility function that gets vertices (list of XYs) or polygons (list of shapley polygons)
+#     and plots them using matplotlib PolygonCollection. If polygons have holes, will "fake it" and plot the holes on top of the 
+#     existing polygons with background color (defaults to white rgb=(1,1,1))
+#     """
+
+#     # First - convert verts_or_polys to just be verts
+#     if isinstance(verts_or_polys[0],shapely.geometry.Polygon): 
+#         (verts,hole_verts) = get_polygons_vertices(verts_or_polys)
+#     else: 
+#         verts = verts_or_polys[0]
+#         hole_verts = verts_or_polys[1]
+
+#     # verts / hole_verts could have lists of verts in them if poly was multipolygons
+#     # merge them and increase rgb_faces accordingly
+#     for i in range(len(verts)):
+#         if isinstance(verts[i], np.ndarray):
+#             verts[i] = [verts[i]]
+#     # Create an index vector for each list (item) in verts and tile the item index the length of the list
+#     index_vectors = [np.full(len(v), i) for i, v in enumerate(verts)]
+#     index_vectors = np.hstack(index_vectors)
+#     # expand the colors as needed
+#     rgb_faces = np.array(rgb_faces)
+#     rgb_faces = rgb_faces[index_vectors]
+#     # Flatten the list of verts to a single list containing all vertices
+#     flattened_verts = [vertex for sublist in verts for vertex in sublist]
+#     verts = flattened_verts
+
+#     if transpose:
+#         verts = [np.fliplr(v) for v in verts]
+
+#     if rotation is not None:
+#         xy = np.vstack(verts)
+#         if rotation == 'auto': 
+#             rotation = find_rotation_angle(xy)
+#         # find XY center of all verts and subtract the center from all vert points
+
+#         if rotation_center is not None: 
+#             xy_cntr = rotation_center
+#         else: 
+#             xy_cntr = xy.mean(axis=0)
+#         verts_cntr = [v-xy_cntr for v in verts]
+#         # convert rotation to matrix
+#         rot_mat = rotation_matrix_degrees(rotation)
+#         # multiply XYcentered by rotation matrix
+#         verts_rot = [np.matmul(v,rot_mat) for v in verts_cntr]
+#         # add back the centroids. 
+#         verts = [v+xy_cntr for v in verts_rot]
+   
+
+#     # verify rgb inputs and deal with cases where we only want edges
+#     assert rgb_faces is not None,"To plot provide RGB array (nx3)"
+
+#     # Create the PolyCollection from vertices and set face/edge colors
+#     p = PolyCollection(verts)
+#     p.set(array=None, facecolors=rgb_faces,edgecolors = 'none')
+#     if ax is None: 
+#         fig = plt.figure(figsize = (8,10))
+#         ax = fig.add_subplot()
+#     ax.add_collection(p)
+
+#     # merge the different inner polygons as they will all be plotted with the same color
+#     all_inr = list()
+#     for i in range(len(hole_verts)):
+#         for j in range(len(hole_verts[i])):
+#             all_inr.append(hole_verts[i][j])
+
+#     if rotation is not None: 
+#         # same for hole-verts
+#         all_inr = [v-xy_cntr for v in all_inr]
+#         all_inr = [np.matmul(v,rot_mat) for v in all_inr]
+#         all_inr = [v+xy_cntr for v in all_inr]
+
+#     # Create a second PolyCollection for the holes
+#     p2 = PolyCollection(all_inr)
+#     p2.set(array=None, facecolors=background_color,edgecolors = background_color)
+#     ax.add_collection(p2)
+
+#     # identify boundaries for ax
+#     xy = np.vstack(verts)
+#     mx = np.max(xy,axis=0)
+#     mn = np.min(xy,axis=0)
+#     if xlm is None: 
+#         xlm = (mn[0],mx[0])
+#     if ylm is None: 
+#         ylm = (mn[1],mx[1])
+
+#     ax.set_xlim(xlm[0],xlm[1])
+#     ax.set_ylim(ylm[0],ylm[1])
+
+#     ax.set_aspect('equal', 'box')
+#     ax.axis('off')
+#     return ax
+
 def plot_polygon_collection(verts_or_polys,
                             rgb_faces = None, # one per polygon
+                            Z = None, 
                             ax = None,
                             xlm = None,
                             ylm = None,
+                            zlm = None, 
+                            alpha = 0,
                             background_color = (1,1,1), # defaults to white background
                             transpose = False,
                             rotation = None):
@@ -353,7 +459,7 @@ def plot_polygon_collection(verts_or_polys,
     """
 
     # First - convert verts_or_polys to just be verts
-    if isinstance(verts_or_polys[0],shapely.geometry.Polygon): 
+    if isinstance(verts_or_polys[0],(shapely.geometry.Polygon,shapely.geometry.MultiPolygon)): 
         (verts,hole_verts) = get_polygons_vertices(verts_or_polys)
     else: 
         verts = verts_or_polys[0]
@@ -370,9 +476,19 @@ def plot_polygon_collection(verts_or_polys,
     # expand the colors as needed
     rgb_faces = np.array(rgb_faces)
     rgb_faces = rgb_faces[index_vectors]
+    if Z is not None: 
+        Z = np.full(len(index_vectors),Z)
+        Z = Z[index_vectors]
     # Flatten the list of verts to a single list containing all vertices
     flattened_verts = [vertex for sublist in verts for vertex in sublist]
     verts = flattened_verts
+
+    empty_indexes = [i for i, v in enumerate(verts) if len(v) == 0]
+    # Remove entries corresponding to empty_indexes from verts, Z, and rgb_faces
+    verts = [v for i, v in enumerate(verts) if i not in empty_indexes]
+    if Z is not None:
+        Z = [z for i, z in enumerate(Z) if i not in empty_indexes]
+    rgb_faces = [color for i, color in enumerate(rgb_faces) if i not in empty_indexes]
 
     if transpose:
         verts = [np.fliplr(v) for v in verts]
@@ -397,12 +513,19 @@ def plot_polygon_collection(verts_or_polys,
     assert rgb_faces is not None,"To plot provide RGB array (nx3)"
 
     # Create the PolyCollection from vertices and set face/edge colors
-    p = PolyCollection(verts)
-    p.set(array=None, facecolors=rgb_faces,edgecolors = 'none')
+    p = PolyCollection(verts, facecolors=rgb_faces, edgecolors = 'none',alpha=alpha)
+
     if ax is None: 
         fig = plt.figure(figsize = (8,10))
-        ax = fig.add_subplot()
-    ax.add_collection(p)
+        if Z is not None: 
+            ax = fig.add_subplot(projection='3d')
+        else: 
+            ax = fig.add_subplot()
+            
+    if Z is None: 
+        ax.add_collection(p)
+    else: 
+        ax.add_collection3d(p, zs=Z, zdir='y')
 
     # merge the different inner polygons as they will all be plotted with the same color
     all_inr = list()
@@ -417,9 +540,12 @@ def plot_polygon_collection(verts_or_polys,
         all_inr = [v+xy_cntr for v in all_inr]
 
     # Create a second PolyCollection for the holes
-    p2 = PolyCollection(all_inr)
-    p2.set(array=None, facecolors=background_color,edgecolors = background_color)
-    ax.add_collection(p2)
+    p2 = PolyCollection(all_inr,facecolors=background_color,edgecolors='none')
+    if Z is None: 
+        ax.add_collection(p2)
+    else:
+        Zholes =  np.full(len(all_inr),Z[0])
+        ax.add_collection3d(p2, zs=Zholes, zdir='y')
 
     # identify boundaries for ax
     xy = np.vstack(verts)
@@ -433,7 +559,11 @@ def plot_polygon_collection(verts_or_polys,
     ax.set_xlim(xlm[0],xlm[1])
     ax.set_ylim(ylm[0],ylm[1])
 
-    ax.set_aspect('equal', 'box')
+    if Z is None: 
+        ax.set_aspect('equal', 'box')
+    else:
+        ax.set_zlim(zlm[0],zlm[1])
+
     ax.axis('off')
     return ax
 
