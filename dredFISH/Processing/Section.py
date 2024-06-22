@@ -141,7 +141,7 @@ class Section_Class(object):
                         self.pull_vectors()
             if not isinstance(self.data,type(None)):
                 self.generate_report()
-                # self.remove_temporary_files()
+                self.remove_temporary_files()
                 # self.qc_score()
                 # self.copy_to_drive()
         else:
@@ -268,13 +268,15 @@ class Section_Class(object):
         """
         if isinstance(path,type(None)):
             path = self.path
+        if len(self.parameters['model_types'])==1:
+            model_type = ''
         # if file_type in ['FF','constant','image_FF','image_constant']:
         #     path = self.well_path
         if (file_type in ['stitched'])&(self.parameters['use_scratch']):
             path = self.scratch_path
         return fileu.check_existance(path=path,fname=fname,hybe=hybe,channel=channel,section=section,file_type=file_type,model_type=model_type,logger=self.log)
 
-    def generate_filename(self,hybe,channel,file_type,model_type='',section='',path=None):
+    def generate_filename(self,hybe='',channel='',file_type='',model_type='',section='',path=None):
         """
         fname Wrapper to fileu.generate_filename Generate Filename
 
@@ -392,7 +394,7 @@ class Section_Class(object):
             self.parameters['jitter_correction'] = False
             self.parameters['n_pixels']=[2448, 2048]
         elif self.parameters['scope']=='PurpleScope':
-            self.parameters['pixel_size'] = 0.409# 0.490#0.327#0.490 # um 490 or 330
+            self.parameters['pixel_size'] = 0.428# 0.490#0.327#0.490 # um 490 or 330 # 0.428 #0.409
             self.parameters['jitter_channel'] = 'FarRed'
             self.parameters['jitter_correction'] = False
             self.parameters['n_pixels']=[2448, 2048]
@@ -555,6 +557,8 @@ class Section_Class(object):
             self.update_user(f"Loading FF and Constant For entire Dataset for {channel}")
             acq = 'dataset'
         path = os.path.join(self.parameters['metadata_path'],self.parameters['microscope_parameters'])
+        if not os.path.exists(path):
+            os.mkdir(path)
         FF = self.generate_filename(path=path,section=self.dataset.split('_')[0],hybe=acq,channel=channel,file_type='FF')
         constant = self.generate_filename(path=path,section=self.dataset.split('_')[0],hybe=acq,channel=channel,file_type='constant')
         if self.check_existance(fname=FF):
@@ -916,28 +920,31 @@ class Section_Class(object):
 
 
             """Only replace 0's with incoming image"""
-            incoming = torch.dstack([nuc,signal])
+            
             destination = stitched[(results[posname]['img_x_min']+results[posname]['translation_x']):(results[posname]['img_x_max']+results[posname]['translation_x']),
                                    (results[posname]['img_y_min']+results[posname]['translation_y']):(results[posname]['img_y_max']+results[posname]['translation_y']),:]
+            mask = destination[:,:,0]==0
+            x,y = torch.where(mask)
+
             if self.parameters['overlap_correction']:
-                m = destination>0
-                if torch.sum(m)>0:
-                    non_zero = incoming>0
-                    overlap_constant = torch.median(incoming[m]-destination[m])
-                    incoming[non_zero] = incoming[non_zero]-overlap_constant
-            destination[destination==0] = incoming[destination==0]
+                if torch.sum(mask)>0:
+                    non_zero = (signal>0)&(mask==False)
+                    overlap_constant = torch.median(signal[non_zero]-destination[non_zero,1])
+                    signal = signal-overlap_constant
+            destination[x,y,0] = nuc[x,y]
+            destination[x,y,1] = signal[x,y]
             stitched[(results[posname]['img_x_min']+results[posname]['translation_x']):(results[posname]['img_x_max']+results[posname]['translation_x']),
                      (results[posname]['img_y_min']+results[posname]['translation_y']):(results[posname]['img_y_max']+results[posname]['translation_y']),:] = destination
             
 
             if isinstance(self.reference_stitched,str):
-                incoming = torch.dstack([
-                        torch.tensor(np.stack([np.array(range(nuc.shape[1])) for i in range(nuc.shape[0])])),
-                        torch.tensor(np.stack([np.array(range(nuc.shape[0])) for i in range(nuc.shape[1])]).T),
-                        torch.ones_like(nuc)*self.posname_index_converter[posname]
-                        ])
+                destination = pixel_coordinates_stitched[(results[posname]['img_x_min']+results[posname]['translation_x']):(results[posname]['img_x_max']+results[posname]['translation_x']),
+                                   (results[posname]['img_y_min']+results[posname]['translation_y']):(results[posname]['img_y_max']+results[posname]['translation_y']),:]
+                destination[x,y,0] = torch.tensor(np.stack([np.array(range(nuc.shape[1])) for i in range(nuc.shape[0])]),dtype=destination.dtype)[x,y]
+                destination[x,y,1] = torch.tensor(np.stack([np.array(range(nuc.shape[0])) for i in range(nuc.shape[1])]).T,dtype=destination.dtype)[x,y]
+                destination[x,y,2] = (torch.ones_like(nuc,dtype=destination.dtype)*self.posname_index_converter[posname])[x,y]
                 pixel_coordinates_stitched[(results[posname]['img_x_min']+results[posname]['translation_x']):(results[posname]['img_x_max']+results[posname]['translation_x']),
-                                           (results[posname]['img_y_min']+results[posname]['translation_y']):(results[posname]['img_y_max']+results[posname]['translation_y']),:] = incoming
+                                           (results[posname]['img_y_min']+results[posname]['translation_y']):(results[posname]['img_y_max']+results[posname]['translation_y']),:] = destination
                 
 
 
@@ -1343,11 +1350,11 @@ class Section_Class(object):
             self.data.var['readout'] = [r for r,h,c in self.parameters['bitmap']]
             self.data.var['hybe'] = [h for r,h,c in self.parameters['bitmap']]
             self.data.var['channel'] = [c for r,h,c in self.parameters['bitmap']]
-            self.data.layers['processed_vectors'] = self.vectors.numpy()
-            self.data.layers['nuc_processed_vectors'] = self.nuc_vectors.numpy()
-            self.data.layers['raw'] = self.vectors.numpy()
-            self.data.layers['nuc_raw'] = self.nuc_vectors.numpy()
-
+            self.data.layers['processed_vectors'] = self.vectors.numpy().copy()
+            self.data.layers['nuc_processed_vectors'] = self.nuc_vectors.numpy().copy()
+            self.data.layers['raw'] = self.vectors.numpy().copy()
+            self.data.layers['nuc_raw'] = self.nuc_vectors.numpy().copy()
+            self.data.obs['sum'] = self.data.layers['processed_vectors'].sum(axis=1)
 
             # observations = ['PolyT','Housekeeping','Nonspecific_Encoding','Nonspecific_Readout'] # FIX upgrade to be everything but the rs in design 
             # for obs in observations:
@@ -1365,7 +1372,7 @@ class Section_Class(object):
                 file_type='metadata_bits',
                 model_type=self.model_type)
             self.save(pd.DataFrame(
-                self.data.layers['processed_vectors'],
+                self.data.layers['raw'],
                 index=self.data.obs.index,
                 columns=self.data.var.index),
                 file_type='matrix',
@@ -1404,8 +1411,7 @@ class Section_Class(object):
         report_path = self.generate_filename(hybe='', channel='', file_type='Report', model_type=self.model_type)
         dpi = 200
         paths= []
-        self.data.obs['sum'] = self.data.layers['processed_vectors'].sum(axis=1)
-        # additional_views = ['housekeeping','dapi','nonspecific_encoding','nonspecific_readout','sum','ieg']
+        temp_data = self.data.copy()
         additional_views = ['sum','dapi']
         plt.close('all')
         if (os.path.exists(report_path)==False)|self.parameters['overwrite_report']:
@@ -1413,7 +1419,7 @@ class Section_Class(object):
             path = self.generate_filename(hybe='', channel='RawVectors', file_type='Figure', model_type=self.model_type)
             if (os.path.exists(path)==False)|self.parameters['overwrite_report']:
                 self.update_user('Generating Raw Figure')
-                n_bits = self.data.shape[1]
+                n_bits = temp_data.shape[1]
                 n_figs = n_bits+len(additional_views)
                 n_columns = 5
                 n_rows = math.ceil(n_figs/n_columns)
@@ -1423,25 +1429,19 @@ class Section_Class(object):
                 for i in range(n_figs):
                     axs[i].axis('off')
                     axs[i].set_aspect('equal')
-                x = self.data.obs['stage_x']
-                y = self.data.obs['stage_y']
-                X = self.data.layers['processed_vectors'].copy()
-                # X = basicu.normalize_fishdata_robust_regression(X)
-                # X = basicu.normalize_fishdata_regress(X,value='sum',leave_log=True,log=True,bitwise=False)
-                # X = basicu.normalize_fishdata_regress(X,value='none',leave_log=True,log=True,bitwise=False)
+                x = temp_data.obs['stage_x']
+                y = temp_data.obs['stage_y']
+                X = np.array(temp_data.layers['processed_vectors']).copy()
                 for i in range(n_bits):
                     c = X[:,i].copy()
                     vmin,vmax = np.percentile(c[np.isnan(c)==False],[5,95])
                     vmin = np.max([vmin,10**1.5])
                     scatter = axs[i].scatter(x,y,c=np.clip(c,vmin,vmax),s=0.01,cmap='jet',marker='x')
                     fig.colorbar(scatter, ax=axs[i])
-                    axs[i].set_title(np.array(self.data.var.index)[i])
+                    axs[i].set_title(np.array(temp_data.var.index)[i])
                     axs[i].axis('off')
-                shared_columns = [i for i in additional_views if i in self.data.obs.columns]
-                X = np.array(self.data.obs[shared_columns]).astype(self.parameters['numpy_dtype'])
-                # X = basicu.normalize_fishdata_robust_regression(X)
-                # X = basicu.normalize_fishdata_regress(X,value='sum',leave_log=True,log=True,bitwise=False)
-                # X = basicu.normalize_fishdata_regress(X,value='none',leave_log=True,log=True,bitwise=False)
+                shared_columns = [i for i in additional_views if i in temp_data.obs.columns]
+                X = np.array(temp_data.obs[shared_columns]).astype(self.parameters['numpy_dtype'])
                 for i,obs in enumerate(shared_columns):
                     c = X[:,i].copy()
                     vmin,vmax = np.percentile(c[np.isnan(c)==False],[5,95])
@@ -1458,7 +1458,7 @@ class Section_Class(object):
             path = self.generate_filename(hybe='', channel='NormVectors', file_type='Figure', model_type=self.model_type)
             if (os.path.exists(path)==False)|self.parameters['overwrite_report']:
                 self.update_user('Generating Norm Figure')
-                n_bits = self.data.shape[1]
+                n_bits = temp_data.shape[1]
                 n_figs = n_bits+len(additional_views)
                 n_columns = 5
                 n_rows = math.ceil(n_figs/n_columns)
@@ -1468,27 +1468,21 @@ class Section_Class(object):
                 for i in range(n_figs):
                     axs[i].axis('off')
                     axs[i].set_aspect('equal')
-                x = self.data.obs['stage_x']
-                y = self.data.obs['stage_y']
-                X = self.data.layers['processed_vectors'].copy()
-                # X = basicu.normalize_fishdata_regress(X,value='none',leave_log=True,log=True,bitwise=False)
+                x = temp_data.obs['stage_x']
+                y = temp_data.obs['stage_y']
+                X = np.array(temp_data.layers['processed_vectors']).copy()
                 X = basicu.normalize_fishdata_robust_regression(X)
-                # X = basicu.normalize_fishdata_regress(X,value='sum',leave_log=True,log=True,bitwise=False)
-                # X = basicu.normalize_fishdata_regress(X,value='none',leave_log=True,log=True,bitwise=False)
                 for i in range(n_bits):
                     c = X[:,i].copy()
                     vmin,vmax = np.percentile(c[np.isnan(c)==False],[5,95])
                     vmin = np.max([vmin,10**1.5])
                     scatter = axs[i].scatter(x,y,c=np.clip(c,vmin,vmax),s=0.01,cmap='jet',marker='x')
                     fig.colorbar(scatter, ax=axs[i])
-                    axs[i].set_title(np.array(self.data.var.index)[i])
+                    axs[i].set_title(np.array(temp_data.var.index)[i])
                     axs[i].axis('off')
-                shared_columns = [i for i in additional_views if i in self.data.obs.columns]
-                X = np.array(self.data.obs[shared_columns]).astype(self.parameters['numpy_dtype']).copy()
-                # X = basicu.normalize_fishdata_regress(X,value='none',leave_log=True,log=True,bitwise=False)
+                shared_columns = [i for i in additional_views if i in temp_data.obs.columns]
+                X = np.array(temp_data.obs[shared_columns]).astype(self.parameters['numpy_dtype']).copy()
                 X = basicu.normalize_fishdata_robust_regression(X)
-                # X = basicu.normalize_fishdata_regress(X,value='sum',leave_log=True,log=True,bitwise=False)
-                # X = basicu.normalize_fishdata_regress(X,value='none',leave_log=True,log=True,bitwise=False)
                 for i,obs in enumerate(shared_columns):
                     c = X[:,i].copy()
                     vmin,vmax = np.percentile(c[np.isnan(c)==False],[5,95])
@@ -1505,7 +1499,7 @@ class Section_Class(object):
             path = self.generate_filename(hybe='', channel='Dapi', file_type='Figure', model_type=self.model_type)
             if (os.path.exists(path)==False)|self.parameters['overwrite_report']:
                 self.update_user('Generating Dapi Figure')
-                n_bits = self.data.shape[1]
+                n_bits = temp_data.shape[1]
                 n_figs = n_bits+len(additional_views)
                 n_columns = 5
                 n_rows = math.ceil(n_figs/n_columns)
@@ -1515,24 +1509,20 @@ class Section_Class(object):
                 for i in range(n_figs):
                     axs[i].axis('off')
                     axs[i].set_aspect('equal')
-                x = self.data.obs['stage_x']
-                y = self.data.obs['stage_y']
-                X = self.data.layers['nuc_processed_vectors'].copy()
-                # X = basicu.normalize_fishdata_robust_regression(X)
-                # X = basicu.normalize_fishdata_regress(X,value='sum',leave_log=True,log=True,bitwise=False)
+                x = temp_data.obs['stage_x']
+                y = temp_data.obs['stage_y']
+                X = np.array(temp_data.layers['nuc_processed_vectors'].copy())
                 X = basicu.normalize_fishdata_regress(X,value='none',leave_log=True,log=True,bitwise=False)
                 for i in range(n_bits):
                     c = X[:,i].copy()
                     vmin,vmax = np.percentile(c[np.isnan(c)==False],[5,95])
                     scatter = axs[i].scatter(x,y,c=np.clip(c,vmin,vmax),s=0.01,cmap='jet',marker='x')
                     fig.colorbar(scatter, ax=axs[i])
-                    axs[i].set_title(np.array(self.data.var.index)[i])
+                    axs[i].set_title(np.array(temp_data.var.index)[i])
                     axs[i].axis('off')
-                shared_columns = [i for i in additional_views if i in self.data.obs.columns]
-                X = np.array(self.data.obs[shared_columns]).astype(self.parameters['numpy_dtype']).copy()
+                shared_columns = [i for i in additional_views if i in temp_data.obs.columns]
+                X = np.array(temp_data.obs[shared_columns]).astype(self.parameters['numpy_dtype']).copy()
                 
-                # X = basicu.normalize_fishdata_robust_regression(X)
-                # X = basicu.normalize_fishdata_regress(X,value='sum',leave_log=True,log=True,bitwise=False)
                 X = basicu.normalize_fishdata_regress(X,value='none',leave_log=True,log=True,bitwise=False)
                 for i,obs in enumerate(shared_columns):
                     c = X[:,i].copy()
@@ -1549,34 +1539,29 @@ class Section_Class(object):
             path = self.generate_filename(hybe='', channel='Louvain', file_type='Figure', model_type=self.model_type)
             if (os.path.exists(path)==False)|self.parameters['overwrite_report']:
                 self.update_user('Generating Louvain Figure')
-                if self.parameters['overwrite_louvain']| (not 'louvain' in self.data.obs.columns):
-                    #  self.data.X = basicu.normalize_fishdata_regress(self.data.layers['processed_vectors'].copy(),value='sum',leave_log=True,log=True,bitwise=True)
-                    X = self.data.layers['processed_vectors'].copy()
-                    # X = basicu.normalize_fishdata_regress(X,value='none',leave_log=True,log=True,bitwise=False)
+                if self.parameters['overwrite_louvain']| (not 'louvain' in temp_data.obs.columns):
+                    bits = [i for i in temp_data.var.index if 'RS' in i]
+                    temp_data = temp_data[:,temp_data.var.index.isin(bits)]
+                    X = temp_data.layers['processed_vectors'].copy()
+
+                    X = np.sqrt(np.clip(X,1,None))
                     X = basicu.normalize_fishdata_robust_regression(X)
-                    # X = basicu.normalize_fishdata_regress(X,value='none',leave_log=True,log=True,bitwise=False)
-                    self.data.X = X.copy()
-                    sc.pp.neighbors(self.data, n_neighbors=15, use_rep='X',metric="correlation")
-                    # sc.tl.umap(self.data, min_dist=0.1)
-                    sc.tl.louvain(self.data,resolution=1,key_added='louvain')
-                    self.data.X = self.data.layers['processed_vectors'].copy()
-                cts = np.array(self.data.obs['louvain'].unique())
-                louvain_counts = self.data.obs['louvain'].value_counts()
+                    temp_data.X = np.nan_to_num(X.copy(),0)
+                    sc.pp.neighbors(temp_data, n_neighbors=15, use_rep='X',metric="correlation")
+                    sc.tl.louvain(temp_data,resolution=1,key_added='louvain')
+                cts = np.array(temp_data.obs['louvain'].unique())
+                louvain_counts = temp_data.obs['louvain'].value_counts()
                 unique_louvain_values_ordered = louvain_counts.sort_values(ascending=False).index.tolist()
                 cts  = np.array(unique_louvain_values_ordered)
                 colors = np.random.choice(np.array(list(mcolors.XKCD_COLORS.keys())),cts.shape[0],replace=False)
-                # colors = np.array(list(mcolors.XKCD_COLORS.keys()))[0:cts.shape[0]]
                 pallette = dict(zip(cts, colors))
-                self.data.obs['louvain_colors'] = self.data.obs['louvain'].map(pallette)
-                x = self.data.obs['stage_x']
-                y = self.data.obs['stage_y']
-                c = np.array(self.data.obs['louvain_colors'])
-                fig,axs  = plt.subplots(1,2,figsize=[20,7])
+                temp_data.obs['louvain_colors'] = temp_data.obs['louvain'].map(pallette)
+                x = temp_data.obs['stage_x']
+                y = temp_data.obs['stage_y']
+                c = np.array(temp_data.obs['louvain_colors'])
+                fig,axs  = plt.subplots(1,2,figsize=[10,7])
                 plt.suptitle('Unsupervised Classification')
                 axs = axs.ravel()
-                # axs[0].scatter(self.data.obsm['X_umap'][:,0],self.data.obsm['X_umap'][:,1],c=c,s=0.1,marker='x')
-                # axs[0].set_title('UMAP Space')
-                # axs[0].axis('off')
                 axs[0].scatter(x,y,s=0.1,c=c,marker='x')
                 axs[0].set_title('Physical Space')
                 axs[0].set_aspect('equal')
@@ -1590,14 +1575,14 @@ class Section_Class(object):
                 fig,axs  = plt.subplots(8,8,figsize=[25,25])
                 plt.suptitle('Unsupervised Classification')
                 axs = axs.ravel()
-                x = np.array(self.data.obs['stage_x'])
-                y = np.array(self.data.obs['stage_y'])
-                c = np.array(self.data.obs['louvain_colors'])
+                x = np.array(temp_data.obs['stage_x'])
+                y = np.array(temp_data.obs['stage_y'])
+                c = np.array(temp_data.obs['louvain_colors'])
                 for i in range(np.min([64,cts.shape[0]])):
                     if i>cts.shape[0]:
                         continue
                     ct = cts[i]
-                    m = np.array(self.data.obs['louvain'])==ct
+                    m = np.array(temp_data.obs['louvain'])==ct
                     axs[i].scatter(x[m],y[m],c=c[m],s=0.1,marker='x')
                     axs[i].set_title(ct)
                     axs[i].axis('off')
@@ -1609,44 +1594,6 @@ class Section_Class(object):
 
             plt.close('all')
 
-            self.save(
-                self.data.obs,
-                file_type='metadata',
-                model_type=self.model_type)
-            self.save(
-                self.data.var,
-                file_type='metadata_bits',
-                model_type=self.model_type)
-            self.save(pd.DataFrame(
-                self.data.layers['processed_vectors'],
-                index=self.data.obs.index,
-                columns=self.data.var.index),
-                file_type='matrix',
-                model_type=self.model_type)
-            self.save(
-                self.data,
-                file_type='anndata',
-                model_type=self.model_type)
-            
-            # """ Generate Report """
-            # from reportlab.pdfgen import canvas
-            # def convert_pngs_to_pdf_reportlab(image_paths, output_filename):
-            #     """Converts a list of PNG image paths to a single PDF with layout options.
-
-            #     Args:
-            #         image_paths: A list of strings containing file paths to PNG images.
-            #         output_filename: The desired name for the output PDF file.
-            #     """
-            #     pdf = canvas.Canvas(output_filename)
-            #     page_width, page_height = pdf.pagesize
-            #     x, y = 0, page_height  # Starting coordinates for image placement
-
-            #     for image_path in image_paths:
-            #         img = canvas.drawImage(image_path, x, y)
-            #         y -= img.height  # Adjust y position for next image
-
-            #     pdf.save()
-            # convert_pngs_to_pdf_reportlab(paths, report_path)
 
                 
 

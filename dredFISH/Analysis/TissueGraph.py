@@ -179,8 +179,29 @@ class TissueMultiGraph:
                               "XY" : "XY", #obsm
                               "Section" : "Slice"} #obs
 
-
+        warnings.filterwarnings('ignore', category=anndata.ImplicitModificationWarning)
+        
+        logging.basicConfig(
+                    filename=os.path.join(self.basepath,'tmg_log.txt'),filemode='a',
+                    format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
+                    datefmt='%Y %B %d %H:%M:%S',level=logging.INFO, force=True)
+        self.log = logging.getLogger("Processing")
+        self.verbose = True
+             
         return 
+
+    def update_user(self,message,level=20):
+        """
+        update_user Wrapper to fileu.update_user
+
+        :param message: Message to be logged
+        :type message: str
+        :param level: priority 0-50, defaults to 20
+        :type level: int, optional
+        """
+        if self.verbose:
+            print(datetime.now().strftime("%Y %B %d %H:%M:%S") + ' ' + message)
+        fileu.update_user(message,level=level,logger=self.log)
 
     def _load(self):
         with open(os.path.join(self.basepath,"TMG.json"),encoding="utf-8") as fh:
@@ -245,7 +266,7 @@ class TissueMultiGraph:
             for Tx in self.Taxonomies: 
                 Tx.save()
               
-        logging.info("saved")
+        self.update_user("saved")
         
     def load_geoms(self,sections = None, geom_types = None):
         # get section names 
@@ -410,12 +431,14 @@ class TissueMultiGraph:
         
         for TG in self.Layers:
             if TG.layer_type == "cell":
-                print("!!`cell` layer already exists; return...")
+                self.update_user("!!`cell` layer already exists; return...")
                 return
         # find list of sections
         adatas = []
         shared_bits = ''
-        for index,row in self.input_df.iterrows():
+        used_names = []
+        self.update_user(f"Attempting To Load {self.input_df.shape[0]} Sections")
+        for index,row in tqdm(self.input_df.iterrows()):
             animal = row['animal']
             section_acq_name = row['section_acq_name']
             dataset = row['dataset']
@@ -423,17 +446,17 @@ class TissueMultiGraph:
             processing = row['processing']
             dataset_path = row['dataset_path']
             if not os.path.exists(os.path.join(dataset_path,dataset,processing,section_acq_name)):
-                print(f" Processing path Not Found {section_acq_name} {os.path.join(dataset_path,dataset,processing,section_acq_name)}")
+                self.update_user(f" Processing path Not Found {section_acq_name} {os.path.join(dataset_path,dataset,processing,section_acq_name)}")
                 continue
             if not os.path.exists(os.path.join(registration_path,section_acq_name)):
-                print(f" Registration path Not Found {section_acq_name} {os.path.join(registration_path,section_acq_name)}")
+                self.update_user(f" Registration path Not Found {section_acq_name} {os.path.join(registration_path,section_acq_name)}")
                 continue
             try:
                 adata = fileu.load(os.path.join(dataset_path,dataset,processing,section_acq_name),file_type='anndata')
             except:
-                print(f"Unable to Load Data {section_acq_name}")
+                self.update_user(f"Unable to Load Data {section_acq_name}")
                 continue
-
+            adata.obs['animal'] = row['animal']
             if register_to_ccf: 
                 try:
                     XYZC  = Registration_Class(adata.copy(),registration_path,section_acq_name,verbose=False).run()
@@ -444,10 +467,16 @@ class TissueMultiGraph:
                     section_name = f"{animal}_{adata.obs['ccf_x'].mean():.1f}"
                     adata.obs['old_section_name'] = section_acq_name
                 except:
-                    print(f"Unable to Register Data {section_acq_name}")
+                    self.update_user(f"Unable to Register Data {section_acq_name}")
                     continue
             else: 
                 section_name = section_acq_name
+            i = 1
+            base_section_name =section_name
+            while section_name in used_names:
+                section_name = f"{base_section_name}_{i}"
+                i += 1
+            used_names.append(section_name)
             adata.obs['section_name'] = section_name
             adata.obs[self.adata_mapping['Section']] = section_name
             if isinstance(shared_bits,str):
@@ -457,7 +486,7 @@ class TissueMultiGraph:
             adatas.append(adata)
 
         adata = anndata.concat([temp[:,np.isin(temp.var.index,shared_bits)] for temp in adatas])
-        logging.info(f"{adata.shape[0]} cells across {adata.obs[self.adata_mapping['Section']].unique().shape[0]} sections")
+        self.update_user(f"{adata.shape[0]} cells across {adata.obs[self.adata_mapping['Section']].unique().shape[0]} sections")
 
         """ Sort adata by section name """
         adata = adata[adata.obs[self.adata_mapping['Section']].argsort()].copy()
@@ -469,25 +498,25 @@ class TissueMultiGraph:
         S = np.array(adata.obs[self.adata_mapping['Section']])
 
         """ Filter Out Non Cells Spatially""" #Parameterize
-        logging.info('Filtering Cells By Spatial Proximity')
+        self.update_user('Filtering Cells By Spatial Proximity')
         M = np.ones(adata.shape[0])==1
         for section in np.unique(S):
             m = S==section
-            M[m] = geomu.in_graph_large_connected_components(XY[m,:],Section = None,max_dist = 0.05,large_comp_def = 0,plot_comp = False)
+            M[m] = geomu.in_graph_large_connected_components(XY[m,:],Section = None,max_dist = 0.05,large_comp_def = 0.1,plot_comp = False)
         adata.obs['in_large_comp'] = M#geomu.in_graph_large_connected_components(XY,Section = S,max_dist = 0.05,large_comp_def = 0,plot_comp = False)
         adata = adata[adata.obs['in_large_comp']==True].copy()
-        logging.info(f"{adata.shape[0]} cells across {adata.obs[self.adata_mapping['Section']].unique().shape[0]} sections")
+        self.update_user(f"{adata.shape[0]} cells across {adata.obs[self.adata_mapping['Section']].unique().shape[0]} sections")
 
         """ Filter Out Non Cells By Nuc Stain""" #Parameterize
-        logging.info('Filtering Cells By Nuc Stain')
+        self.update_user('Filtering Cells By Nuc Stain')
         adata.layers['nuc_mask'] = basicu.filter_cells_nuc(adata)
         adata = adata[np.sum(adata.layers['nuc_mask']==False,axis=1)>0].copy() # Harshest possible filter get rid of any cells that are bad in any bit
-        logging.info(f"{adata.shape[0]} cells across {adata.obs[self.adata_mapping['Section']].unique().shape[0]} sections")
+        self.update_user(f"{adata.shape[0]} cells across {adata.obs[self.adata_mapping['Section']].unique().shape[0]} sections")
 
         """ Minimum Sum Filter """ #Parameterize
-        logging.info('Filtering Cells By Minimum Raw Sum')
+        self.update_user('Filtering Cells By Minimum Raw Sum')
         adata = adata[np.clip(np.array(adata.layers['raw']).copy().sum(1),1,None)>100].copy()
-        logging.info(f"{adata.shape[0]} cells across {adata.obs[self.adata_mapping['Section']].unique().shape[0]} sections")
+        self.update_user(f"{adata.shape[0]} cells across {adata.obs[self.adata_mapping['Section']].unique().shape[0]} sections")
 
         if register_to_ccf: 
             XY = np.array(adata.obs[["ccf_z","ccf_y"]])
@@ -496,6 +525,7 @@ class TissueMultiGraph:
         S = np.array(adata.obs[self.adata_mapping['Section']])
 
         FISHbasis = np.array(adata.layers['raw'].copy()).copy()
+        self.update_user(f"Normalizing using {norm}")
         if norm == 'robust_regression':
             FISHbasis_norm = basicu.normalize_fishdata_robust_regression(FISHbasis)
         elif norm == 'logrowmedian':
@@ -507,7 +537,8 @@ class TissueMultiGraph:
         elif norm == 'none':
             FISHbasis_norm = FISHbasis.copy()
         elif norm == 'scalar_then_regression':
-            FISHbasis_norm = basicu.correct_linear_staining_patterns(FISHbasis.copy(),XY,Section=S)
+            FISHbasis_norm = FISHbasis.copy()
+            # FISHbasis_norm = basicu.correct_linear_staining_patterns(FISHbasis_norm.copy(),XY,Section=S)
             FISHbasis_norm = basicu.batch_bit_scaling(FISHbasis_norm.copy(),Section=S)
             FISHbasis_norm = basicu.normalize_fishdata_robust_regression(FISHbasis_norm.copy())
         else:
@@ -529,15 +560,15 @@ class TissueMultiGraph:
 
         # build two key graphs
         if build_spatial_graph:
-            logging.info('building spatial graphs')
+            self.update_user('building spatial graphs')
             TG.build_spatial_graph()
         if build_feature_graph:
-            logging.info('building feature graphs')
+            self.update_user('building feature graphs')
             TG.build_feature_graph(FISHbasis_norm, metric=metric)
         
         # add layer
         self.Layers.append(TG)
-        logging.info('done with create_cell_layer')
+        self.update_user('done with create_cell_layer')
         return
 
     def create_merged_layer(self, base_layer_id = 0, replace = False, layer_type = None, tax_name = None, tax_composition_name = None, Labels=None):
@@ -657,8 +688,8 @@ class TissueMultiGraph:
         all_layer_types = np.array(self.layer_types)
         ix = np.flatnonzero(all_layer_types == layer_type)
         if len(ix) == 0:
-            print(f"No layer of type {layer_type} was found.")
-            print("Check layer_types to see what options already exist in a TMG object") 
+            self.update_user(f"No layer of type {layer_type} was found.")
+            self.update_user("Check layer_types to see what options already exist in a TMG object") 
             return(ix)
         if len(ix) != 1: 
             raise ValueError("More then one layer has the same name, please check")
@@ -898,7 +929,26 @@ class TissueGraph:
         if layers!=None:
             self.adata.layers = layers
 
-        return None
+        logging.basicConfig(
+                    filename=os.path.join(self.basepath,'tmg_log.txt'),filemode='a',
+                    format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
+                    datefmt='%Y %B %d %H:%M:%S',level=logging.INFO, force=True)
+        self.log = logging.getLogger("Processing")
+        self.verbose = True
+        return 
+
+    def update_user(self,message,level=20):
+        """
+        update_user Wrapper to fileu.update_user
+
+        :param message: Message to be logged
+        :type message: str
+        :param level: priority 0-50, defaults to 20
+        :type level: int, optional
+        """
+        if self.verbose:
+            print(datetime.now().strftime("%Y %B %d %H:%M:%S") + ' ' + message)
+        fileu.update_user(message,level=level,logger=self.log)
     
     def is_empty(self):
         """Determines if the TG object is empty
@@ -1226,7 +1276,7 @@ class TissueGraph:
         Many are not updated in the readthedocs so check the sources code! 
         """
     
-        logging.info(f"building feature graph using {metric}")
+        self.update_user(f"building feature graph using {metric}")
         if metric is None:
             raise ValueError('metric was not specified')
 
@@ -1301,7 +1351,7 @@ class TissueGraph:
 
         """
         unqS = self.unqS
-        logging.info(f"Building spatial graphs for {self.Nsections} sections")
+        self.update_user(f"Building spatial graphs for {self.Nsections} sections")
         section = self.Section.reset_index(drop=True)
         sorted_section = section.sort_values().reset_index(drop=True)
         if not np.all(sorted_section == section):
@@ -1316,19 +1366,23 @@ class TissueGraph:
         # to merge the spatial graphs into one with many components: 
         self.SG = igraph.Graph.disjoint_union(self.SG[0],self.SG[1:])
         
-        logging.info("updating anndata")
+        self.update_user("updating anndata")
         self.adata.obsp["SG"] = self.SG.get_adjacency_sparse()
         self.adata.obs[self.adata_mapping["node_size"]] = np.ones(self.XY.shape[0])
 
         # get XYZ data
         if save_knn:
-            logging.info("building knn query objects")
+            self.update_user("building knn query object")
             self.SG_knn = list()
             for s in self.unqS: 
                 XY_per_section = self.XY[self.Section==s,:]
                 _,knn = tmgu.build_knn_graph(XY_per_section,'euclidean')
                 self.SG_knn.append(knn)
-        logging.info("done building spatial graph")
+            self.update_user("building knn query object")
+            XYZ = self.XYZ
+            _,knn = tmgu.build_knn_graph(self.XYZ,'euclidean')
+            self.SG_knn = knn
+        self.update_user("done building spatial graph")
 
 
     def add_spatial_graph_edges(self,min_distance=2,max_distance=3):
@@ -1627,8 +1681,9 @@ class TissueGraph:
         Ent = np.zeros(Rvec.shape)
         Ntypes = np.zeros(Rvec.shape)
         for i in range(len(Rvec)):
-            print(f"iter: {i}")
             TypeVec = self.FG["G"].community_leiden(resolution_parameter=Rvec[i],objective_function='modularity').membership
+            self.update_user(f"iter: {i}")
+            TypeVec = self.FG.community_leiden(resolution_parameter=Rvec[i],objective_function='modularity').membership
             TypeVec = np.array(TypeVec).astype(np.int64)
             Ent[i] = self.contract_graph(TypeVec,return_useful_layer = False).cond_entropy()
             Ntypes[i] = len(np.unique(TypeVec))

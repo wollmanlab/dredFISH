@@ -277,7 +277,7 @@ def load(path='',hybe='',channel='',file_type='anndata',model_type='',dataset=''
         update_user('File Does Not Exist '+fname,level=30,logger=logger)
         return None
 
-def update_user(message,level=20,logger=None):
+def update_user(message,level=20,logger=None,verbose=False):
     """
     update_user Send string messages to logger with various levels OF IMPORTANCE
 
@@ -288,11 +288,13 @@ def update_user(message,level=20,logger=None):
     :param logger: Logger to send logs can be a name of logger, defaults to 'FileU'
     :type logger: str, logging.Logger, optional
     """
+    if verbose:
+        print(datetime.now().strftime("%Y %B %d %H:%M:%S") + ' ' + message)
     if isinstance(logger,logging.Logger):
         log = logger
     elif isinstance(logger,str):
         log = logging.getLogger(logger)
-    elif isinstance(log,type(None)):
+    elif isinstance(logging,type(None)):
         log = logging.getLogger('Update_User')
     else:
         log = logging.getLogger('Unknown Logger')

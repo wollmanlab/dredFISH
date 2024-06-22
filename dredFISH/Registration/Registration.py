@@ -122,7 +122,7 @@ class Registration_Class(object):
         Z = non_rigid_transformed_XYZC['ccf_z']
         design_matrix = np.c_[Y,Z]
         non_rigid_transformed_XYZC['ccf_x'] = self.X_model.predict(design_matrix)#[0]
-        
+        non_rigid_transformed_XYZC['ccf_z'] = non_rigid_transformed_XYZC['ccf_z']+5.71 # Fix centering issue
         return non_rigid_transformed_XYZC
 
     def fit(self):
