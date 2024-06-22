@@ -404,7 +404,7 @@ class LayeredMap(Panel):
 
         self.xlim = kwargs.get('xlim',None)
         self.ylim = kwargs.get('ylim',None)
-        self.rotation = kwargs.get('rotation','auto')
+        self.rotation = kwargs.get('rotation',None)
 
         # section information: which section in TMG are we plotting
         self.section = section
