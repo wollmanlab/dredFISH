@@ -35,12 +35,15 @@ import anndata
 import os
 import torch
 import math
+import matplotlib.colors as mcolors
 from dredFISH.Analysis import TissueGraph
-
+from dredFISH.Utils import fileu
+from dredFISH.Utils import tmgu
 from dredFISH.Utils import pathu
 from dredFISH.Utils import basicu
 from dredFISH.Utils import celltypeu
-
+from functools import partial
+from scipy.ndimage import gaussian_filter
 class Classifier(metaclass=abc.ABCMeta): 
     """Interface for classifiers 
 
@@ -893,7 +896,7 @@ class SpatialAssistedLabelTransfer(Classifier):
                             hidden_layer_sizes=(50,),  # Adjust number and size of hidden layers as needed
                             activation='relu',  # Choose a suitable activation function
                             max_iter=500,  # Set maximum iterations for training
-                            verbose=False,weighted=weighted
+                            verbose=False
                             )
             elif model == 'knn':
                 self.model = KNN(train_k=15,predict_k=100,max_distance=np.inf,metric='euclidean')
@@ -932,7 +935,7 @@ class SpatialAssistedLabelTransfer(Classifier):
         self.Nbases = self.measured.shape[1]
         level = self.ref_levels[-1]
         idxes = []
-        total_cells = self.measured.shape[0]
+        total_cells = np.min([self.measured.shape[0],500000])
         weights = np.mean(self.priors[level]['matrix'],axis=0)
         weights = weights/weights.sum()
         for i,label in enumerate(self.priors[level]['columns']):
@@ -1037,17 +1040,9 @@ class SpatialAssistedLabelTransfer(Classifier):
                             os.makedirs(figure_path)
                         plt.savefig(os.path.join(figure_path,f"{bit}.png"))
                     plt.show()
-            pallette = dict(zip(self.reference.obs[level], self.reference.obs[level+'_color']))
-            self.measured.obs[level] = self.posteriors[level]['columns'][np.argmax(self.posteriors[level]['matrix'],axis=1)]
-            self.measured.obs[level+'_color'] = self.measured.obs[level].map(pallette)
-            # """ Backpropagate upstream classification to match this level"""
-            # for temp_level in self.ref_levels:
-            #     if temp_level==level:
-            #         break
-            #     pallette = dict(zip(self.reference.obs[temp_level], self.reference.obs[temp_level+'_color']))
-            #     converter = dict(zip(self.reference.obs[level] ,self.reference.obs[temp_level]))
-            #     self.measured.obs[temp_level] = self.measured.obs[level].map(converter)
-            #     self.measured.obs[temp_level+'_color'] = self.measured.obs[temp_level].map(pallette)
+            pallette = dict(zip(self.reference.obs[temp_level], self.reference.obs[temp_level+'_color']))
+            self.measured.obs[temp_level] = self.posteriors[temp_level]['columns'][np.argmax(self.posteriors[temp_level]['matrix'],axis=1)]
+            self.measured.obs[temp_level+'_color'] = self.measured.obs[temp_level].map(pallette)
             """ Add metrics for downstream QC """
         return self.measured
 

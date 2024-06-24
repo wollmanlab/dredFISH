@@ -139,6 +139,15 @@ class TissueMultiGraph:
 
         # update self if this instance of TMG is with geoms or not
         self.save_taxonomies = False
+
+        warnings.filterwarnings('ignore', category=anndata.ImplicitModificationWarning)
+        
+        logging.basicConfig(
+                    filename=os.path.join(self.basepath,'tmg_log.txt'),filemode='a',
+                    format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
+                    datefmt='%Y %B %d %H:%M:%S',level=logging.INFO, force=True)
+        self.log = logging.getLogger("Processing")
+        self.verbose = True
         
         if not redo and os.path.exists(os.path.join(self.basepath,"TMG.json")):
             self._load()
@@ -181,14 +190,6 @@ class TissueMultiGraph:
                               "XY" : "XY", #obsm
                               "Section" : "Slice"} #obs
 
-        warnings.filterwarnings('ignore', category=anndata.ImplicitModificationWarning)
-        
-        logging.basicConfig(
-                    filename=os.path.join(self.basepath,'tmg_log.txt'),filemode='a',
-                    format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
-                    datefmt='%Y %B %d %H:%M:%S',level=logging.INFO, force=True)
-        self.log = logging.getLogger("Processing")
-        self.verbose = True
              
         return 
 
