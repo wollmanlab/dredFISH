@@ -915,8 +915,8 @@ class Section_Class(object):
             signal = torch.clip(signal,0,None)
             if posname in redo_posnames:
                 """ replace translation with median of the successful registrations"""
-                results[posname]['translation_x'] = int(np.median(translation_x_list))
-                results[posname]['translation_y'] = int(np.median(translation_y_list))
+                results[posname]['translation_x'] = int(np.nanmedian(translation_x_list))
+                results[posname]['translation_y'] = int(np.nanmedian(translation_y_list))
 
 
             """Only replace 0's with incoming image"""
@@ -1543,9 +1543,10 @@ class Section_Class(object):
                     bits = [i for i in temp_data.var.index if 'RS' in i]
                     temp_data = temp_data[:,temp_data.var.index.isin(bits)]
                     X = temp_data.layers['processed_vectors'].copy()
-
-                    X = np.sqrt(np.clip(X,1,None))
+                    # X = basicu.robust_zscore(X)
+                    # X = np.sqrt(np.clip(X,1,None))
                     X = basicu.normalize_fishdata_robust_regression(X)
+                    X = basicu.robust_zscore(X)
                     temp_data.X = np.nan_to_num(X.copy(),0)
                     sc.pp.neighbors(temp_data, n_neighbors=15, use_rep='X',metric="correlation")
                     sc.tl.louvain(temp_data,resolution=1,key_added='louvain')
@@ -1562,7 +1563,7 @@ class Section_Class(object):
                 fig,axs  = plt.subplots(1,2,figsize=[10,7])
                 plt.suptitle('Unsupervised Classification')
                 axs = axs.ravel()
-                axs[0].scatter(x,y,s=0.1,c=c,marker='x')
+                axs[0].scatter(x,y,s=0.01,c=c,marker='x')
                 axs[0].set_title('Physical Space')
                 axs[0].set_aspect('equal')
                 axs[0].axis('off')
@@ -1583,7 +1584,7 @@ class Section_Class(object):
                         continue
                     ct = cts[i]
                     m = np.array(temp_data.obs['louvain'])==ct
-                    axs[i].scatter(x[m],y[m],c=c[m],s=0.1,marker='x')
+                    axs[i].scatter(x[m],y[m],c=c[m],s=0.01,marker='x')
                     axs[i].set_title(ct)
                     axs[i].axis('off')
                     axs[i].set_aspect('equal')
