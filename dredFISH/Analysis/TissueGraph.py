@@ -142,6 +142,8 @@ class TissueMultiGraph:
         
         if not redo and os.path.exists(os.path.join(self.basepath,"TMG.json")):
             self._load()
+            self.log = logging.getLogger("Processing")
+            self.verbose = True
             return 
         
         if keep_geoms and os.path.exists(os.path.join(self.basepath,"TMG.json")): 
@@ -1371,6 +1373,7 @@ class TissueGraph:
         self.adata.obs[self.adata_mapping["node_size"]] = np.ones(self.XY.shape[0])
 
         # get XYZ data
+        # building KNN objects in the same way that the grpah was build, per section
         if save_knn:
             self.update_user("building knn query object")
             self.SG_knn = list()
@@ -1378,10 +1381,6 @@ class TissueGraph:
                 XY_per_section = self.XY[self.Section==s,:]
                 _,knn = tmgu.build_knn_graph(XY_per_section,'euclidean')
                 self.SG_knn.append(knn)
-            self.update_user("building knn query object")
-            XYZ = self.XYZ
-            _,knn = tmgu.build_knn_graph(self.XYZ,'euclidean')
-            self.SG_knn = knn
         self.update_user("done building spatial graph")
 
 
