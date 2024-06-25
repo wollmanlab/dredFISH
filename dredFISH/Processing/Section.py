@@ -576,12 +576,16 @@ class Section_Class(object):
                 # """ Maybe now is a good time to make them"""
                 self.update_user(f" {acq} Computing FF and Constant Now",level=40)
                 file_list = self.image_metadata.stkread(Channel=channel,acq=acq,groupby='Channel',fnames_only = True)
-                (FF, constant) = imageu.estimate_flatfield_and_constant(file_list)
-                fileu.save(FF,section=self.dataset.split('_')[0],path=path,hybe=acq,channel=channel,file_type='FF')
-                fileu.save(FF*1000,section=self.dataset.split('_')[0],path=path,hybe=acq,channel=channel,file_type='image_FF')
-                fileu.save(constant,section=self.dataset.split('_')[0],path=path,hybe=acq,channel=channel,file_type='constant')
-                fileu.save(constant,section=self.dataset.split('_')[0],path=path,hybe=acq,channel=channel,file_type='image_constant')
-                return FF,constant
+                try:
+                    (FF, constant) = imageu.estimate_flatfield_and_constant(file_list)
+                    fileu.save(FF,section=self.dataset.split('_')[0],path=path,hybe=acq,channel=channel,file_type='FF')
+                    fileu.save(FF*1000,section=self.dataset.split('_')[0],path=path,hybe=acq,channel=channel,file_type='image_FF')
+                    fileu.save(constant,section=self.dataset.split('_')[0],path=path,hybe=acq,channel=channel,file_type='constant')
+                    fileu.save(constant,section=self.dataset.split('_')[0],path=path,hybe=acq,channel=channel,file_type='image_constant')
+                    return FF,constant
+                except:
+                    self.update_user(f" {acq} Failed to Compute FF and Constant",level=40)
+                    return None,None
             elif imaging_batch == 'hybe':
                 """ load all FF for this hybe and average """
                 acq_list = [i for i in self.image_metadata.acqnames if acq+'_' in i]
