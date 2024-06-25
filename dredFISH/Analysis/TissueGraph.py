@@ -142,6 +142,10 @@ class TissueMultiGraph:
 
         warnings.filterwarnings('ignore', category=anndata.ImplicitModificationWarning)
         
+        # create basepath if needed
+        if not os.path.exists(self.basepath) and not mem_only:
+            os.mkdir(self.basepath, mode = 0o775)
+
         logging.basicConfig(
                     filename=os.path.join(self.basepath,'tmg_log.txt'),filemode='a',
                     format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
@@ -170,9 +174,6 @@ class TissueMultiGraph:
         if mem_only: 
             redo = True
 
-        # create basepath if needed
-        if not os.path.exists(self.basepath) and not mem_only:
-            os.mkdir(self.basepath, mode = 0o775)
         self.TMG_ver = 1
         self.Layers = list() # a list of TissueGraphs
         self.layers_graph = list() # a list of tuples that keep track of the relationship between different layers 
@@ -193,7 +194,7 @@ class TissueMultiGraph:
              
         return 
 
-    def update_user(self,message,level=20):
+    def update_user(self,message,level=20,verbose=None):
         """
         update_user Wrapper to fileu.update_user
 
@@ -202,7 +203,7 @@ class TissueMultiGraph:
         :param level: priority 0-50, defaults to 20
         :type level: int, optional
         """
-        if self.verbose:
+        if (self.verbose)|(verbose==True):
             print(datetime.now().strftime("%Y %B %d %H:%M:%S") + ' ' + message)
         fileu.update_user(message,level=level,logger=self.log)
 
