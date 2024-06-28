@@ -11,8 +11,17 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if not os.path.exists(args.analysis_path):
         os.mkdir(args.analysis_path,mode=0o777)
-
-    analyze_mouse_brain_data(args.animal,
+    if args.animal == 'all':
+        for animal in ['Tax','WTF01','WTM01','MMSM01','MMSF01']:
+            try:
+                analyze_mouse_brain_data(animal,
+                                        project_path=args.project_path,
+                                        analysis_path=args.analysis_path,
+                                        verbose=False)
+            except:
+                continue
+    else:
+        analyze_mouse_brain_data(args.animal,
                             project_path=args.project_path,
                             analysis_path=args.analysis_path,
                             verbose=False)
