@@ -190,7 +190,7 @@ parameters['stitch_flipud'] = False# NEW False
 parameters['stitch_fliplr'] = True# NEW True
 parameters['register_stitch_reference'] = True
 parameters['segment_gpu'] = False
-parameters['max_registration_shift'] = 50
+parameters['max_registration_shift'] = 200
 
 parameters['QC_pixel_size'] = 2 # um
 parameters['diameter'] = 8 #15 # um
