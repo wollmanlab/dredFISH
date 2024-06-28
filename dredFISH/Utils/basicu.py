@@ -907,14 +907,26 @@ def correct_linear_staining_patterns(X, XY, Section=None):
             # Get the predicted values of the model
             predicted_values = model.predict(xy)
             
-            # Calculate the scalar to correct the values
-            scalar = predicted_values.mean() / predicted_values
-            
             # Correct the values of the current feature for the cells in the current section
-            out_X[m, i] = x * scalar
+            out_X[m, i] = (x - predicted_values)/predicted_values.mean()
     
     # Return the corrected data
     return out_X
+
+def image_coordinate_correction(X,XY):
+    # Initialize a linear regression model
+    model = LinearRegression()
+    out_X = X.copy()
+
+    for i in range(X.shape[1]):
+        x = X[:,i]
+        # Fit the model to the data
+        model.fit(XY, x)
+        
+        predicted_x = model.predict(XY)
+        out_X[:,i] = (x-predicted_x) + predicted_x.mean()
+    return out_X
+
 
 def batch_bit_scaling(X, Section=None):
     """
