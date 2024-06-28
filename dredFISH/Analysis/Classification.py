@@ -132,7 +132,7 @@ class KNNClassifier(Classifier):
     def train(self, ref_data, ref_label_id):
         """ Builds approx. KNN graph for queries
         """
-        self._knn = pynndescent.NNDescent(ref_data,n_neighbors = self.approx_nn, metric = self.metric)
+        self._knn = pynndescent.NNDescent(ref_data.astype(np.float32),n_neighbors = self.approx_nn, metric = self.metric)
         self._knn.prepare()
         self._ref_label_id = np.array(ref_label_id)
         
@@ -143,7 +143,7 @@ class KNNClassifier(Classifier):
         """Find class of rows in data based on approx. KNN
         """
         # get indices and remove self. 
-        indices,distances = self._knn.query(data,k=self.k)
+        indices,distances = self._knn.query(data.astype(np.float32),k=self.k)
         if self.k==1:
             ids = self._ref_label_id[indices]
         else:
@@ -842,6 +842,9 @@ class KNN(object):
         likelihoods = torch.zeros([X.shape[0],self.cts.shape[0]])
         for cell_type in self.cts:
             likelihoods[:,self.converter[cell_type]] = torch.sum(1*torch.tensor(neighbor_types==self.converter[cell_type]),axis=1)
+        total = torch.sum(likelihoods,axis=1,keepdims=True)
+        total[total==0] = 1
+        likelihoods = likelihoods/total
         return likelihoods.numpy()
     
     @property
@@ -899,7 +902,7 @@ class SpatialAssistedLabelTransfer(Classifier):
                             verbose=False
                             )
             elif model == 'knn':
-                self.model = KNN(train_k=15,predict_k=100,max_distance=np.inf,metric='euclidean')
+                self.model = KNN(train_k=15,predict_k=100,max_distance=np.inf,metric='correlation')
             else:
                 raise ValueError("Need to choose from: `nb`,`mlp`,`knn`")
         else:
@@ -919,17 +922,24 @@ class SpatialAssistedLabelTransfer(Classifier):
         self.update_user("Generating Spatial Priors")
         self.priors = {}
         priors,types = kdesp.classify(self.measured, level=self.ref_levels[-1],dim_labels=['ccf_x','ccf_y','ccf_z'])
-        self.priors[self.ref_levels[-1]] = {'columns':types,'indexes':np.array(self.measured.obs.index),'matrix':priors}
+        priors[np.sum(priors,axis=1)==0,:] = 1 # if all zeros make it uniform
+        # priors[np.sum(priors,axis=1)==0,:] = np.median(priors,axis=0) # if all zeros make it the average
+        self.priors[self.ref_levels[-1]] = {'columns':types,'indexes':np.array(self.measured.obs.index),'matrix':priors.astype(np.float16)}
         for level in self.ref_levels:
             if level == self.ref_levels[-1]:
                 continue
             level_priors,level_types = kdesp.convert_priors(priors,level)
-            self.priors[level] = {'columns':level_types,'indexes':np.array(self.measured.obs.index),'matrix':level_priors}
-        del kdesp
+            self.priors[level] = {'columns':level_types,'indexes':np.array(self.measured.obs.index),'matrix':level_priors.astype(np.float16)}
+        del kdesp,priors
+        gc.collect()
         self.update_user("Generating Spatial Balanced Reference")
         self.reference = anndata.read(self.ref_path)
         self.reference.layers['raw'] = self.reference.X.copy()
         shared_var = list(self.reference.var.index.intersection(self.measured.var.index))
+
+        # bad_bits = ['RS0109_cy5','RSN9927.0_cy5','RS0468_cy5','RS643.0_cy5','RS156.0_cy5','RS0237_cy5']
+        # shared_var = [i for i in shared_var if not i in bad_bits]
+
         self.reference = self.reference[:,np.isin(self.reference.var.index,shared_var)].copy()
         self.measured = self.measured[:,np.isin(self.measured.var.index,shared_var)].copy()
         self.Nbases = self.measured.shape[1]
@@ -952,10 +962,12 @@ class SpatialAssistedLabelTransfer(Classifier):
 
         self.update_user("Performing Initial Normalization")
         """ Assume that 'normalized from measured has already been size corrected """
-        self.measured.layers['classification_space'] = self.measured.layers['normalized'].copy()
+        if not 'classification_space' in self.measured.layers.keys():
+            self.measured.layers['classification_space'] = self.measured.layers['normalized'].copy()
 
         """ Assume some size correction has been done to reference """
-        self.reference.layers['classification_space'] = self.reference.layers['raw'].copy()
+        if not 'classification_space' in self.reference.layers.keys():
+            self.reference.layers['classification_space'] = self.reference.layers['raw'].copy()
         gc.collect()
 
     def classify(self):
@@ -973,15 +985,18 @@ class SpatialAssistedLabelTransfer(Classifier):
         self.update_user(f"{level} Classification")
         measured_coordinates = basicu.robust_zscore(measured_coordinates)
         reference_coordinates = basicu.robust_zscore(reference_coordinates)
-        model = self.model
         self.update_user(f"{level} Training Feature Model")
-        model.fit(reference_coordinates,np.array(self.reference.obs[level]))
+        gc.collect()
+        self.model.fit(reference_coordinates,np.array(self.reference.obs[level]))
+        del reference_coordinates
+        gc.collect()
         self.update_user(f"{level} Predicting From Features")
-        likelihoods = model.predict_proba(measured_coordinates)
-        for idx,ct in enumerate(model.classes_):
+        likelihoods = self.model.predict_proba(measured_coordinates).astype(np.float16)
+        for idx,ct in enumerate(self.model.classes_):
             jidx = np.where(self.likelihoods[level]['columns']==ct)[0][0]
             self.likelihoods[level]['matrix'][:,jidx] = likelihoods[:,idx]
-
+        del self.model
+        gc.collect()
                     
         """ Propagate likelihoods to higher levels """
         for temp_level in self.ref_levels:
@@ -995,6 +1010,11 @@ class SpatialAssistedLabelTransfer(Classifier):
                     ct_idxes = [i for i,c in enumerate(self.likelihoods[self.ref_levels[-1]]['columns']) if converter[c]==ct]
                     self.likelihoods[temp_level]['matrix'][:,idx] = np.sum(self.likelihoods[self.ref_levels[-1]]['matrix'][:,ct_idxes],axis=1)
             self.posteriors[temp_level]['matrix'] = self.likelihoods[temp_level]['matrix']*self.priors[temp_level]['matrix']
+            """ if all zeros just use priors """
+            self.posteriors[temp_level]['matrix'][np.max(self.posteriors[temp_level]['matrix'],axis=1)==0,:] = self.priors[temp_level]['matrix'][np.max(self.posteriors[temp_level]['matrix'],axis=1)==0,:] 
+            """ if all zeros just use likelihoods """
+            self.posteriors[temp_level]['matrix'][np.max(self.posteriors[temp_level]['matrix'],axis=1)==0,:] = self.likelihoods[temp_level]['matrix'][np.max(self.posteriors[temp_level]['matrix'],axis=1)==0,:] 
+        
             if self.verbose:
                 level = temp_level
 
@@ -1002,9 +1022,9 @@ class SpatialAssistedLabelTransfer(Classifier):
                 for metric_label,metric in metrics.items():
                     self.measured.obs[level] = metric[level]['columns'][np.argmax(metric[level]['matrix'],axis=1)]
                     bit = f"Supervised : {level} {metric_label}"
-                    n_columns = np.min([4,self.measured.obs[self.batch_name].unique().shape[0]])
+                    n_columns = np.min([6,self.measured.obs[self.batch_name].unique().shape[0]])
                     n_rows = math.ceil(self.measured.obs[self.batch_name].unique().shape[0]/n_columns)
-                    fig,axs = plt.subplots(n_columns,n_rows,figsize=[n_rows*5,n_columns*5])
+                    fig,axs = plt.subplots(n_columns,n_rows,figsize=[n_rows*3,n_columns*3])
                     fig.patch.set_facecolor('black')
                     fig.suptitle(f"{self.dataset.split('_')[0]} {bit}", color='white')
                     if self.measured.obs[self.batch_name].unique().shape[0]==1:
@@ -1031,9 +1051,6 @@ class SpatialAssistedLabelTransfer(Classifier):
                         ax.axis('off')
                         ax.axis('off')
                         im = ax.scatter(temp_data.obs['ccf_z'],temp_data.obs['ccf_y'],c=c,s=0.01,marker='x')
-
-                        # ax.set_xlim([-5,5])
-                        # ax.set_ylim([9,-1])
                     if self.save_fig:
                         figure_path = os.path.join(self.out_path, 'Figure')
                         if not os.path.exists(figure_path):
@@ -1043,6 +1060,8 @@ class SpatialAssistedLabelTransfer(Classifier):
             pallette = dict(zip(self.reference.obs[temp_level], self.reference.obs[temp_level+'_color']))
             self.measured.obs[temp_level] = self.posteriors[temp_level]['columns'][np.argmax(self.posteriors[temp_level]['matrix'],axis=1)]
             self.measured.obs[temp_level+'_color'] = self.measured.obs[temp_level].map(pallette)
+            self.measured.obs[temp_level+'_score'] = np.max(self.posteriors[temp_level]['matrix'],axis=1)
+            gc.collect()
             """ Add metrics for downstream QC """
         return self.measured
 
@@ -1097,7 +1116,7 @@ class KDESpatialPriors(Classifier):
                 print('Using Only Non Neurons')
                 types = np.array([i for i in types if 'NN' in i])
             # print(f" Using these Types only {types}")
-        typedata = np.zeros([bins[0].shape[0],bins[1].shape[0],bins[2].shape[0],types.shape[0]])
+        typedata = np.zeros([bins[0].shape[0],bins[1].shape[0],bins[2].shape[0],types.shape[0]],dtype=np.float16)
         for i in trange(types.shape[0],desc='Calculating Spatial KDE'):
             label = types[i]
             m = labels==label
@@ -1441,18 +1460,15 @@ def filterUsingUnsupervised(adata,label='leiden',verbose=True):
 from sklearn.linear_model import LogisticRegression
 import joblib
 class NeuronClassifier(Classifier):
-    def __init__(self,verbose=True,modeL_path=None):
+    def __init__(self,verbose=True,bad_bits=[]):
         self.verbose = verbose
-        self.train(modeL_path=modeL_path)
+        self.bad_bits = bad_bits
+        self.train()
 
-    def train(self,modeL_path=None):
-        if isinstance(modeL_path,str):
-            if os.path.exists(modeL_path):
-                fileu.update_user(f"Loading Model",verbose=self.verbose)
-                self.model = joblib.load(modeL_path)
-                return
+    def train(self):
         fileu.update_user(f"Training Model",verbose=self.verbose)
         reference = anndata.read(pathu.get_path('allen_wmb_tree', check=True))
+        reference = reference[:,np.isin(reference.var.index,self.bad_bits,invert=True)].copy()
         reference.layers['classification_space'] = basicu.robust_zscore(reference.X.copy())
         converter = {True:'Non_Neuron', False:'Neuron'}
         labels = np.array([converter[('NN' in i)] for i in reference.obs['subclass']])
@@ -1467,9 +1483,6 @@ class NeuronClassifier(Classifier):
         test = model.predict(reference_coordinates)
         fileu.update_user(f"{str(np.mean(test == labels))} Accuracy",verbose=self.verbose)
         self.model = model
-        if isinstance(modeL_path,str):
-            fileu.update_user(f"Saving Model",verbose=self.verbose)
-            joblib.dump(model,modeL_path)
 
     def classify(self,adata):
 
@@ -1522,15 +1535,26 @@ def splitClassification(adata,ref_levels=['class', 'subclass','supertype','clust
     non_neuron_adata = adata[adata.obs['neuron']!='Neuron'].copy()
 
     def wrapperClassification(adata,ref_levels=['class', 'subclass','supertype','cluster'],weighted=False,neuron=None,verbose=False):
+        gc.collect()
         salt = SpatialAssistedLabelTransfer(adata,ref_levels=ref_levels,batch_name='Slice',model='knn',weighted=weighted,neuron=neuron,verbose=verbose)
         salt.train()
         salt.classify()
-        return salt.measured
+        adata = salt.measured.copy()
+        del salt
+        gc.collect()
+        return adata
+
     neuron_pfunc = partial(wrapperClassification,ref_levels=ref_levels,weighted=weighted,neuron=True,verbose=verbose)
     non_neuron_pfunc = partial(wrapperClassification,ref_levels=ref_levels,weighted=weighted,neuron=False,verbose=verbose)
-    for pfunc,temp_adata in dict(zip([neuron_pfunc,non_neuron_pfunc],[neuron_adata,non_neuron_adata])).items():
+    # for pfunc,temp_adata in dict(zip([neuron_pfunc,non_neuron_pfunc],[neuron_adata,non_neuron_adata])).items():
+    for pfunc,temp_adata in dict(zip([non_neuron_pfunc,neuron_pfunc],[non_neuron_adata,neuron_adata])).items():
         temp_adata = pfunc(temp_adata)
-        adata.obs.loc[temp_adata.obs.index,level] = temp_adata.obs.loc[temp_adata.obs.index,level].copy()
-        adata.obs.loc[temp_adata.obs.index,level+'_color'] = temp_adata.obs.loc[temp_adata.obs.index,level+'_color'].copy()
+        for level in ref_levels:
+            adata.obs.loc[temp_adata.obs.index,level] = temp_adata.obs.loc[temp_adata.obs.index,level].copy()
+            adata.obs.loc[temp_adata.obs.index,level+'_color'] = temp_adata.obs.loc[temp_adata.obs.index,level+'_color'].copy()
+            adata.obs.loc[temp_adata.obs.index,level+'_score'] = temp_adata.obs.loc[temp_adata.obs.index,level+'_score'].copy()
+        del pfunc
+        del temp_adata
+        gc.collect()
     return adata
 
