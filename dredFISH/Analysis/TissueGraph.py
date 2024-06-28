@@ -413,11 +413,11 @@ class TissueMultiGraph:
         return 
     
     def create_cell_layer(self,  
-                          norm='scalar_then_regression', 
+                          norm='scalar', 
                           register_to_ccf = True,
                           metric='cosine',
                           build_spatial_graph = False,
-                          build_feature_graph = False):
+                          build_feature_graph = False,bad_bits=[]):
          
         """Creating cell layer from raw data. 
         
@@ -442,7 +442,7 @@ class TissueMultiGraph:
         shared_bits = ''
         used_names = []
         self.update_user(f"Attempting To Load {self.input_df.shape[0]} Sections")
-        for index,row in tqdm(self.input_df.iterrows()):
+        for index,row in tqdm(self.input_df.iterrows(),desc='Loading Sections',total=self.input_df.shape[0]):
             animal = row['animal']
             section_acq_name = row['section_acq_name']
             dataset = row['dataset']
@@ -487,6 +487,33 @@ class TissueMultiGraph:
                 shared_bits = list(adata.var.index)
             else:
                 shared_bits = [i for i in shared_bits if i in list(adata.var.index)]
+            if register_to_ccf: 
+                XY = np.array(adata.obs[["ccf_z","ccf_y"]])
+            else: 
+                XY = np.array(adata.obs[["stage_x","stage_y"]])
+            adata = adata[:,np.isin(adata.var.index,bad_bits,invert=True)].copy()
+            adata.obs['in_large_comp'] = geomu.in_graph_large_connected_components(XY,Section = None,max_dist = 0.05,large_comp_def = 0.1,plot_comp = False)
+            adata = adata[adata.obs['in_large_comp']==True].copy()
+
+            adata.layers['nuc_mask'] = basicu.filter_cells_nuc(adata)
+            adata = adata[np.sum(adata.layers['nuc_mask']==False,axis=1)>0].copy() # Harshest possible filter get rid of any cells that are bad in any bit
+
+            adata = adata[np.clip(np.array(adata.layers['raw']).copy().sum(1),1,None)>100].copy()
+
+            if adata.shape[0] == 0:
+                self.update_user(f" No Cells Found {section_acq_name}")
+                continue
+
+            adata.X = adata.layers['raw'].copy()
+            
+            adata.X = basicu.normalize_fishdata_robust_regression(adata.X.copy())
+
+            adata.X = basicu.image_coordinate_correction(adata.X.copy(),np.array(adata.obs[["image_x","image_y"]]))
+
+            adata.layers['normalized'] = adata.X.copy()
+
+            adata.layers['classification_space'] = basicu.robust_zscore(adata.X.copy())
+            
             adatas.append(adata)
 
         adata = anndata.concat([temp[:,np.isin(temp.var.index,shared_bits)] for temp in adatas])
@@ -501,26 +528,26 @@ class TissueMultiGraph:
             XY = np.array(adata.obs[["stage_x","stage_y"]])
         S = np.array(adata.obs[self.adata_mapping['Section']])
 
-        """ Filter Out Non Cells Spatially""" #Parameterize
-        self.update_user('Filtering Cells By Spatial Proximity')
-        M = np.ones(adata.shape[0])==1
-        for section in np.unique(S):
-            m = S==section
-            M[m] = geomu.in_graph_large_connected_components(XY[m,:],Section = None,max_dist = 0.05,large_comp_def = 0.1,plot_comp = False)
-        adata.obs['in_large_comp'] = M#geomu.in_graph_large_connected_components(XY,Section = S,max_dist = 0.05,large_comp_def = 0,plot_comp = False)
-        adata = adata[adata.obs['in_large_comp']==True].copy()
-        self.update_user(f"{adata.shape[0]} cells across {adata.obs[self.adata_mapping['Section']].unique().shape[0]} sections")
+        # """ Filter Out Non Cells Spatially""" #Parameterize
+        # self.update_user('Filtering Cells By Spatial Proximity')
+        # M = np.ones(adata.shape[0])==1
+        # for section in np.unique(S):
+        #     m = S==section
+        #     M[m] = geomu.in_graph_large_connected_components(XY[m,:],Section = None,max_dist = 0.05,large_comp_def = 0.1,plot_comp = False)
+        # adata.obs['in_large_comp'] = M#geomu.in_graph_large_connected_components(XY,Section = S,max_dist = 0.05,large_comp_def = 0,plot_comp = False)
+        # adata = adata[adata.obs['in_large_comp']==True].copy()
+        # self.update_user(f"{adata.shape[0]} cells across {adata.obs[self.adata_mapping['Section']].unique().shape[0]} sections")
 
-        """ Filter Out Non Cells By Nuc Stain""" #Parameterize
-        self.update_user('Filtering Cells By Nuc Stain')
-        adata.layers['nuc_mask'] = basicu.filter_cells_nuc(adata)
-        adata = adata[np.sum(adata.layers['nuc_mask']==False,axis=1)>0].copy() # Harshest possible filter get rid of any cells that are bad in any bit
-        self.update_user(f"{adata.shape[0]} cells across {adata.obs[self.adata_mapping['Section']].unique().shape[0]} sections")
+        # """ Filter Out Non Cells By Nuc Stain""" #Parameterize
+        # self.update_user('Filtering Cells By Nuc Stain')
+        # adata.layers['nuc_mask'] = basicu.filter_cells_nuc(adata)
+        # adata = adata[np.sum(adata.layers['nuc_mask']==False,axis=1)>0].copy() # Harshest possible filter get rid of any cells that are bad in any bit
+        # self.update_user(f"{adata.shape[0]} cells across {adata.obs[self.adata_mapping['Section']].unique().shape[0]} sections")
 
-        """ Minimum Sum Filter """ #Parameterize
-        self.update_user('Filtering Cells By Minimum Raw Sum')
-        adata = adata[np.clip(np.array(adata.layers['raw']).copy().sum(1),1,None)>100].copy()
-        self.update_user(f"{adata.shape[0]} cells across {adata.obs[self.adata_mapping['Section']].unique().shape[0]} sections")
+        # """ Minimum Sum Filter """ #Parameterize
+        # self.update_user('Filtering Cells By Minimum Raw Sum')
+        # adata = adata[np.clip(np.array(adata.layers['raw']).copy().sum(1),1,None)>100].copy()
+        # self.update_user(f"{adata.shape[0]} cells across {adata.obs[self.adata_mapping['Section']].unique().shape[0]} sections")
 
         if register_to_ccf: 
             XY = np.array(adata.obs[["ccf_z","ccf_y"]])
@@ -528,7 +555,7 @@ class TissueMultiGraph:
             XY = np.array(adata.obs[["stage_x","stage_y"]])
         S = np.array(adata.obs[self.adata_mapping['Section']])
 
-        FISHbasis = np.array(adata.layers['raw'].copy()).copy()
+        FISHbasis = np.array(adata.layers['normalized'].copy()).copy()
         self.update_user(f"Normalizing using {norm}")
         if norm == 'robust_regression':
             FISHbasis_norm = basicu.normalize_fishdata_robust_regression(FISHbasis)
@@ -545,6 +572,9 @@ class TissueMultiGraph:
             # FISHbasis_norm = basicu.correct_linear_staining_patterns(FISHbasis_norm.copy(),XY,Section=S)
             FISHbasis_norm = basicu.batch_bit_scaling(FISHbasis_norm.copy(),Section=S)
             FISHbasis_norm = basicu.normalize_fishdata_robust_regression(FISHbasis_norm.copy())
+        elif norm == 'scalar':
+            FISHbasis_norm = FISHbasis.copy()
+            FISHbasis_norm = basicu.batch_bit_scaling(FISHbasis_norm.copy(),Section=S)
         else:
             raise ValueError(f"Norm {norm} is not a valid option")
         adata.X = FISHbasis_norm
