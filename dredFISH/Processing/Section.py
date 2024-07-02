@@ -419,7 +419,6 @@ class Section_Class(object):
 
         hybe = [i for i in self.image_metadata.acqnames if 'hybe' in i.lower()][0]
         posnames = np.unique(self.image_metadata.image_table[np.isin(self.image_metadata.image_table.acq,hybe)].Position)
-        self.update_user(str(posnames.shape[0])+' Positions Found')
         sections = np.unique([i.split('-Pos')[0] for i in posnames if '-Pos' in i])
 
         if sections.shape[0] == 0:
@@ -432,10 +431,16 @@ class Section_Class(object):
             self.acqs = np.unique(self.image_metadata.image_table[np.isin(self.image_metadata.image_table.Position,self.posnames)].acq)
             if len(self.acqs)==0:
                 self.update_user(self.image_metadata.acqnames)
+            """ Ensure that every position is in every round """
+            for acq in self.acqs:
+                posnames = np.unique(self.image_metadata.image_table[self.image_metadata.image_table.acq==acq].Position)
+                self.posnames = [i for i in self.posnames if i in posnames]
             self.coordinates = {}
             for posname in self.posnames:
                 self.coordinates[posname] = (self.image_metadata.image_table[(self.image_metadata.image_table.Position==posname)].XY.iloc[0]/self.parameters['process_pixel_size']).astype(int)
             self.posname_index_converter = {posname:posname_index for posname_index,posname in enumerate(self.posnames)}
+            self.update_user(str(posnames.shape[0])+' Positions Found')
+
 
     def find_acq(self,hybe,protocol='hybe'):
         """
