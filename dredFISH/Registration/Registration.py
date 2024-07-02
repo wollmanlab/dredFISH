@@ -20,6 +20,7 @@ import math
 import time
 import anndata
 import warnings
+import matplotlib
 
 class Registration_Class(object):
     def __init__(self, XYZC, 
@@ -126,6 +127,7 @@ class Registration_Class(object):
         return non_rigid_transformed_XYZC
 
     def fit(self):
+        matplotlib.use("QtAgg")
         self.load_reference_data()
         self.set_rigid()
         self.fit_X_model()
