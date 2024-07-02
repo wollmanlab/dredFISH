@@ -861,7 +861,7 @@ class SpatialAssistedLabelTransfer(Classifier):
         ref_levels=['class', 'subclass','supertype','cluster'], 
         model='knn',
         out_path='',
-        batch_name='section_index',save_fig=False,neuron=None,weighted=False,verbose=True,
+        batch_name='section_index',save_fig=False,neuron=None,weighted=False,verbose=True,kde_kernel = (0.25,0.1,0.1)
         ):
         """
         Parameters
@@ -889,6 +889,7 @@ class SpatialAssistedLabelTransfer(Classifier):
         self.batch_name = batch_name
         self.neuron=neuron
         self.verbose=verbose
+        self.kde_kernel = kde_kernel
 
         # model could be a string or simply sklearn classifier (many kinds)
         if isinstance(model, str):
@@ -917,7 +918,7 @@ class SpatialAssistedLabelTransfer(Classifier):
         self.update_user("Initializing")
 
         self.update_user("Training Spatial Model")
-        kdesp = KDESpatialPriors(ref_levels=self.ref_levels,neuron=self.neuron)
+        kdesp = KDESpatialPriors(ref_levels=self.ref_levels,neuron=self.neuron,kernel=self.kde_kernel)
         kdesp.train()
         self.update_user("Generating Spatial Priors")
         self.priors = {}
@@ -1086,13 +1087,14 @@ class SpatialOnlyLabelTransfer(Classifier):
 class KDESpatialPriors(Classifier):
     def __init__(self,
     ref='/scratchdata1/MouseBrainAtlases/Allen',
-    ref_levels=['class', 'subclass'],neuron=None):
+    ref_levels=['class', 'subclass'],neuron=None,kernel = (0.25,0.1,0.1)):
         if isinstance(ref,str):
             self.ref = TissueGraph.TissueMultiGraph(basepath = ref, input_df = None, redo = False).Layers[0].adata
         else:
             self.ref = ref
         self.ref_levels = ref_levels
         self.neuron = neuron
+        self.kernel = kernel
 
     def train(self,dim_labels=['x_ccf','y_ccf','z_ccf'],border=1,binsize=0.1):
         XYZ = np.array(self.ref.obs[dim_labels])
@@ -1124,7 +1126,8 @@ class KDESpatialPriors(Classifier):
                 continue
             hist, edges = np.histogramdd(XYZ[m,:], bins=gates)
             # stk = gaussian_filter(hist,(0.5/binsize,0.25/binsize,0.25/binsize))
-            stk = gaussian_filter(hist,(0.25/binsize,0.1/binsize,0.1/binsize))
+            # stk = gaussian_filter(hist,(0.25/binsize,0.1/binsize,0.1/binsize))
+            stk = gaussian_filter(hist,(i/binsize for i in self.kernel))
             typedata[:,:,:,i] = stk
         density = np.sum(typedata,axis=-1,keepdims=True)
         density[density==0] = 1
@@ -1527,16 +1530,16 @@ class NeuronClassifier(Classifier):
         return adata
 
 
-def splitClassification(adata,ref_levels=['class', 'subclass','supertype','cluster'],weighted=False,verbose=False):
+def splitClassification(adata,ref_levels=['class', 'subclass','supertype','cluster'],weighted=False,verbose=False,kde_kernel=(0.25,0.1,0.1)):
     for level in ref_levels:
         adata.obs[level] = 'Unassigned'
         adata.obs[level+'_color'] = 'Unassigned'
     neuron_adata = adata[adata.obs['neuron']=='Neuron'].copy()
     non_neuron_adata = adata[adata.obs['neuron']!='Neuron'].copy()
 
-    def wrapperClassification(adata,ref_levels=['class', 'subclass','supertype','cluster'],weighted=False,neuron=None,verbose=False):
+    def wrapperClassification(adata,ref_levels=['class', 'subclass','supertype','cluster'],weighted=False,neuron=None,verbose=False,kde_kernel=(0.25,0.1,0.1)):
         gc.collect()
-        salt = SpatialAssistedLabelTransfer(adata,ref_levels=ref_levels,batch_name='Slice',model='knn',weighted=weighted,neuron=neuron,verbose=verbose)
+        salt = SpatialAssistedLabelTransfer(adata,ref_levels=ref_levels,batch_name='Slice',model='knn',weighted=weighted,neuron=neuron,verbose=verbose,kde_kernel=kde_kernel)
         salt.train()
         salt.classify()
         adata = salt.measured.copy()
@@ -1544,8 +1547,8 @@ def splitClassification(adata,ref_levels=['class', 'subclass','supertype','clust
         gc.collect()
         return adata
 
-    neuron_pfunc = partial(wrapperClassification,ref_levels=ref_levels,weighted=weighted,neuron=True,verbose=verbose)
-    non_neuron_pfunc = partial(wrapperClassification,ref_levels=ref_levels,weighted=weighted,neuron=False,verbose=verbose)
+    neuron_pfunc = partial(wrapperClassification,ref_levels=ref_levels,weighted=weighted,neuron=True,verbose=verbose,kde_kernel=kde_kernel)
+    non_neuron_pfunc = partial(wrapperClassification,ref_levels=ref_levels,weighted=weighted,neuron=False,verbose=verbose,kde_kernel=kde_kernel)
     # for pfunc,temp_adata in dict(zip([neuron_pfunc,non_neuron_pfunc],[neuron_adata,non_neuron_adata])).items():
     for pfunc,temp_adata in dict(zip([non_neuron_pfunc,neuron_pfunc],[non_neuron_adata,neuron_adata])).items():
         temp_adata = pfunc(temp_adata)
