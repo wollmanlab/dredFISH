@@ -293,12 +293,16 @@ def fast_median_bin(stk,bin=2):
 
 
 def estimate_flatfield_and_constant(full_file_list):
+    if len(full_file_list)<5:
+        raise ValueError("Too few images to estimate flatfield and constant")
     stk = stkread(full_file_list)
     stk_ds = fast_median_bin(stk)
 
     # Calc constnt by taking bottom 1% and smoothing with iternative gaussian
     stk_tensor = torch.Tensor(stk_ds.astype(np.float32))
-    Mraw_tensor = torch.kthvalue(stk_tensor, k=stk_tensor.shape[2]//100, dim=2).values
+    n = np.min([stk_tensor.shape[2],100])
+    Mraw_tensor = torch.kthvalue(stk_tensor, k=stk_tensor.shape[2]//n, dim=2).values
+    # Mraw_tensor = torch.min(Mraw_tensor, axis=2).values
     Mraw = np.array(Mraw_tensor)
     Mflt = iterative_gaussian_filter(Mraw,sigma=20,iter=5)
 
