@@ -398,6 +398,11 @@ class Section_Class(object):
             self.parameters['jitter_channel'] = 'FarRed'
             self.parameters['jitter_correction'] = False
             self.parameters['n_pixels']=[2448, 2048]
+        elif self.parameters['scope']=='BlueScope':
+            self.parameters['pixel_size'] = 0.495# 0.490#0.327#0.490 # um 490 or 330 # 0.428 #0.409
+            self.parameters['jitter_channel'] = ''
+            self.parameters['jitter_correction'] = False
+            self.parameters['n_pixels']=[2448, 2048]
         else:
             self.update_user(f" {self.parameters['scope']} isnt a default device please check config file for pixel size accuracy")
 
@@ -434,7 +439,7 @@ class Section_Class(object):
             """ Ensure that every position is in every round """
             for acq in self.acqs:
                 posnames = np.unique(self.image_metadata.image_table[self.image_metadata.image_table.acq==acq].Position)
-                self.posnames = [i for i in self.posnames if i in posnames]
+                self.posnames = np.array([i for i in self.posnames if i in posnames])
             self.coordinates = {}
             for posname in self.posnames:
                 self.coordinates[posname] = (self.image_metadata.image_table[(self.image_metadata.image_table.Position==posname)].XY.iloc[0]/self.parameters['process_pixel_size']).astype(int)
@@ -1549,8 +1554,8 @@ class Section_Class(object):
             if (os.path.exists(path)==False)|self.parameters['overwrite_report']:
                 self.update_user('Generating Louvain Figure')
                 if self.parameters['overwrite_louvain']| (not 'louvain' in temp_data.obs.columns):
-                    bits = [i for i in temp_data.var.index if 'RS' in i]
-                    temp_data = temp_data[:,temp_data.var.index.isin(bits)]
+                    # bits = [i for i in temp_data.var.index if 'RS' in i]
+                    # temp_data = temp_data[:,temp_data.var.index.isin(bits)]
                     X = temp_data.layers['processed_vectors'].copy()
                     # X = basicu.robust_zscore(X)
                     # X = np.sqrt(np.clip(X,1,None))
