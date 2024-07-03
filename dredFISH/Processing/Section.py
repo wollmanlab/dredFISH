@@ -593,7 +593,8 @@ class Section_Class(object):
                     fileu.save(constant,section=self.dataset.split('_')[0],path=path,hybe=acq,channel=channel,file_type='constant')
                     fileu.save(constant,section=self.dataset.split('_')[0],path=path,hybe=acq,channel=channel,file_type='image_constant')
                     return FF,constant
-                except:
+                except Exception as e:
+                    print(e)
                     self.update_user(f" {acq} Failed to Compute FF and Constant",level=40)
                     return None,None
             elif imaging_batch == 'hybe':
