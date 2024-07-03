@@ -586,6 +586,9 @@ class Section_Class(object):
                 # """ Maybe now is a good time to make them"""
                 self.update_user(f" {acq} Computing FF and Constant Now",level=40)
                 file_list = self.image_metadata.stkread(Channel=channel,acq=acq,groupby='Channel',fnames_only = True)
+                if len(file_list)<10:
+                    self.update_user(f" {acq} Not Enough Images to Compute FF and Constant",level=40)
+                    return None,None
                 try:
                     (FF, constant) = imageu.estimate_flatfield_and_constant(file_list)
                     fileu.save(FF,section=self.dataset.split('_')[0],path=path,hybe=acq,channel=channel,file_type='FF')
