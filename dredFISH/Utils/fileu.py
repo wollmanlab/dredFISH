@@ -372,7 +372,7 @@ def create_input_df(project_path, animal):
                 if not os.path.exists(os.path.join(project_path,dataset,processing,section)):
                     continue
                 if check_existance(os.path.join(project_path,dataset,processing,section),file_type='anndata'):
-                    sections[f"{dataset}_section"] = {
+                    sections[f"{dataset}_{section}"] = {
                         'animal':animal,
                         'processing':processing,
                         'processing_path':os.path.join(project_path,dataset,processing),
@@ -384,13 +384,13 @@ def create_input_df(project_path, animal):
         sorted_registration_paths = [x for _, x in reversed(sorted(zip(registration_date, registration_paths)))]
         for registration in sorted_registration_paths:
             for section in dataset_sections:
-                if 'registration_path' in sections[f"{dataset}_section"].keys():
+                if 'registration_path' in sections[f"{dataset}_{section}"].keys():
                     continue
                 if not os.path.exists(os.path.join(project_path,dataset,registration,section)):
                     continue
-                if check_existance(os.path.join(project_path,dataset,registration,section),channel='X',file_type='Model'):
-                    sections[f"{dataset}_section"]['registration_path'] = os.path.join(project_path,dataset,registration)
-                    sections[f"{dataset}_section"]['registration'] = registration
+                if check_existance(os.path.join(project_path,dataset,registration,section.split('_')[-1]),channel='X',file_type='Model'):
+                    sections[f"{dataset}_{section}"]['registration_path'] = os.path.join(project_path,dataset,registration)
+                    sections[f"{dataset}_{section}"]['registration'] = registration
     incomplete_sections = []
     for section,items in sections.items():
         if not 'registration_path' in items.keys():
@@ -400,7 +400,7 @@ def create_input_df(project_path, animal):
 
     # Convert the sections dictionary to a DataFrame
     input_df = pd.DataFrame.from_dict(sections, orient='index')
-    input_df['section_acq_name']  = input_df.index
+    input_df['section_acq_name']  = [i.split('_')[-1] for i in input_df.index]
     input_df.reset_index(drop=True, inplace=True)
     input_df = input_df[['animal', 'section_acq_name','processing','registration','dataset', 'registration_path', 'processing_path', 'dataset_path']]
 
