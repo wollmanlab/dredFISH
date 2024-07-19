@@ -750,7 +750,7 @@ class TissueMultiGraph:
             def get_ccf_x(section):
                 return float(section.split('_')[1])
             # Sort Sections based on ccf_x from lowest to highest
-            self._unqS = sorted(Sections, key=get_ccf_x)
+            self._unqS = sorted(np.unique(Sections), key=get_ccf_x)
             # self._unqS = list(np.unique(Sections))
         # return a list of (unique) sections 
         return(self._unqS)
