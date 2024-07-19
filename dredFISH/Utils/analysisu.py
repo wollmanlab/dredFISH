@@ -150,10 +150,6 @@ def analyze_mouse_brain_data(animal,
             shutil.rmtree(basepath)
         else:
             os.mkdir(basepath, mode=0o777)
-
-        figure_path = os.path.join(basepath,'Figures')
-        if not os.path.exists(figure_path): 
-            os.mkdir(figure_path,mode=0o777)
         
         # Create TissueMultiGraph object
         TMG = TissueMultiGraph(basepath=basepath, input_df=input_df, redo=True)
@@ -163,24 +159,28 @@ def analyze_mouse_brain_data(animal,
         print(TMG.Layers[0].adata)
         TMG.save()
 
+        figure_path = os.path.join(basepath,'Figures')
+        if not os.path.exists(figure_path): 
+            os.mkdir(figure_path,mode=0o777)
+
         adata = TMG.Layers[0].adata.copy()
         for var in adata.var.index:
             c = np.array(adata.layers['classification_space'][:,np.isin(adata.var.index,[var])])
             vmin,vmax = np.percentile(c,[5,95])
             bit = f"Measurement : {var} vmin: {round(vmin,2)} vmax: {round(vmax,2)}"
-            n_columns = np.min([6,adata.obs[batch_name].unique().shape[0]])
-            n_rows = math.ceil(adata.obs[batch_name].unique().shape[0]/n_columns)
+            n_columns = np.min([6,adata.obs['Slice'].unique().shape[0]])
+            n_rows = math.ceil(adata.obs['Slice'].unique().shape[0]/n_columns)
             fig,axs = plt.subplots(n_rows,n_columns,figsize=[n_columns*3,n_rows*3],dpi=300)
             fig.patch.set_facecolor((1, 1, 1, 0))
             fig.suptitle(f"{d} {bit}", color='black')
-            if adata.obs[batch_name].unique().shape[0]==1:
+            if adata.obs['Slice'].unique().shape[0]==1:
                 axs = [axs]
             else:
                 axs = axs.ravel()
             for ax in axs:
                 ax.axis('off')
-            for i,section in tqdm(enumerate(sorted(adata.obs[batch_name].unique())),desc=f"{var} Visualization"):
-                m = (adata.obs[batch_name]==section)
+            for i,section in tqdm(enumerate(sorted(adata.obs['Slice'].unique())),desc=f"{var} Visualization"):
+                m = (adata.obs['Slice']==section)
                 temp_data = adata[m,:].copy()
                 c = np.array(temp_data.layers['classification_space'][:,np.isin(adata.var.index,[var])])
                 ax = axs[i]
@@ -246,19 +246,19 @@ def analyze_mouse_brain_data(animal,
         level = 'subclass'
         adata = TMG.Layers[0].adata#.copy()
         bit = f"Supervised : {level}"
-        n_columns = np.min([6,adata.obs[batch_name].unique().shape[0]])
-        n_rows = math.ceil(adata.obs[batch_name].unique().shape[0]/n_columns)
+        n_columns = np.min([6,adata.obs['Slice'].unique().shape[0]])
+        n_rows = math.ceil(adata.obs['Slice'].unique().shape[0]/n_columns)
         fig,axs = plt.subplots(n_rows,n_columns,figsize=[n_columns*5,n_rows*5],dpi=300)
         fig.patch.set_facecolor((1, 1, 1, 0))
         fig.suptitle(f"{d} {bit}", color='black')
-        if adata.obs[batch_name].unique().shape[0]==1:
+        if adata.obs['Slice'].unique().shape[0]==1:
             axs = [axs]
         else:
             axs = axs.ravel()
         for ax in axs:
             ax.axis('off')
-        for i,section in tqdm(enumerate(sorted(adata.obs[batch_name].unique())),desc=f"{level} Visualization"):
-            m = (adata.obs[batch_name]==section)
+        for i,section in tqdm(enumerate(sorted(adata.obs['Slice'].unique())),desc=f"{level} Visualization"):
+            m = (adata.obs['Slice']==section)
             temp_data = adata[m,:].copy()
             c = np.array(temp_data.obs[level+'_color'])
             ax = axs[i]
@@ -274,19 +274,19 @@ def analyze_mouse_brain_data(animal,
             c = np.array(adata.layers['harmonized'][:,np.isin(adata.var.index,[var])])
             vmin,vmax = np.percentile(c,[5,95])
             bit = f"Harmonized : {var} vmin: {round(vmin,2)} vmax: {round(vmax,2)}"
-            n_columns = np.min([6,adata.obs[batch_name].unique().shape[0]])
-            n_rows = math.ceil(adata.obs[batch_name].unique().shape[0]/n_columns)
+            n_columns = np.min([6,adata.obs['Slice'].unique().shape[0]])
+            n_rows = math.ceil(adata.obs['Slice'].unique().shape[0]/n_columns)
             fig,axs = plt.subplots(n_rows,n_columns,figsize=[n_columns*3,n_rows*3],dpi=300)
             fig.patch.set_facecolor((1, 1, 1, 0))
             fig.suptitle(f"{d} {bit}", color='black')
-            if adata.obs[batch_name].unique().shape[0]==1:
+            if adata.obs['Slice'].unique().shape[0]==1:
                 axs = [axs]
             else:
                 axs = axs.ravel()
             for ax in axs:
                 ax.axis('off')
-            for i,section in tqdm(enumerate(sorted(adata.obs[batch_name].unique())),desc=f"{var} Visualization"):
-                m = (adata.obs[batch_name]==section)
+            for i,section in tqdm(enumerate(sorted(adata.obs['Slice'].unique())),desc=f"{var} Visualization"):
+                m = (adata.obs['Slice']==section)
                 temp_data = adata[m,:].copy()
                 c = np.array(temp_data.layers['harmonized'][:,np.isin(adata.var.index,[var])])
                 ax = axs[i]
@@ -319,7 +319,7 @@ def analyze_mouse_brain_data(animal,
         adata.obs['ccf_y'] = -1*adata.obs['ccf_y']
         adata.obs['ccf_z'] = -1*adata.obs['ccf_z']
         for i,section in tqdm(enumerate(TMG.unqS),desc=f"{level} Visualization"):
-            m = (adata.obs[batch_name]==section)
+            m = (adata.obs['Slice']==section)
             temp_data = adata[m,:].copy()
             c = np.array(temp_data.obs[level+'_color'])
             # ax.scatter(temp_data.obs['ccf_z'],temp_data.obs['ccf_x'],temp_data.obs['ccf_y'],c='k',s=0.1,marker=',')
