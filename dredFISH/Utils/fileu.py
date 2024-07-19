@@ -359,7 +359,8 @@ def create_input_df(project_path, animal):
         else:
             wells = [i.split('.')[-1] for i in dataset.split('_') if ('.' in i)&(animal in i)]
         if len(wells)==0:
-            continue
+            wells = '1'
+            # continue
         dataset_sections = []
         processing_paths = [i for i in os.listdir(os.path.join(project_path,dataset)) if 'Processing_' in i]
         processing_date = [os.path.getctime(os.path.join(project_path,dataset,processing)) for processing in processing_paths]
@@ -371,7 +372,7 @@ def create_input_df(project_path, animal):
                 if not os.path.exists(os.path.join(project_path,dataset,processing,section)):
                     continue
                 if check_existance(os.path.join(project_path,dataset,processing,section),file_type='anndata'):
-                    sections[section] = {
+                    sections[f"{dataset}_section"] = {
                         'animal':animal,
                         'processing':processing,
                         'processing_path':os.path.join(project_path,dataset,processing),
@@ -383,13 +384,13 @@ def create_input_df(project_path, animal):
         sorted_registration_paths = [x for _, x in reversed(sorted(zip(registration_date, registration_paths)))]
         for registration in sorted_registration_paths:
             for section in dataset_sections:
-                if 'registration_path' in sections[section].keys():
+                if 'registration_path' in sections[f"{dataset}_section"].keys():
                     continue
                 if not os.path.exists(os.path.join(project_path,dataset,registration,section)):
                     continue
                 if check_existance(os.path.join(project_path,dataset,registration,section),channel='X',file_type='Model'):
-                    sections[section]['registration_path'] = os.path.join(project_path,dataset,registration)
-                    sections[section]['registration'] = registration
+                    sections[f"{dataset}_section"]['registration_path'] = os.path.join(project_path,dataset,registration)
+                    sections[f"{dataset}_section"]['registration'] = registration
     incomplete_sections = []
     for section,items in sections.items():
         if not 'registration_path' in items.keys():
