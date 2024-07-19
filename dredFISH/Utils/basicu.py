@@ -10,6 +10,7 @@ from scipy.interpolate import interp1d
 from sklearn.linear_model import LinearRegression,RANSACRegressor
 import matplotlib.pyplot as plt
 import logging
+import torch
 
 def reset_logging(**kwargs):
     """reset logging.
@@ -818,43 +819,46 @@ def filter_cells_nuc(adata, thresh=10, vis=False, inplace=False):
     """
     
     # Copy the AnnData object
-    adata = adata.copy()
+    # adata = adata.copy()
     
     # Get the 'nuc_raw' layer data
     nuc = np.array(adata.layers['nuc_raw']).copy()
     
     # Get the minimum value of nuc across the second axis
     nuc_min = np.min(nuc, axis=1)
+
+    # Keep Cells whose dapi is within 50% of median for all but at most 2 rounds
+    mask = (nuc/np.clip(np.median(nuc,axis=1,keepdims=True),1,None))>0.5
     
-    # Scale the nuc data so that the median of each column is equal to the global median
-    nuc_scaled = nuc * np.median(np.median(nuc, axis=0, keepdims=True)) / np.median(nuc, axis=0, keepdims=True)
+    # # Scale the nuc data so that the median of each column is equal to the global median
+    # nuc_scaled = nuc * np.median(np.median(nuc, axis=0, keepdims=True)) / np.median(nuc, axis=0, keepdims=True)
     
-    # Copy the scaled nuc data
-    zscored = nuc_scaled.copy()
+    # # Copy the scaled nuc data
+    # zscored = nuc_scaled.copy()
     
-    # Subtract the median of each row from the corresponding row
-    zscored = zscored - np.median(zscored, axis=1, keepdims=True)
+    # # Subtract the median of each row from the corresponding row
+    # zscored = zscored - np.median(zscored, axis=1, keepdims=True)
     
-    # Get the global standard deviation
-    std = np.median(np.median(np.abs(zscored), axis=1, keepdims=True))
+    # # Get the global standard deviation
+    # std = np.median(np.median(np.abs(zscored), axis=1, keepdims=True))
     
-    # Normalize the zscored data
-    zscored = zscored / std
+    # # Normalize the zscored data
+    # zscored = zscored / std
     
-    # Create a mask where the absolute value of zscored is greater than the threshold
-    mask = np.abs(zscored) > thresh
+    # # Create a mask where the absolute value of zscored is greater than the threshold
+    # mask = np.abs(zscored) > thresh
     
     # Set the mask to False where the minimum value of nuc is less than the threshold
     mask[nuc_min < thresh, :] = False
     
-    # If vis is True, visualize the data
-    if vis:
-        vmin = -20
-        vmax = 20
-        plt.figure(figsize=(10, 10))
-        for i in range(zscored.shape[1]):
-            plt.hist(np.clip(zscored[:, i], vmin, vmax), bins=np.linspace(vmin, vmax, 100), label=i, alpha=0.1)
-        plt.show()
+    # # If vis is True, visualize the data
+    # if vis:
+    #     vmin = -20
+    #     vmax = 20
+    #     plt.figure(figsize=(10, 10))
+    #     for i in range(zscored.shape[1]):
+    #         plt.hist(np.clip(zscored[:, i], vmin, vmax), bins=np.linspace(vmin, vmax, 100), label=i, alpha=0.1)
+    #     plt.show()
     
     # If inplace is True, modify the original AnnData object
     if inplace:
@@ -897,18 +901,20 @@ def correct_linear_staining_patterns(X, XY, Section=None):
         for i in range(X.shape[1]):
             # Get the values of the current feature for the cells in the current section
             x = np.array(X[m, i]).copy()
+            vmin,vmax = np.percentile(x,[1,99])
+            mask = (x>=vmin) & (x<=vmax)
             
             # Initialize a linear regression model
             model = LinearRegression()
             
             # Fit the model to the data
-            model.fit(xy, x)
+            model.fit(xy[mask,:], x[mask])
             
             # Get the predicted values of the model
             predicted_values = model.predict(xy)
             
             # Correct the values of the current feature for the cells in the current section
-            out_X[m, i] = (x - predicted_values)/predicted_values.mean()
+            out_X[m, i] = (x - predicted_values) + predicted_values.mean()
     
     # Return the corrected data
     return out_X
@@ -920,13 +926,13 @@ def image_coordinate_correction(X,XY):
 
     for i in range(X.shape[1]):
         x = X[:,i]
+        vmin,vmax = np.percentile(x,[1,99])
+        mask = (x>=vmin) & (x<=vmax)
         # Fit the model to the data
-        model.fit(XY, x)
-        
+        model.fit(XY[mask,:], x[mask])
         predicted_x = model.predict(XY)
         out_X[:,i] = (x-predicted_x) + predicted_x.mean()
     return out_X
-
 
 def batch_bit_scaling(X, Section=None):
     """
@@ -969,7 +975,6 @@ def batch_bit_scaling(X, Section=None):
     # Return the scaled data
     return out_X
 
-
 def robust_zscore(X, axis=0):
     """
     This function applies a robust z-score normalization to the data along the specified axis.
@@ -983,17 +988,79 @@ def robust_zscore(X, axis=0):
     """
     
     # Copy the input array
-    X = np.array(X).copy()
+    revert = False
+    if not isinstance(X,torch.Tensor):
+        revert = True
+        X = torch.tensor(X)
+    # X = np.array(X).copy()
     
     # Subtract the median of the specified axis from the corresponding axis
-    X = X - np.median(X, axis=axis, keepdims=True)
+    # X = X - np.median(X, axis=axis, keepdims=True)
+    X = X - torch.median(X, axis=axis).values
     
     # Calculate the median absolute deviation along the specified axis
-    std = np.median(np.abs(X), axis=axis, keepdims=True)
-    
+    # std = np.median(np.abs(X), axis=axis, keepdims=True)
+    std = torch.median(torch.abs(X), axis=axis).values
+    if torch.sum(std==0)>0:
+        std[std == 0] = torch.std(X[std==0], axis=axis)
+    std[std == 0] = 1
     # Divide the specified axis by its corresponding median absolute deviation
     X = X / std
     
     # Return the normalized data
-    return X
+    if revert:
+        return X.numpy()
+    else:
+        return X
+    
+def quantile_scale(X, axis=0,vmin=0.05,vmax=0.95):
+    """
+    This function applies a robust z-score normalization to the data along the specified axis.
+
+    Parameters:
+    X: A numpy array to be normalized.
+    axis: The axis along which the normalization is applied. Default is 0.
+
+    Returns:
+    X: A numpy array with the same shape as the input, but with normalized values.
+    """
+    
+    # Copy the input array
+    revert = False
+    if not isinstance(X,torch.Tensor):
+        revert = True
+        X = torch.tensor(X)
+    parameters = torch.quantile(X, torch.tensor([vmin, vmax]), dim=axis)
+    parameters[1,parameters[0]==parameters[1]] = parameters[0,parameters[0]==parameters[1]]+1
+    X = X - parameters[0]
+    X = X/(parameters[1]-parameters[0])
+
+    if revert:
+        return X.numpy()
+    else:
+        return X
+
+def linear_transform(ref_X,X, axis=0,vmin=0.05,vmax=0.95):
+    if ref_X.shape[1] != X.shape[1]:
+        raise ValueError("Matrices must have the same number of columns.")
+    
+    # Copy the input array
+    revert = False
+    if not isinstance(X,torch.Tensor):
+        revert = True
+        X = torch.tensor(X,dtype=torch.float32)
+        ref_X = torch.tensor(ref_X,dtype=torch.float32)
+    parameters = torch.quantile(X, torch.tensor([vmin, vmax],dtype=torch.float32), dim=axis)
+    parameters[1,parameters[0]==parameters[1]] = parameters[0,parameters[0]==parameters[1]]+1
+    X = X - parameters[0]
+    X = X/(parameters[1]-parameters[0])
+    ref_parameters = torch.quantile(ref_X, torch.tensor([vmin, vmax],dtype=torch.float32), dim=axis)
+    ref_parameters[1,ref_parameters[0]==ref_parameters[1]] = ref_parameters[0,ref_parameters[0]==ref_parameters[1]]+1
+    X = X*(ref_parameters[1]-ref_parameters[0])+ref_parameters[0]
+
+    if revert:
+        return X.numpy()
+    else:
+        return X
+    
 
