@@ -70,6 +70,9 @@ class View:
         
         # link to the TMG used to create the view
         self.TMG = TMG
+        self.lims = {'x' : np.array([0, 11.4]),
+                     'y' : np.array([0,8]),
+                     'z' : np.array([0,13.2])}
         
         # list of all panels
         self.Panels = list()
@@ -77,6 +80,7 @@ class View:
         self.figsize = figsize
         self.fig = plt.figure(figsize = self.figsize)
         self.fig.patch.set_facecolor(facecolor)
+
         
     def show(self):
         """
@@ -114,6 +118,42 @@ class BasisView(View):
         feature_mat = feature_mat[:,basis]
         for i in range(len(basis)):
             P = Colorpleth(feature_mat[:,i],V = self,section = section,geom_type='voronoi',colormaps = colormaps,pos = gs[i],**kwargs,qntl = qntl)
+
+class MultiSectionBasisView(View): 
+    def __init__(self,TMG, basis = None, qntl = (0.025,0.975),clim = None, colormaps="jet",subplot_layout = [1,1],**kwargs):
+
+        if basis is None: 
+            raise ValueError("Please provide basis index to plot")
+
+        figsize = kwargs.get('figsize',(15,10))
+        super().__init__(TMG,name = "View basis",figsize=figsize)
+        self.fig.patch.set_facecolor(kwargs.get('facecolor','white'))
+        # decide the subplot layout, that keep a 2x3 design
+        # this will only run if the subplot_layout is smaller then needed 
+        while np.prod(subplot_layout)<len(TMG.unqS):
+            subplot_layout[1] += 1
+            if np.prod(subplot_layout)>=len(TMG.unqS): 
+                break
+            if subplot_layout[1]/subplot_layout[0] > 1.5:
+                subplot_layout[0] += 1
+        
+        # set up subpanels
+        gs = self.fig.add_gridspec(subplot_layout[0],subplot_layout[1],wspace = 0.01,hspace = 0.01) 
+
+        sec_feature_mats = list()
+        for i,section in enumerate(TMG.unqS):
+            f_mat = self.TMG.Layers[0].get_feature_mat(section = section)
+            sec_feature_mats.append(f_mat[:,basis])
+
+        # Calculate the quantiles for the concatenated feature matrix
+        if clim is None: 
+            all_feature_mat = np.concatenate(sec_feature_mats, axis=0)
+            clim = (np.quantile(all_feature_mat, qntl[0]), np.quantile(all_feature_mat, qntl[1]))
+
+        for i,section in enumerate(TMG.unqS):
+            P = Colorpleth(sec_feature_mats[i],V = self,section = section,geom_type='voronoi',colormaps = colormaps,pos = gs[i],**kwargs,clim = clim)
+
+    
 
 def MultiSectionMapView(TMG, sections=None, level_type="cell", map_type="type", figsize='infer', n_columns=4,facecolor='white', **kwargs):
     """
@@ -170,37 +210,27 @@ class SingleMapView(View):
     A view that has only a single map in it. 
     map_type is one of 'type', 'colorpleth', 'random', 'type_with_boundaries' (supply two levels in level_type)
     """
-    def __init__(self, TMG, section = None,level_type = "cell",map_type = "type", val_to_map = None, figsize=(11, 11),
-                        flip_left_right=False,flip_top_down=False,**kwargs):
+    def __init__(self, TMG, section = None,level_type = "cell",map_type = "type", val_to_map = None, figsize=(11, 11),**kwargs):
         super().__init__(TMG, "Map", figsize)
 
         if len(TMG.unqS)==1 and section is None: 
             section = TMG.unqS[0]
-        
-        # Calculate global x and y limits across all sections
-        all_XY = TMG.Layers[0].XY
-        x_min, x_max = all_XY[:, 0].min(), all_XY[:, 0].max()
-        if flip_left_right:
-            x_max, x_min = all_XY[:, 0].min(), all_XY[:, 0].max()
-        y_min, y_max = all_XY[:, 1].min(), all_XY[:, 1].max()
-        if flip_top_down:
-            y_max, y_min = all_XY[:, 1].min(), all_XY[:, 1].max()
-        
+      
         if map_type == 'type':
             geom_type = TMG.layer_to_geom_type_mapping[level_type]
-            Pmap = TypeMap(geom_type,V=self,section = section, xlim=(x_min, x_max), ylim=(y_min, y_max),**kwargs)
+            Pmap = TypeMap(geom_type,V=self,section = section,**kwargs)
         elif map_type == 'colorpleth': 
             geom_type = TMG.layer_to_geom_type_mapping[level_type]
             if val_to_map is None: 
                 raise ValueError("Must provide val_to_map if map_type is colorpleth")
-            Pmap = Colorpleth(val_to_map,geom_type=geom_type,V=self,section = section, xlim=(x_min, x_max), ylim=(y_min, y_max),**kwargs)
+            Pmap = Colorpleth(val_to_map,geom_type=geom_type,V=self,section = section,**kwargs)
         elif map_type == 'random':
             geom_type = TMG.layer_to_geom_type_mapping[level_type]
-            Pmap = RandomColorMap(geom_type,V=self,section=section, xlim=(x_min, x_max), ylim=(y_min, y_max),**kwargs)
+            Pmap = RandomColorMap(geom_type,V=self,section=section,**kwargs)
         elif map_type == 'type_with_boundaries':
             poly_geom = TMG.layer_to_geom_type_mapping[level_type[0]]
             bound_geom = TMG.layer_to_geom_type_mapping[level_type[1]]
-            Pmap = TypeWithBoundaries(V=self, section=section, poly_geom=poly_geom, boundaries_geom=bound_geom, xlim=(x_min, x_max), ylim=(y_min, y_max),**kwargs)
+            Pmap = TypeWithBoundaries(V=self, section=section, poly_geom=poly_geom, boundaries_geom=bound_geom,**kwargs)
         else: 
             raise ValueError(f"value {map_type} is not a recognized map_type")
 
@@ -484,8 +514,8 @@ class Map(Panel):
         else: 
             section_ix = self.V.TMG.unqS.index(self.section)
 
-        self.xlim = kwargs.get('xlim',None)
-        self.ylim = kwargs.get('ylim',None)
+        self.xlim = kwargs.get('xlim',V.lims['x'])
+        self.ylim = kwargs.get('ylim',V.lims['y'])
         self.rotation = kwargs.get('rotation',None)
 
         # get the geom collection saved in appropriate TMG Geom
@@ -613,8 +643,7 @@ class Colorpleth(Map):
     It will choose the geomtry (voronoi,isozones,regions) from the size of the use provided values_to_map vector. 
     """
     def __init__(self, values_to_map,geom_type = None,V = None,section = None, name = None, 
-                                      pos = (0,0,1,1), qntl = (0,1),
-                                      clp = (-np.inf,np.inf), **kwargs):
+                                      pos = (0,0,1,1), qntl = (0,1), clim = None, **kwargs):
         # if geom_type is None chose it based on size of input vector
         if geom_type is None:         
             raise ValueError("Must supply geom_type to colorpleth")
@@ -629,16 +658,12 @@ class Colorpleth(Map):
         # Create the rgb_faces using self.clrmp and self.Data['values_to_map']
         scalar_mapping = self.Data['values_to_map']
 
-        # clip extreme values by value
-        scalar_mapping = np.clip(scalar_mapping,clp[0],clp[1])
+        if clim is None:
+            clim = (np.quantile(scalar_mapping, qntl[0]), np.quantile(scalar_mapping, qntl[1]))
 
-        # rescale usign quantiles
-        scalar_mapping[scalar_mapping < np.percentile(scalar_mapping,qntl[0]*100)]=np.percentile(scalar_mapping,qntl[0]*100)
-        scalar_mapping[scalar_mapping > np.percentile(scalar_mapping,qntl[1]*100)]=np.percentile(scalar_mapping,qntl[1]*100)
-        
-        # convert to 0-1 range to maximize colormap dynamic range
-        scalar_mapping = scalar_mapping-scalar_mapping.min()
-        scalar_mapping = scalar_mapping/scalar_mapping.max()
+        # Rescale scalar_mapping based on clim
+        scalar_mapping = (scalar_mapping - clim[0]) / (clim[1] - clim[0])
+        scalar_mapping = np.clip(scalar_mapping, 0, 1)
         
         self.rgb_faces = self.cmap(scalar_mapping)
         
