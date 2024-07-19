@@ -367,7 +367,7 @@ def create_input_df(project_path, animal):
         sorted_processing_paths = [x for _, x in reversed(sorted(zip(processing_date, processing_paths)))]
         for processing in sorted_processing_paths:
             for section in [i for i in os.listdir(os.path.join(project_path,dataset,processing)) if i.split('-')[0].split('Well')[-1] in wells]:
-                if section in sections.keys():
+                if f"{dataset}_{section}" in sections.keys():
                     continue
                 if not os.path.exists(os.path.join(project_path,dataset,processing,section)):
                     continue
