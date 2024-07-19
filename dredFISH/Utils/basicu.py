@@ -1002,7 +1002,7 @@ def robust_zscore(X, axis=0):
     # std = np.median(np.abs(X), axis=axis, keepdims=True)
     std = torch.median(torch.abs(X), axis=axis).values
     if torch.sum(std==0)>0:
-        std[std == 0] = torch.std(X[std==0], axis=axis)
+        std[std == 0] = torch.std(X[:,std==0], axis=axis)
     std[std == 0] = 1
     # Divide the specified axis by its corresponding median absolute deviation
     X = X / std
