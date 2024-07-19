@@ -233,7 +233,7 @@ parameters['highpass_smooth'] = 3
 
 parameters['strip'] = True
 parameters['model_types'] = ['total']
-parameters['dapi_thresh'] = 200
+parameters['dapi_thresh'] = 100
 parameters['background_estimate_iters'] = 0
 parameters['stain_correction'] = False
 parameters['stain_correction_downsample'] = 10
