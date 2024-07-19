@@ -172,7 +172,7 @@ def analyze_mouse_brain_data(animal,
             n_rows = math.ceil(adata.obs['Slice'].unique().shape[0]/n_columns)
             fig,axs = plt.subplots(n_rows,n_columns,figsize=[n_columns*3,n_rows*3],dpi=300)
             fig.patch.set_facecolor((1, 1, 1, 0))
-            fig.suptitle(f"{d} {bit}", color='black')
+            fig.suptitle(f"{animal} {bit}", color='black')
             if adata.obs['Slice'].unique().shape[0]==1:
                 axs = [axs]
             else:
@@ -188,17 +188,17 @@ def analyze_mouse_brain_data(animal,
                 ax.axis('off')
                 ax.axis('off')
                 im = ax.scatter(temp_data.obs['ccf_z'],temp_data.obs['ccf_y'],c=c,s=0.5,marker=',', edgecolors='none', linewidths=0,cmap='jet',vmin=vmin,vmax=vmax)
-            plt.savefig(os.path.join(figure_path,f"{d} {bit.split(var)[0]} {var}.png"))
+            plt.savefig(os.path.join(figure_path,f"{animal} {bit.split(var)[0]} {var}.png"))
             plt.close()
         fnames = []
-        out_fname = os.path.join(figure_path,f"{d} Measurement.gif")
+        out_fname = os.path.join(figure_path,f"{animal} Measurement.gif")
         if os.path.exists(out_fname):
             os.remove(out_fname)
         # Create a GIF writer object
         with imageio.get_writer(out_fname, fps=1) as writer:
             for var in tqdm(adata.var.index):
                 bit = f"Measurement : {var} "
-                fname = os.path.join(figure_path,f"{d} {bit.split(var)[0]} {var}.png")
+                fname = os.path.join(figure_path,f"{animal} {bit.split(var)[0]} {var}.png")
                 image = imageio.imread(fname)
                 writer.append_data(image)
 
@@ -250,7 +250,7 @@ def analyze_mouse_brain_data(animal,
         n_rows = math.ceil(adata.obs['Slice'].unique().shape[0]/n_columns)
         fig,axs = plt.subplots(n_rows,n_columns,figsize=[n_columns*5,n_rows*5],dpi=300)
         fig.patch.set_facecolor((1, 1, 1, 0))
-        fig.suptitle(f"{d} {bit}", color='black')
+        fig.suptitle(f"{animal} {bit}", color='black')
         if adata.obs['Slice'].unique().shape[0]==1:
             axs = [axs]
         else:
@@ -266,7 +266,7 @@ def analyze_mouse_brain_data(animal,
             ax.axis('off')
             ax.axis('off')
             im = ax.scatter(temp_data.obs['ccf_z'],temp_data.obs['ccf_y'],c=c,s=0.5,marker=',', edgecolors='none', linewidths=0)
-        plt.savefig(os.path.join(figure_path,f"{d} {bit.split(level)[0]} {level}.png"))
+        plt.savefig(os.path.join(figure_path,f"{animal} {bit.split(level)[0]} {level}.png"))
         plt.close()
 
         adata = TMG.Layers[0].adata.copy()
@@ -278,7 +278,7 @@ def analyze_mouse_brain_data(animal,
             n_rows = math.ceil(adata.obs['Slice'].unique().shape[0]/n_columns)
             fig,axs = plt.subplots(n_rows,n_columns,figsize=[n_columns*3,n_rows*3],dpi=300)
             fig.patch.set_facecolor((1, 1, 1, 0))
-            fig.suptitle(f"{d} {bit}", color='black')
+            fig.suptitle(f"{animal} {bit}", color='black')
             if adata.obs['Slice'].unique().shape[0]==1:
                 axs = [axs]
             else:
@@ -294,17 +294,17 @@ def analyze_mouse_brain_data(animal,
                 ax.axis('off')
                 ax.axis('off')
                 im = ax.scatter(temp_data.obs['ccf_z'],temp_data.obs['ccf_y'],c=c,s=0.5,marker=',', edgecolors='none', linewidths=0,cmap='jet',vmin=vmin,vmax=vmax)
-            plt.savefig(os.path.join(figure_path,f"{d} {bit.split(var)[0]} {var}.png"))
+            plt.savefig(os.path.join(figure_path,f"{animal} {bit.split(var)[0]} {var}.png"))
             plt.close()
         fnames = []
-        out_fname = os.path.join(figure_path,f"{d} Harmonized.gif")
+        out_fname = os.path.join(figure_path,f"{animal} Harmonized.gif")
         if os.path.exists(out_fname):
             os.remove(out_fname)
         # Create a GIF writer object
         with imageio.get_writer(out_fname, fps=1) as writer:
             for var in tqdm(adata.var.index):
                 bit = f"Harmonized : {var} "
-                fname = os.path.join(figure_path,f"{d} {bit.split(var)[0]} {var}.png")
+                fname = os.path.join(figure_path,f"{animal} {bit.split(var)[0]} {var}.png")
                 image = imageio.imread(fname)
                 writer.append_data(image)
 
@@ -314,7 +314,7 @@ def analyze_mouse_brain_data(animal,
         ax = fig.add_subplot(111, projection='3d')
         ax.axis('off')
         ax.set_facecolor((1, 1, 1, 0))
-        plt.title(f"{d} {bit}", color='black')
+        plt.title(f"{animal} {bit}", color='black')
         adata.obs['ccf_x'] = -10*adata.obs['ccf_x']
         adata.obs['ccf_y'] = -1*adata.obs['ccf_y']
         adata.obs['ccf_z'] = -1*adata.obs['ccf_z']
@@ -341,7 +341,7 @@ def analyze_mouse_brain_data(animal,
         # Set view angle
         ax.view_init(elev=25, azim=45)  # Adjust these values to change the view angle
         plt.tight_layout()
-        plt.savefig(os.path.join(figure_path,f"{d} {bit.split(level)[0]} {level}.png"))
+        plt.savefig(os.path.join(figure_path,f"{animal} {bit.split(level)[0]} {level}.png"))
         plt.close()
 
         tax_basepath = os.path.join(analysis_path, "Taxonomies")
