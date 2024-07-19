@@ -448,7 +448,7 @@ def plot_polygon_collection(verts_or_polys,
                             xlm = None,
                             ylm = None,
                             zlm = None, 
-                            alpha = 0,
+                            alpha = 1,
                             background_color = (1,1,1), # defaults to white background
                             transpose = False,
                             rotation = None):
@@ -493,13 +493,22 @@ def plot_polygon_collection(verts_or_polys,
     if transpose:
         verts = [np.fliplr(v) for v in verts]
 
+    # identify boundaries for ax
+    xy = np.vstack(verts)
+    mx = np.max(xy,axis=0)
+    mn = np.min(xy,axis=0)
+    if xlm is None: 
+        xlm = (mn[0],mx[0])
+    if ylm is None: 
+        ylm = (mn[1],mx[1])
+
     if rotation is not None:
         xy = np.vstack(verts)
         if rotation == 'auto': 
             rotation = find_rotation_angle(xy)
-        # find XY center of all verts and subtract the center from all vert points
 
-        xy_cntr = xy.mean(axis=0)
+        # find XY center of all verts and subtract the center from all vert points
+        xy_cntr = np.array([xlm.mean(), ylm.mean()])
         verts_cntr = [v-xy_cntr for v in verts]
         # convert rotation to matrix
         rot_mat = rotation_matrix_degrees(rotation)
@@ -546,15 +555,7 @@ def plot_polygon_collection(verts_or_polys,
     else:
         Zholes =  np.full(len(all_inr),Z[0])
         ax.add_collection3d(p2, zs=Zholes, zdir='y')
-
-    # identify boundaries for ax
-    xy = np.vstack(verts)
-    mx = np.max(xy,axis=0)
-    mn = np.min(xy,axis=0)
-    if xlm is None: 
-        xlm = (mn[0],mx[0])
-    if ylm is None: 
-        ylm = (mn[1],mx[1])
+    
 
     ax.set_xlim(xlm[0],xlm[1])
     ax.set_ylim(ylm[0],ylm[1])
