@@ -44,6 +44,7 @@ from dredFISH.Utils import basicu
 from dredFISH.Utils import celltypeu
 from functools import partial
 from scipy.ndimage import gaussian_filter
+import pickle
 class Classifier(metaclass=abc.ABCMeta): 
     """Interface for classifiers 
 
@@ -797,55 +798,67 @@ class KNN(object):
         self.metric = metric
         self.verbose = verbose
         self.weighted = weighted
+        self.homogeneous = False
 
     def fit(self,X,y):
-        if self.weighted:
-            F, p = f_classif(X, y)
-            self.weights = F
-            X = X*self.weights
-        self.feature_tree_dict = {}
-        self.feature_tree_dict['labels'] = y
-        self.feature_tree_dict['tree'] = NNDescent(X, metric=self.metric, n_neighbors=self.train_k,n_trees=10,verbose=self.verbose)
-        self.cts = np.array(sorted(np.unique(self.feature_tree_dict['labels'])))
-        self.converter = dict(zip(self.cts,np.array(range(self.cts.shape[0]))))
-        self.feature_tree_dict['labels_index'] = np.array([self.converter[i] for i in y])
-
-    def predict(self,X,y=None):
-        if self.weighted:
-            X = X*self.weights
-        if not isinstance(y,type(None)):
+        if np.unique(y).shape[0]==1:
+            self.cts = np.unique(y)
+            self.homogeneous = True
+        else:
+            self.homogeneous = False
+            if self.weighted:
+                F, p = f_classif(X, y)
+                self.weights = F
+                X = X*self.weights
+            self.feature_tree_dict = {}
             self.feature_tree_dict['labels'] = y
+            self.feature_tree_dict['tree'] = NNDescent(X, metric=self.metric, n_neighbors=self.train_k,n_trees=10,verbose=self.verbose)
+            self.cts = np.array(sorted(np.unique(self.feature_tree_dict['labels'])))
             self.converter = dict(zip(self.cts,np.array(range(self.cts.shape[0]))))
             self.feature_tree_dict['labels_index'] = np.array([self.converter[i] for i in y])
-        self.cts = np.array(sorted(np.unique(self.feature_tree_dict['labels'])))
 
-        neighbors,distances = self.feature_tree_dict['tree'].query(X,k=self.predict_k)
-        neighbor_types = self.feature_tree_dict['labels_index'][neighbors]
-        neighbor_types[distances>self.max_distance]==-1
-        likelihoods = torch.zeros([X.shape[0],self.cts.shape[0]])
-        for cell_type in self.cts:
-            likelihoods[:,self.converter[cell_type]] = torch.sum(1*torch.tensor(neighbor_types==self.converter[cell_type]),axis=1)
-        return self.cts[likelihoods.max(1).indices]
+    def predict(self,X,y=None):
+        if self.homogeneous:
+            return self.cts[0]*np.ones(X.shape[0])
+        else:
+            if self.weighted:
+                X = X*self.weights
+            if not isinstance(y,type(None)):
+                self.feature_tree_dict['labels'] = y
+                self.converter = dict(zip(self.cts,np.array(range(self.cts.shape[0]))))
+                self.feature_tree_dict['labels_index'] = np.array([self.converter[i] for i in y])
+            self.cts = np.array(sorted(np.unique(self.feature_tree_dict['labels'])))
+
+            neighbors,distances = self.feature_tree_dict['tree'].query(X,k=self.predict_k)
+            neighbor_types = self.feature_tree_dict['labels_index'][neighbors]
+            neighbor_types[distances>self.max_distance]==-1
+            likelihoods = torch.zeros([X.shape[0],self.cts.shape[0]])
+            for cell_type in self.cts:
+                likelihoods[:,self.converter[cell_type]] = torch.sum(1*torch.tensor(neighbor_types==self.converter[cell_type]),axis=1)
+            return self.cts[likelihoods.max(1).indices]
     
     def predict_proba(self,X,y=None):
-        if self.weighted:
-            X = X*self.weights
-        if not isinstance(y,type(None)):
-            self.feature_tree_dict['labels'] = y
-            self.converter = dict(zip(self.cts,np.array(range(self.cts.shape[0]))))
-            self.feature_tree_dict['labels_index'] = np.array([self.converter(i) for i in y])
-        self.cts = np.array(sorted(np.unique(self.feature_tree_dict['labels'])))
+        if self.homogeneous:
+            return np.ones([X.shape[0],1])
+        else:
+            if self.weighted:
+                X = X*self.weights
+            if not isinstance(y,type(None)):
+                self.feature_tree_dict['labels'] = y
+                self.converter = dict(zip(self.cts,np.array(range(self.cts.shape[0]))))
+                self.feature_tree_dict['labels_index'] = np.array([self.converter(i) for i in y])
+            self.cts = np.array(sorted(np.unique(self.feature_tree_dict['labels'])))
 
-        neighbors,distances = self.feature_tree_dict['tree'].query(X,k=self.predict_k)
-        neighbor_types = self.feature_tree_dict['labels_index'][neighbors]
-        neighbor_types[distances>self.max_distance]==-1
-        likelihoods = torch.zeros([X.shape[0],self.cts.shape[0]])
-        for cell_type in self.cts:
-            likelihoods[:,self.converter[cell_type]] = torch.sum(1*torch.tensor(neighbor_types==self.converter[cell_type]),axis=1)
-        total = torch.sum(likelihoods,axis=1,keepdims=True)
-        total[total==0] = 1
-        likelihoods = likelihoods/total
-        return likelihoods.numpy()
+            neighbors,distances = self.feature_tree_dict['tree'].query(X,k=self.predict_k)
+            neighbor_types = self.feature_tree_dict['labels_index'][neighbors]
+            neighbor_types[distances>self.max_distance]==-1
+            likelihoods = torch.zeros([X.shape[0],self.cts.shape[0]])
+            for cell_type in self.cts:
+                likelihoods[:,self.converter[cell_type]] = torch.sum(1*torch.tensor(neighbor_types==self.converter[cell_type]),axis=1)
+            total = torch.sum(likelihoods,axis=1,keepdims=True)
+            total[total==0] = 1
+            likelihoods = likelihoods/total
+            return likelihoods.numpy()
     
     @property
     def classes_(self):
@@ -961,6 +974,13 @@ class SpatialAssistedLabelTransfer(Classifier):
                         idxes.extend(list(np.random.choice(temp,n_cells)))
         self.reference = self.reference[idxes,:].copy()
 
+        """ Permute """
+        for level in self.ref_levels:
+            self.update_user(f"Permuting {level}")
+            pallette = dict(zip(self.reference.obs[level], self.reference.obs[level+'_color']))
+            self.reference.obs[level] = np.random.permutation(self.reference.obs[level].values)
+            self.reference.obs[level+'_color'] = self.reference.obs[level].map(pallette)
+
         self.update_user("Performing Initial Normalization")
         """ Assume that 'normalized from measured has already been size corrected """
         if not 'classification_space' in self.measured.layers.keys():
@@ -968,7 +988,7 @@ class SpatialAssistedLabelTransfer(Classifier):
 
         """ Assume some size correction has been done to reference """
         if not 'classification_space' in self.reference.layers.keys():
-            self.reference.layers['classification_space'] = self.reference.layers['raw'].copy()
+            self.reference.layers['classification_space'] = basicu.normalize_fishdata_robust_regression(self.reference.layers['raw'].copy())
         gc.collect()
 
     def classify(self):
@@ -1011,11 +1031,13 @@ class SpatialAssistedLabelTransfer(Classifier):
                     ct_idxes = [i for i,c in enumerate(self.likelihoods[self.ref_levels[-1]]['columns']) if converter[c]==ct]
                     self.likelihoods[temp_level]['matrix'][:,idx] = np.sum(self.likelihoods[self.ref_levels[-1]]['matrix'][:,ct_idxes],axis=1)
             self.posteriors[temp_level]['matrix'] = self.likelihoods[temp_level]['matrix']*self.priors[temp_level]['matrix']
-            """ if all zeros just use priors """
-            self.posteriors[temp_level]['matrix'][np.max(self.posteriors[temp_level]['matrix'],axis=1)==0,:] = self.priors[temp_level]['matrix'][np.max(self.posteriors[temp_level]['matrix'],axis=1)==0,:] 
+            # """ if all zeros just use priors """
+            # self.posteriors[temp_level]['matrix'][np.max(self.posteriors[temp_level]['matrix'],axis=1)==0,:] = self.priors[temp_level]['matrix'][np.max(self.posteriors[temp_level]['matrix'],axis=1)==0,:] 
             """ if all zeros just use likelihoods """
             self.posteriors[temp_level]['matrix'][np.max(self.posteriors[temp_level]['matrix'],axis=1)==0,:] = self.likelihoods[temp_level]['matrix'][np.max(self.posteriors[temp_level]['matrix'],axis=1)==0,:] 
-        
+            # """ if all zeros just use priors """
+            # self.posteriors[temp_level]['matrix'][np.max(self.posteriors[temp_level]['matrix'],axis=1)==0,:] = self.priors[temp_level]['matrix'][np.max(self.posteriors[temp_level]['matrix'],axis=1)==0,:] 
+            
             if self.verbose:
                 level = temp_level
 
@@ -1087,59 +1109,90 @@ class SpatialOnlyLabelTransfer(Classifier):
 class KDESpatialPriors(Classifier):
     def __init__(self,
     ref='/scratchdata1/MouseBrainAtlases/Allen',
-    ref_levels=['class', 'subclass'],neuron=None,kernel = (0.25,0.1,0.1)):
-        if isinstance(ref,str):
-            self.ref = TissueGraph.TissueMultiGraph(basepath = ref, input_df = None, redo = False).Layers[0].adata
+    ref_levels=['class', 'subclass'],neuron=None,kernel = (0.25,0.1,0.1),border=1,binsize=0.1,bins=None,gates=None,types=None):
+        self.out_path = f"/scratchdata1/KDE_kernel_{kernel[0]}_{kernel[1]}_{kernel[2]}_border_{border}_binsize_{binsize}_level_{ref_levels[-1]}_neuron_{neuron}.pkl"
+        if os.path.exists(self.out_path):
+            temp = pickle.load(open(self.out_path,'rb'))
+            self.typedata = temp.typedata
+            self.types = temp.types
+            self.ref_levels = temp.ref_levels
+            self.neuron = temp.neuron
+            self.kernel = temp.kernel
+            self.bins = temp.bins
+            self.gates = temp.gates
+            self.border = temp.border
+            self.binsize = temp.binsize
+            self.ref = temp.ref
+            self.converters = temp.converters
         else:
-            self.ref = ref
-        self.ref_levels = ref_levels
-        self.neuron = neuron
-        self.kernel = kernel
-
-    def train(self,dim_labels=['x_ccf','y_ccf','z_ccf'],border=1,binsize=0.1):
-        XYZ = np.array(self.ref.obs[dim_labels])
-        gates = []
-        bins = []
-        for dim in range(3):
-            vmin  = binsize*int((np.min(XYZ[:,dim])-border)/binsize)
-            vmax = binsize*int((np.max(XYZ[:,dim])+border)/binsize)
-            g = np.linspace(vmin,vmax,int((vmax-vmin)/binsize)+1)
-            gates.append(g)
-            bins.append(g[:-1]+binsize/2)
-
-        labels = np.array(self.ref.obs[self.ref_levels[-1]])
-        types = np.unique(labels)
-
-        if isinstance(self.neuron,bool):
-            if self.neuron:
-                print('Using Only Neurons')
-                types = np.array([i for i in types if not 'NN' in i])
+            if isinstance(ref,str):
+                self.ref = TissueGraph.TissueMultiGraph(basepath = ref, input_df = None, redo = False).Layers[0].adata
             else:
-                print('Using Only Non Neurons')
-                types = np.array([i for i in types if 'NN' in i])
-            # print(f" Using these Types only {types}")
-        typedata = np.zeros([bins[0].shape[0],bins[1].shape[0],bins[2].shape[0],types.shape[0]],dtype=np.float16)
-        for i in trange(types.shape[0],desc='Calculating Spatial KDE'):
-            label = types[i]
-            m = labels==label
-            if np.sum(m)==0:
-                continue
-            hist, edges = np.histogramdd(XYZ[m,:], bins=gates)
-            # stk = gaussian_filter(hist,(0.5/binsize,0.25/binsize,0.25/binsize))
-            # stk = gaussian_filter(hist,(0.25/binsize,0.1/binsize,0.1/binsize))
-            stk = gaussian_filter(hist,(i/binsize for i in self.kernel))
-            typedata[:,:,:,i] = stk
-        density = np.sum(typedata,axis=-1,keepdims=True)
-        density[density==0] = 1
-        typedata = typedata/density
-        self.typedata = typedata
-        self.bins = bins
-        self.types = types
-        self.converters = {}
-        for level in self.ref_levels:
-            if level==self.ref_levels[-1]:
-                continue
-            self.converters[level] = dict(zip(self.ref.obs[self.ref_levels[-1]],self.ref.obs[level]))
+                self.ref = ref
+            self.ref_levels = ref_levels
+            self.neuron = neuron
+            self.kernel = kernel
+            self.bins = bins
+            self.gates = gates
+            self.border = border
+            self.binsize = binsize
+            self.types = types
+            self.typedata = None
+
+    def train(self,dim_labels=['x_ccf','y_ccf','z_ccf']):
+        """ check if types in self """
+        if isinstance(self.typedata,type(None)):
+            binsize = self.binsize
+            border = self.border
+            XYZ = np.array(self.ref.obs[dim_labels])
+            if isinstance(self.gates,type(None)):
+                self.gates = []
+                self.bins = []
+                for dim in range(3):
+                    vmin  = binsize*int((np.min(XYZ[:,dim])-border)/binsize)
+                    vmax = binsize*int((np.max(XYZ[:,dim])+border)/binsize)
+                    g = np.linspace(vmin,vmax,int((vmax-vmin)/binsize)+1)
+                    self.gates.append(g)
+                    self.bins.append(g[:-1]+binsize/2)
+            bins = self.bins
+            gates = self.gates
+
+            labels = np.array(self.ref.obs[self.ref_levels[-1]])
+            types = np.unique(labels)
+            if isinstance(self.types,type(None)):
+                if isinstance(self.neuron,bool):
+                    if self.neuron:
+                        print('Using Only Neurons')
+                        types = np.array([i for i in types if not 'NN' in i])
+                    else:
+                        print('Using Only Non Neurons')
+                        types = np.array([i for i in types if 'NN' in i])
+                    # print(f" Using these Types only {types}")
+            else:
+                types = self.types
+            self.types = types
+            typedata = np.zeros([bins[0].shape[0],bins[1].shape[0],bins[2].shape[0],types.shape[0]],dtype=np.float16)
+            for i in trange(types.shape[0],desc='Calculating Spatial KDE'):
+                label = types[i]
+                m = labels==label
+                if np.sum(m)==0:
+                    continue
+                hist, edges = np.histogramdd(XYZ[m,:], bins=gates)
+                # stk = gaussian_filter(hist,(0.5/binsize,0.25/binsize,0.25/binsize))
+                # stk = gaussian_filter(hist,(0.25/binsize,0.1/binsize,0.1/binsize))
+                stk = gaussian_filter(hist,(i/binsize for i in self.kernel))
+                typedata[:,:,:,i] = stk
+            density = np.sum(typedata,axis=-1,keepdims=True)
+            density[density==0] = 1
+            typedata = typedata/density
+            self.typedata = typedata
+
+            self.converters = {}
+            for level in self.ref_levels:
+                if level==self.ref_levels[-1]:
+                    continue
+                self.converters[level] = dict(zip(self.ref.obs[self.ref_levels[-1]],self.ref.obs[level]))
+            pickle.dump(self,open(self.out_path,'wb'))
 
     def convert_priors(self,priors,level):
         converter = self.converters[level]
@@ -1472,7 +1525,7 @@ class NeuronClassifier(Classifier):
         fileu.update_user(f"Training Model",verbose=self.verbose)
         reference = anndata.read(pathu.get_path('allen_wmb_tree', check=True))
         reference = reference[:,np.isin(reference.var.index,self.bad_bits,invert=True)].copy()
-        reference.layers['classification_space'] = basicu.robust_zscore(reference.X.copy())
+        reference.layers['classification_space'] = basicu.robust_zscore(basicu.normalize_fishdata_robust_regression(reference.X.copy()))
         converter = {True:'Non_Neuron', False:'Neuron'}
         labels = np.array([converter[('NN' in i)] for i in reference.obs['subclass']])
         reference_coordinates = np.array(reference.layers['classification_space'])
@@ -1560,4 +1613,515 @@ def splitClassification(adata,ref_levels=['class', 'subclass','supertype','clust
         del temp_adata
         gc.collect()
     return adata
+
+from scipy.cluster.hierarchy import linkage, fcluster, dendrogram
+from sklearn.cluster import AgglomerativeClustering
+from scipy.spatial.distance import squareform
+import seaborn as sns
+import matplotlib.cm as cm
+from scipy.stats import mode
+
+# from dredFISH.Analysis.TissueGraph import *
+
+
+def plot_clustermap(X,y,c=None):
+    # Step 1: Aggregate X by labels in y
+    unique_labels = np.unique(y)
+    averaged_data = {label: X[y == label].mean(axis=0) for label in unique_labels}
+
+    # Step 2: Create a DataFrame from the aggregated data
+    df = pd.DataFrame(averaged_data)  # Transpose to have labels as rows
+
+    # Step 3: Calculate pairwise correlations
+    correlations = df.corr()
+    condensed_distance_matrix = squareform(np.abs(correlations-1), checks=False)
+    Z = linkage(condensed_distance_matrix, method='ward')
+    clusters = np.array(correlations.index)
+
+    # Step 4: Create a mapping between column names and their respective clusters
+    column_clusters = {col: cluster for col, cluster in zip(df.columns, clusters)}
+    column_clusters
+
+    if isinstance(c,type(None)):
+        cts = np.unique(clusters)
+        colors = np.array(cm.nipy_spectral(np.linspace(0, 1, cts.shape[0])))
+        # np.random.shuffle(colors)
+        dend_pallette = dict(zip(cts, colors))
+    else:
+        dend_pallette = dict(zip(y, c))
+
+    index_colors = [dend_pallette[ct] for ct in correlations.index]
+    column_colors = [dend_pallette[ct] for ct in correlations.columns]
+    # If labels are the columns of df, use: label_colors = df.columns.map(palette).tolist()
+
+    # Step 2: Visualize the clustermap with label colors
+    import seaborn as sns
+    sns.clustermap(correlations, row_colors=index_colors,col_colors=column_colors, cmap="vlag",center=0,figsize=(10,10),row_linkage=Z,col_linkage=Z, xticklabels=False, yticklabels=False)
+    plt.show()
+
+    return dend_pallette
+
+def recursive_unsupervised_classification(adata,max_iterations=2,plot=False,N=4,sample_frequency=1/10,resolution=2):
+    for iteration in range(max_iterations):
+        adata.layers[f"updated_classification_space_L{iteration}"] = np.zeros_like(adata.layers['classification_space'])
+        if iteration ==0:
+            print(f"Unsupervised Iteration {iteration}")
+            adata,predicted,merge_prediction = subsampled_graph_leiden(adata,sample_frequency = sample_frequency,window=0.3,n_neighbors = 15,N=N,resolution=resolution)
+            adata.obs[f"unsupervised_L{iteration}"] = merge_prediction
+            adata.obs[f"unsupervised_L{iteration}_fine"] = predicted
+            adata.layers[f"updated_classification_space_L{iteration}"] = adata.layers['updated_classification_space'].copy()
+        else:
+            adata.obs[f"unsupervised_L{iteration}"] = 0
+            adata.obs[f"unsupervised_L{iteration}_fine"] = 0
+            for cluster in adata.obs[f"unsupervised_L{int(iteration-1)}"].unique():
+                print(f"Unsupervised Iteration {iteration} Cluster {cluster}")
+                m = adata.obs[f"unsupervised_L{int(iteration-1)}"]==cluster
+                temp_adata = adata[m,:].copy()
+                temp_adata,predicted,merge_prediction = subsampled_graph_leiden(temp_adata,sample_frequency = sample_frequency,window=0.3,n_neighbors = 15,N=N,resolution=resolution)
+                adata.obs.loc[temp_adata.obs.index,f"unsupervised_L{iteration}"] = merge_prediction+np.max(adata.obs[f"unsupervised_L{iteration}"])+1
+                adata.obs.loc[temp_adata.obs.index,f"unsupervised_L{iteration}_fine"] = predicted+np.max(adata.obs[f"unsupervised_L{iteration}_fine"])+1
+                adata.layers[f"updated_classification_space_L{iteration}"][m] = temp_adata.layers['updated_classification_space'].copy()
+        clusters = adata.obs[f"unsupervised_L{iteration}"]
+        cts = np.unique(clusters)
+        colors = np.array(cm.nipy_spectral(np.linspace(0, 1, cts.shape[0])))
+        # np.random.shuffle(colors)
+        dend_pallette = dict(zip(cts, colors))
+        leiden_colors = np.array([colors[0] for i in range(clusters.shape[0])])
+        for key, value in dend_pallette.items():
+            m = np.array(clusters == key)
+            if np.sum(m)>0:
+                leiden_colors[m] = [value for i in range(m.sum())]
+        adata.obs[f"unsupervised_L{iteration}_color"] = [leiden_colors[i,:] for i in range(leiden_colors.shape[0])]#adata.obs[f"unsupervised_L{iteration}_color"] = adata.obs[f"unsupervised_L{iteration}"].map(dend_pallette)
+        
+        clusters = adata.obs[f"unsupervised_L{iteration}_fine"]
+        cts = np.unique(clusters)
+        colors = np.array(cm.nipy_spectral(np.linspace(0, 1, cts.shape[0])))
+        # np.random.shuffle(colors)
+        dend_pallette = dict(zip(cts, colors))
+        leiden_colors = np.array([colors[0] for i in range(clusters.shape[0])])
+        for key, value in dend_pallette.items():
+            m = np.array(clusters == key)
+            if np.sum(m)>0:
+                leiden_colors[m] = [value for i in range(m.sum())]
+        adata.obs[f"unsupervised_L{iteration}_fine_color"] = [leiden_colors[i,:] for i in range(leiden_colors.shape[0])]#adata.obs[f"unsupervised_L{iteration}_fine"].map(dend_pallette)
+
+        if plot:
+            print(f"{iteration}")
+            plot_clustermap(adata.layers['classification_space'],adata.obs[f"unsupervised_L{iteration}"],c=adata.obs[f"unsupervised_L{iteration}_color"])
+            plot_clustermap(adata.layers['classification_space'],adata.obs[f"unsupervised_L{iteration}_fine"],c=adata.obs[f"unsupervised_L{iteration}_fine_color"])
+            
+    return adata
+
+def merge_labels(X,y,N):
+    # Step 1: Aggregate X by labels in y
+    X = np.array(X)
+    y = np.array(y).ravel()
+    unique_labels = np.unique(y)
+    averaged_data = {label: np.nanmedian(X[y == label,:],axis=0) for label in unique_labels}
+
+    # Step 2: Create a DataFrame from the aggregated data
+    df = pd.DataFrame(averaged_data)  # Transpose to have labels as rows
+
+    # Step 3: Calculate pairwise correlations
+    correlations = df.corr()
+    condensed_distance_matrix = squareform(np.abs(correlations-1), checks=False)
+
+    Z = linkage(condensed_distance_matrix, method='ward')
+    # Z = linkage(df.T, method='ward')
+    clusters = fcluster(Z, t=Z[-N,2], criterion='distance')
+
+    # Step 4: Create a mapping between column names and their respective clusters
+    column_clusters = {col: cluster for col, cluster in zip(df.columns, clusters)}
+    column_clusters
+
+    return np.array(pd.Series(y).map(column_clusters)).astype(int)
+
+def subsampled_graph_leiden(adata,sample_frequency = 1/10,window=0.3,n_neighbors = 15,N=4,resolution=25):
+    """ Batch Normalize """
+    X = torch.tensor(adata.layers['classification_space'])
+    if not 'Slice_id' in adata.obs.columns:
+        converter = dict(zip(adata.obs['Slice'].unique(),range(len(adata.obs['Slice'].unique()))))
+        adata.obs['Slice_id'] = adata.obs['Slice'].map(converter)
+    else:
+        converter = dict(zip(adata.obs['Slice'],adata.obs['Slice_id']))
+    if not 'reference' in converter.keys():
+        converter['reference'] = -1
+    y = torch.tensor(adata.obs['Slice_id'])
+
+    for section in tqdm(torch.unique(y),desc='Batch Normalizing'):
+        m = y == section
+        # X[m,:] = basicu.robust_zscore(X[m,:])
+        X[m,:] = basicu.quantile_scale(X[m,:],vmin=0.5,vmax=0.95)
+        
+    adata.layers['updated_classification_space'] = X.numpy()
+
+    """ Subsample """
+    if sample_frequency==1:
+        sampled_adata = adata
+    else:
+        sampled_adata = adata[::int(1/sample_frequency)]
+    sampled_adata.obs['universal_index'] = np.arange(sampled_adata.shape[0])
+
+    """ For each Section Find its Neighbors """
+    section_neighbor_mapping = {}
+    for section in adata.obs['Slice_id'].unique():
+        section_neighbor_mapping[section] = []
+        if section == converter['reference']:
+            for neighbor in adata.obs['Slice_id'].unique():
+                section_neighbor_mapping[section].append(neighbor)
+        else:
+            section_loc = adata[adata.obs['Slice_id'] == section].obs['ccf_x'].mean()
+            for neighbor in adata.obs['Slice_id'].unique():
+                if neighbor == converter['reference']:
+                    section_neighbor_mapping[section].append(neighbor)
+                else:
+                    neighbor_loc = adata[adata.obs['Slice_id'] == neighbor].obs['ccf_x'].mean()
+                    if np.abs(neighbor_loc-section_loc) < window:
+                        section_neighbor_mapping[section].append(neighbor)
+
+    """ For each Section create a Feature Graph """
+    sections = sampled_adata.obs['Slice_id'].unique()
+    indexes_from = []
+    indexes_to = []
+    distances_between = []
+    iterable = sections
+    iterable = tqdm(iterable,desc="Calculating Neighbors",position=0, mininterval=1.0)
+    for section in iterable:
+        temp_adata = sampled_adata[sampled_adata.obs['Slice_id'] == section].copy()
+        if temp_adata.shape[0]:
+            continue
+        X = np.array(temp_adata.layers['updated_classification_space']).copy()
+        XY = np.array(temp_adata.obs[['ccf_y','ccf_z']]).copy()
+        feature_knn = pynndescent.NNDescent(X, n_neighbors=n_neighbors,metric='correlation',verbose=False,n_trees=1,n_jobs=-1)
+        sub_iterable = section_neighbor_mapping[section]
+        for neighbor in sub_iterable:
+            neighbor_adata = sampled_adata[sampled_adata.obs['Slice_id'] == neighbor]
+            if neighbor_adata.shape[0]==0:
+                continue
+            neighbor_indices = np.array(neighbor_adata.obs['universal_index'])
+            neighbor_indices = np.tile(neighbor_indices,n_neighbors)
+            neighbor_indices = neighbor_indices.flatten(order='F')
+            neighbor_XY = np.array(neighbor_adata.obs[['ccf_y','ccf_z']])
+            neighbor_X = np.array(neighbor_adata.layers['updated_classification_space'])
+
+            indices,distances = feature_knn.query(neighbor_X,k=n_neighbors)
+            indices = np.array(temp_adata.obs['universal_index'])[indices]
+            indices = indices.flatten(order='F')
+            distances = distances.flatten(order='F')
+            indexes_from.extend(neighbor_indices)
+            indexes_to.extend(indices)
+            distances_between.extend(distances)
+
+    print('Creating Graph')
+    edgeList = np.vstack((indexes_from,indexes_to)).T
+    del indexes_from,indexes_to
+    G = igraph.Graph(n=sampled_adata.shape[0], edges=edgeList, edge_attrs={'weight': distances_between})
+    del edgeList
+    G.simplify()
+    G.es['weight'] = distances_between
+    del distances_between
+    print('Clustering')
+    TypeVec = G.community_leiden(resolution=resolution,objective_function='modularity',weights='weight').membership
+    TypeVec = np.array(TypeVec).astype(int)
+    del G 
+
+    if sample_frequency==1:
+        predicted = TypeVec
+    else:
+        """ propogate to all cells """
+        print('Propogating')
+        X = np.array(sampled_adata.layers['updated_classification_space']).copy()
+        y = np.array(TypeVec).copy()
+        feature_knn = pynndescent.NNDescent(X, n_neighbors=n_neighbors,metric='correlation',verbose=False,n_trees=1,n_jobs=-1)
+        indices,distances = feature_knn.query(np.array(adata.layers['updated_classification_space']).copy())
+        predicted = np.array(mode(y[indices],axis=1).mode).ravel()
+        del feature_knn
+
+    print('Merging')
+    merge_prediction = merge_labels(np.array(adata.layers['updated_classification_space']).copy(),predicted,N)
+
+    return adata,predicted,merge_prediction
+
+from sklearn.linear_model import LogisticRegression
+
+class SingleCellAlignmentLeveragingExpectations(Classifier): 
+    """
+    """
+    def __init__(self, adata, 
+        tax_name='iterative_spatial_assisted_label_transfer',
+        ref='allen_wmb_tree', 
+        spatial_ref='spatial_reference',
+        ref_level='subclass', 
+        model='knn',
+        out_path='',
+        batch_name='section_index',save_fig=False,neuron=None,weighted=False,verbose=True,kde_kernel = (0.25,0.1,0.1),binary_spatial_thresh=None,use_prior=True
+        ):
+        """
+        Parameters
+        ----------
+        adata : TissueGraph or adata
+            Required parameter - the TissueGraph object we're going to use for unsupervised clustering. 
+            The TG is required to have a `TG.adata.layers['raw']` matrix
+        ref : 
+            tag of a reference dataset, or path to a reference dataset (.h5ad)
+        spatial_ref : 
+            tag of a spatial reference dataset, or path to a spatial reference dataset (.h5ad)
+        """
+        # specific packages to this task
+
+        # if isinstance(adata, TissueGraph): 
+        #     adata = adata.adata.copy()
+
+        # super().__init__(tax=None)
+        self.save_fig = save_fig
+        # self.tax.name = tax_name
+        self.ref_path = pathu.get_path(ref, check=True) # refdata
+        self.spatial_ref_path = pathu.get_path(spatial_ref, check=True) # refdata
+        self.ref_level = ref_level 
+        self.out_path = out_path
+        self.batch_name = batch_name
+        self.neuron=neuron
+        self.verbose=verbose
+        self.kde_kernel = kde_kernel
+        self.binary_spatial_thresh = binary_spatial_thresh
+        self.use_prior = use_prior
+        self.reference = None
+
+        # model could be a string or simply sklearn classifier (many kinds)
+        if isinstance(model, str):
+            if model == 'nb':
+                self.model = GaussianNB()
+            elif model == 'mlp':
+                self.model = MLPClassifier(
+                            hidden_layer_sizes=(50,),  # Adjust number and size of hidden layers as needed
+                            activation='relu',  # Choose a suitable activation function
+                            max_iter=500,  # Set maximum iterations for training
+                            verbose=False
+                            )
+            elif model == 'knn':
+                self.model = KNN(train_k=15,predict_k=15,max_distance=np.inf,metric='correlation')
+            elif model == 'logreg':
+                self.model = LogisticRegression(max_iter=1000) 
+            else:
+                raise ValueError("Need to choose from: `nb`,`mlp`,`knn`,'logreg' ")
+        else:
+            self.model = model
+        self.measured = adata.copy()
+        self.dataset = self.measured.obs['dataset'].iloc[0]
+
+    def update_user(self,message):
+        fileu.update_user(message,verbose=self.verbose)
+
+    def train(self):
+        self.update_user("Initializing")
+
+        self.update_user("Training Spatial Model")
+        kdesp = KDESpatialPriors(ref_levels=[self.ref_level],neuron=self.neuron,kernel=self.kde_kernel)
+        kdesp.train()
+        self.update_user("Generating Spatial Priors")
+        self.priors = {}
+        priors,types = kdesp.classify(self.measured, level=self.ref_level,dim_labels=['ccf_x','ccf_y','ccf_z'])
+        priors[np.sum(priors,axis=1)==0,:] = 1 # if all zeros make it uniform
+        self.priors = {'columns':types,'indexes':np.array(self.measured.obs.index),'matrix':priors.astype(np.float32)}
+
+        del kdesp,priors
+        gc.collect()
+        self.update_user("Generating Spatial Balanced Reference")
+        if isinstance(self.reference,type(None)): 
+            self.reference = anndata.read(self.ref_path)
+        shared_var = list(self.reference.var.index.intersection(self.measured.var.index))
+        self.reference = self.reference[:,np.isin(self.reference.var.index,shared_var)]
+        self.measured = self.measured[:,np.isin(self.measured.var.index,shared_var)]
+        self.Nbases = self.measured.shape[1]
+        level = self.ref_level
+        idxes = []
+        # total_cells = np.min([self.measured.shape[0],500000])
+        total_cells = 500000
+        weights = np.mean(self.priors['matrix'],axis=0)
+        weights = weights/weights.sum()
+        for i,label in enumerate(self.priors['columns']):
+            n_cells = int(total_cells*weights[i])
+            if n_cells>10:
+                m = self.reference.obs[level]==label
+                temp = np.array(self.reference.obs[m].index)
+                if temp.shape[0]>0:
+                    if np.sum(m)>n_cells:
+                        idxes.extend(list(np.random.choice(temp,n_cells,replace=False)),)
+                    else:
+                        idxes.extend(list(np.random.choice(temp,n_cells)))
+            # else:
+            #     self.update_user(f"Removing {label} from Reference too few cells {n_cells}")
+                
+        self.reference = self.reference[idxes,:].copy()
+        if self.use_prior:
+            self.update_user("Using Spatial Prior")
+            if not isinstance(self.binary_spatial_thresh,type(None)):
+                self.update_user("Binarizing Spatial Prior")
+                self.priors['matrix'] = 1*(self.priors['matrix']>self.binary_spatial_thresh).astype(np.float32)
+        else:
+            self.update_user("Ignoring Spatial Prior")
+            self.priors['matrix'] = np.ones(self.priors['matrix'].shape).astype(np.float32)
+        # """ Permute """
+        # for level in self.ref_levels:
+        #     self.update_user(f"Permuting {level}")
+        #     pallette = dict(zip(self.reference.obs[level], self.reference.obs[level+'_color']))
+        #     self.reference.obs[level] = np.random.permutation(self.reference.obs[level].values)
+        #     self.reference.obs[level+'_color'] = self.reference.obs[level].map(pallette)
+
+        self.update_user("Performing Initial Normalization")
+        """ Assume that 'normalized from measured has already been size corrected """
+        if not 'classification_space' in self.measured.layers.keys():
+            self.measured.layers['classification_space'] = self.measured.layers['normalized'].copy()
+
+        """ Assume some size correction has been done to reference """
+        if not 'classification_space' in self.reference.layers.keys():
+            # self.reference.layers['classification_space'] = basicu.robust_zscore(basicu.normalize_fishdata_robust_regression(self.reference.layers['raw'].copy()))
+            self.reference.layers['classification_space'] = basicu.normalize_fishdata_robust_regression(self.reference.layers['raw'].copy())
+        gc.collect()
+
+        """ Create Dendrogram to Walk on """
+        self.update_user("Creating Dendrogram")
+        X = np.array(self.reference.layers['classification_space'])
+        y = np.array(self.reference.obs[self.ref_level])
+        unique_labels = np.unique(y)
+        averaged_data = {label: np.median(X[y == label],axis=0) for label in unique_labels}
+        df = pd.DataFrame(averaged_data)
+        correlations = df.corr()
+        condensed_distance_matrix = squareform(np.abs(correlations-1), checks=False)
+        self.Z = linkage(condensed_distance_matrix, method='ward')
+        self.average_df = df.copy()
+        clusters = fcluster(self.Z, t=self.Z[0,2], criterion='distance')
+        column_clusters = {col: cluster for col, cluster in zip(self.average_df.columns, clusters)}
+
+        from tqdm import trange
+        dend = pd.DataFrame(index=self.average_df.columns,columns=range(self.Z.shape[0]))
+        stop=False
+        for n in range(self.Z.shape[0]):
+            clusters = np.array(fcluster(self.Z, t=self.Z[-(n+1),2], criterion='distance'))
+            if n==0:
+                dend[n] = clusters
+                column_clusters = {col: cluster for col, cluster in zip(self.average_df.columns, clusters)}
+                previous_labels = pd.Series(y).map(column_clusters)
+                continue
+            clusters = clusters+dend[n-1].max()
+            column_clusters = {col: cluster for col, cluster in zip(self.average_df.columns, clusters)}
+
+            updated_labels = pd.Series(y).map(column_clusters)
+            updated_label_counts = updated_labels.value_counts()
+            previous_label_counts = previous_labels.value_counts()
+            """ check for clusters with the same number of cells"""
+            for idx in updated_label_counts.index:
+                count = updated_label_counts[idx]
+                for idx2 in previous_label_counts[previous_label_counts==count].index:
+                    """ check if they are for the same base_types"""
+                    if np.mean(np.array(dend[n-1]==idx2)==np.array(clusters==idx))==1:
+                        clusters[clusters==idx] = idx2
+            dend[n] = clusters
+            column_clusters = {col: cluster for col, cluster in zip(self.average_df.columns, clusters)}
+            previous_labels = pd.Series(y).map(column_clusters)
+        """ Rename to have no gaps in names"""
+        mapper = dict(zip(sorted(np.unique(dend)),range(len(np.unique(dend)))))
+        for i in dend.columns:
+            dend[i] = dend[i].map(mapper)
+        self.dend = dend
+
+        """ Remake Priors to use dend clusters """
+        self.update_user("Remaking Priors")
+        types = np.unique(np.array(self.dend).ravel())
+        priors = np.zeros((self.measured.shape[0],types.shape[0])).astype(np.float32)
+        updated_priors = {'columns':types,'indexes':np.array(self.measured.obs.index),'matrix':priors.astype(np.float32)}
+        for i,cluster in enumerate(types):
+            included_labels = np.array(self.dend.index)[(self.dend==cluster).max(axis=1)==1]
+            updated_priors['matrix'][:,i] = np.sum(self.priors['matrix'][:,np.isin(self.priors['columns'],included_labels)],axis=1)
+        self.priors = updated_priors
+
+        if self.use_prior:
+            self.update_user("Using Spatial Prior")
+            if not isinstance(self.binary_spatial_thresh,type(None)):
+                self.update_user("Binarizing Spatial Prior")
+                self.priors['matrix'] = 1*(self.priors['matrix']>self.binary_spatial_thresh).astype(np.float32)
+        else:
+            self.update_user("Ignoring Spatial Prior")
+            self.priors['matrix'] = np.ones(self.priors['matrix'].shape).astype(np.float32)
+
+
+        # self.models = {}
+        # for cluster in tqdm(np.unique(np.array(self.dend).ravel()),desc='Training',total=len(np.unique(np.array(self.dend).ravel()))):
+        #     # if cluster ==0:
+        #     #     continue
+        #     included_labels = np.array(self.dend.index)[(self.dend==cluster).max(axis=1)==1]
+        #     m = np.isin(y,included_labels)
+        #     if np.sum(m)<20:
+        #         for label in included_labels:
+        #             self.priors['matrix'][:,self.priors['columns']==label] = 0
+        #         continue
+        #     self.models[cluster] = self.model.copy()
+        #     self.models[cluster].fit(X[m],y[m])
+        #     gc.collect()
+
+        # """ Train Classifier"""
+        # gc.collect()
+        # self.model.fit(X,y)
+        self.reference_features = X
+        self.reference_labels_ref = y
+        # gc.collect()
+
+    def classify(self):
+        self.update_user("Classifying")
+        self.likelihoods = {'columns':self.priors['columns'],'indexes':np.array(self.measured.obs.index),'matrix':np.zeros_like(self.priors['matrix'])}
+        self.posteriors = {'columns':self.priors['columns'],'indexes':np.array(self.measured.obs.index),'matrix':np.zeros_like(self.priors['matrix'])}
+        self.measured_features = self.measured.layers['classification_space'].copy()
+        completed_clusters = []
+
+        self.measured_features = basicu.linear_transform(self.reference_features,self.measured_features,vmin=0.5,vmax=0.95)
+        self.measured_labels = np.zeros(self.measured_features.shape[0])
+        clusters = np.unique(np.array(self.dend).ravel())
+        for cluster in sorted(clusters):
+            if cluster in self.dend[self.dend.columns[-1]].unique():
+                """ Reached the end of this branch"""
+                continue
+            mask = self.measured_labels==cluster
+            self.likelihoods['matrix'][mask,:] = 0
+            if np.sum(mask)==0:
+                continue
+            n = np.max(self.dend.columns[(self.dend==cluster).max(0)])
+            if n==self.dend.columns[-1]:
+                """ Reached the end of this branch"""
+                continue
+            mapper = dict(self.dend[n+1])
+            next_clusters = self.dend[n+1][self.dend[n]==cluster].unique()
+            self.reference_labels = np.array(pd.Series(self.reference_labels_ref).map(mapper))
+            ref_m = np.isin(self.reference_labels, next_clusters) 
+
+            self.model.fit(self.reference_features[ref_m],self.reference_labels[ref_m])
+            likelihoods = self.model.predict_proba(self.measured_features[mask,:]).astype(np.float32)
+
+            for idx,ct in enumerate(self.model.classes_):
+                jidx = np.where(self.likelihoods['columns']==ct)[0][0]
+                self.likelihoods['matrix'][mask,jidx] = likelihoods[:,idx]
+            likelihoods = self.likelihoods['matrix'][mask,:].copy()
+            likelihoods[:,np.isin(self.priors['columns'],next_clusters)==False] = 0
+            priors = self.priors['matrix'][mask,:].copy()
+            priors[:,np.isin(self.priors['columns'],next_clusters)==False] = 0
+            posteriors = likelihoods*priors
+            posteriors[posteriors.max(1)==0,:] = priors[posteriors.max(1)==0,:].copy()
+            posteriors[posteriors.max(1)==0,:] = likelihoods[posteriors.max(1)==0,:].copy()
+            labels = self.priors['columns'][np.argmax(posteriors,axis=1)]
+            labels[posteriors.max(1)==0] = -1
+            self.measured_labels[mask] = labels
+            for cluster in np.unique(self.measured_labels[mask]):
+                m = self.measured_labels==cluster
+                ref_m = self.reference_labels==cluster
+                if np.sum(m)>0:
+                    if cluster ==-1:
+                        self.update_user(f"{np.sum(m)} cells 0 posterior")
+                        continue
+                    self.measured_features[m,:] = basicu.linear_transform(self.reference_features[ref_m,:],self.measured_features[m,:],vmin=0.5,vmax=0.95)
+            gc.collect()
+        """ Map Back to Ref Labels """
+        mapper = dict(self.dend[self.dend.columns[-1]])
+        reverse_mapper = {v:k for k,v in mapper.items()}
+        self.measured_labels = np.array(pd.Series(self.measured_labels).map(reverse_mapper))
+
+        return self.measured_features,self.measured_labels
 
