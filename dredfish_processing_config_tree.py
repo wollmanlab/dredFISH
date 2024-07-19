@@ -3,29 +3,48 @@ import logging
 import torch
 # Basic parameters of imaging
 bitmap = [('RS0095_cy5', 'hybe1', 'FarRed'),
-            ('RS0109_cy5', 'hybe2', 'FarRed'),
             ('RS0175_cy5', 'hybe3', 'FarRed'),
-            ('RS0237_cy5', 'hybe4', 'FarRed'),
             ('RS0332_cy5', 'hybe6', 'FarRed'),
-            ('RSN9927.0_cy5', 'hybe7', 'FarRed'),
             ('RSN2336.0_cy5', 'hybe8', 'FarRed'),
             ('RSN1807.0_cy5', 'hybe9', 'FarRed'),
             ('RS0384_cy5', 'hybe10', 'FarRed'),
             ('RS0406_cy5', 'hybe11', 'FarRed'),
             ('RS0451_cy5', 'hybe12', 'FarRed'),
-            ('RS0468_cy5', 'hybe13', 'FarRed'),
             ('RS0548_cy5', 'hybe14', 'FarRed'),
             ('RS64.0_cy5', 'hybe15', 'FarRed'),
             ('RSN4287.0_cy5', 'hybe16', 'FarRed'),
             ('RSN1252.0_cy5', 'hybe17', 'FarRed'),
             ('RSN9535.0_cy5', 'hybe18', 'FarRed'),
-            ('RS156.0_cy5', 'hybe19', 'FarRed'),
-            ('RS643.0_cy5', 'hybe22', 'FarRed'),
             ('RS740.0_cy5', 'hybe23', 'FarRed'),
             ('RS810.0_cy5', 'hybe24', 'FarRed'),
             ('RS458122_cy5', 'hybe21', 'FarRed'), # (’R25’,’RS458122_cy5’, 'hybe25', 'FarRed',’AACTCCTTATCACCCTACTC’)
             ('RS0083_SS_Cy5', 'hybe5', 'FarRed'), # (’R26’,’RS0083_SS_Cy5’, ’hybe5/bDNA’, ‘FarRed’,’ACACTACCACCATTTCCTAT’)
             ('RS0255_SS_Cy5', 'hybe20', 'FarRed')] # R20
+# All 24
+# bitmap = [('RS0095_cy5', 'hybe1', 'FarRed'),
+#             ('RS0109_cy5', 'hybe2', 'FarRed'),
+#             ('RS0175_cy5', 'hybe3', 'FarRed'),
+#             ('RS0237_cy5', 'hybe4', 'FarRed'),
+#             ('RS0332_cy5', 'hybe6', 'FarRed'),
+#             ('RSN9927.0_cy5', 'hybe7', 'FarRed'),
+#             ('RSN2336.0_cy5', 'hybe8', 'FarRed'),
+#             ('RSN1807.0_cy5', 'hybe9', 'FarRed'),
+#             ('RS0384_cy5', 'hybe10', 'FarRed'),
+#             ('RS0406_cy5', 'hybe11', 'FarRed'),
+#             ('RS0451_cy5', 'hybe12', 'FarRed'),
+#             ('RS0468_cy5', 'hybe13', 'FarRed'),
+#             ('RS0548_cy5', 'hybe14', 'FarRed'),
+#             ('RS64.0_cy5', 'hybe15', 'FarRed'),
+#             ('RSN4287.0_cy5', 'hybe16', 'FarRed'),
+#             ('RSN1252.0_cy5', 'hybe17', 'FarRed'),
+#             ('RSN9535.0_cy5', 'hybe18', 'FarRed'),
+#             ('RS156.0_cy5', 'hybe19', 'FarRed'),
+#             ('RS643.0_cy5', 'hybe22', 'FarRed'),
+#             ('RS740.0_cy5', 'hybe23', 'FarRed'),
+#             ('RS810.0_cy5', 'hybe24', 'FarRed'),
+#             ('RS458122_cy5', 'hybe21', 'FarRed'), # (’R25’,’RS458122_cy5’, 'hybe25', 'FarRed',’AACTCCTTATCACCCTACTC’)
+#             ('RS0083_SS_Cy5', 'hybe5', 'FarRed'), # (’R26’,’RS0083_SS_Cy5’, ’hybe5/bDNA’, ‘FarRed’,’ACACTACCACCATTTCCTAT’)
+#             ('RS0255_SS_Cy5', 'hybe20', 'FarRed')] # R20
 
 # bitmap = [('RS0095_cy5', 'hybe1', 'FarRed'),
 #             ('RS0109_cy5', 'hybe2', 'FarRed'),
