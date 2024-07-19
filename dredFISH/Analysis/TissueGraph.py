@@ -480,7 +480,6 @@ class TissueMultiGraph:
             while section_name in used_names:
                 section_name = f"{base_section_name}_{i}"
                 i += 1
-            used_names.append(section_name)
             adata.obs['section_name'] = section_name
             adata.obs[self.adata_mapping['Section']] = section_name
             if isinstance(shared_bits,str):
@@ -491,17 +490,21 @@ class TissueMultiGraph:
                 XY = np.array(adata.obs[["ccf_z","ccf_y"]])
             else: 
                 XY = np.array(adata.obs[["stage_x","stage_y"]])
+            self.update_user(f"Found {adata.shape[0]} cells for {section_acq_name}")
             adata = adata[:,np.isin(adata.var.index,bad_bits,invert=True)].copy()
+
             adata.obs['in_large_comp'] = geomu.in_graph_large_connected_components(XY,Section = None,max_dist = 0.05,large_comp_def = 0.1,plot_comp = False)
             adata = adata[adata.obs['in_large_comp']==True].copy()
+            self.update_user(f"Keeping {adata.shape[0]} cells after component filtering for {section_acq_name}")
 
             adata.layers['nuc_mask'] = basicu.filter_cells_nuc(adata)
-            adata = adata[np.sum(adata.layers['nuc_mask']==False,axis=1)>0].copy() # Harshest possible filter get rid of any cells that are bad in any bit
+            adata = adata[np.sum(adata.layers['nuc_mask']==False,axis=1)<2].copy()
 
             adata = adata[np.clip(np.array(adata.layers['raw']).copy().sum(1),1,None)>100].copy()
+            self.update_user(f"Keeping {adata.shape[0]} cells after nuc filtering for {section_acq_name}")
 
-            if adata.shape[0] == 0:
-                self.update_user(f" No Cells Found {section_acq_name}")
+            if adata.shape[0]<25000:
+                self.update_user(f" Not Enough Cells Found {section_acq_name} {adata.shape[0]} cells")
                 continue
 
             adata.X = adata.layers['raw'].copy()
@@ -510,10 +513,13 @@ class TissueMultiGraph:
 
             adata.X = basicu.image_coordinate_correction(adata.X.copy(),np.array(adata.obs[["image_x","image_y"]]))
 
+            adata.X = basicu.correct_linear_staining_patterns(adata.X.copy(),np.array(adata.obs[["image_x","image_y"]]))
+
             adata.layers['normalized'] = adata.X.copy()
 
             adata.layers['classification_space'] = basicu.robust_zscore(adata.X.copy())
             
+            used_names.append(section_name)
             adatas.append(adata)
 
         adata = anndata.concat([temp[:,np.isin(temp.var.index,shared_bits)] for temp in adatas])
@@ -740,7 +746,12 @@ class TissueMultiGraph:
         if self._unqS is None:
             assert len(self.Layers)
             Sections = self.Layers[0].Section
-            self._unqS = list(np.unique(Sections))
+            """ order based on ccf_location {animal}_{ccf_x}"""
+            def get_ccf_x(section):
+                return float(section.split('_')[1])
+            # Sort Sections based on ccf_x from lowest to highest
+            self._unqS = sorted(Sections, key=get_ccf_x)
+            # self._unqS = list(np.unique(Sections))
         # return a list of (unique) sections 
         return(self._unqS)
 
