@@ -1554,7 +1554,7 @@ class TissueGraph:
         else: 
             return(cond_entropy)
     
-    def extract_environments(self,ordr = None,typevec = None, k=None):
+    def extract_environments(self,ordr = None,typevec = None, k=None, N = None, weights = None):
         """returns the categorical distribution of neighbors. 
         
         Depending on input there could be two uses, 
@@ -1582,14 +1582,29 @@ class TissueGraph:
             ind = list()
             for i in range(len(np.unique(typevec))):
                 ind.append(np.flatnonzero(typevec==i))
-        else: 
+        else:
+            env_file_path = os.path.join(self.basepath, 'Layer', f"Env_{self.adata_mapping['Type'][:-3]}_{k}.npy")
+            if os.path.exists(env_file_path) and weights is None:
+                print("loading Env from file")
+                return np.load(env_file_path)
             nbrs_ind,nbrs_dist = self.knn_query((self.XY,self.Section),k=k)
-            typ = self.Type
+            typ = self.Type.astype(int)
             nbrs_types = typ[nbrs_ind.astype(int)]
-            N = self.Type.max()+1
+            if N is None: 
+                N = self.Type.max()+1
             Env = np.zeros((nbrs_types.shape[0], N), dtype=int)
             # Use np.add.at to accumulate counts directly into the occurrence matrix
-            np.add.at(Env, (np.arange(nbrs_types.shape[0])[:, None], nbrs_types), 1)
+            if weights is None: 
+                np.add.at(Env, (np.arange(nbrs_types.shape[0])[:, None], nbrs_types), 1)
+                np.save(env_file_path, Env)
+            else:
+                if k<5: 
+                    raise ValueError("Weights not implemented for k<5")
+                nbrs_types = typ[nbrs_ind.astype(int)]
+                local_dens = nbrs_dist[:,5][:,None] * weights
+                nbrs_weights = np.exp(-(nbrs_dist**2)/(local_dens**2)) 
+                np.add.at(Env, (np.arange(nbrs_types.shape[0])[:, None], nbrs_types), nbrs_weights)
+            
             return Env
 
         
