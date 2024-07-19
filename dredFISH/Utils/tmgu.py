@@ -170,7 +170,7 @@ def get_local_type_abundance(
     
     return env_mat
 
-def build_knn_graph(X, metric, n_neighbors=15, accuracy={'prob':1, 'extras':1.5}, metric_kwds={}): 
+def build_knn_graph(X, metric, n_neighbors=15, accuracy={'prob':1, 'extras':1.5}, metric_kwds={}, allow_KDtree = True): 
     """
     Buils the knn graph. If X is small uses KDTree, if large pynndescent
     """
@@ -178,7 +178,7 @@ def build_knn_graph(X, metric, n_neighbors=15, accuracy={'prob':1, 'extras':1.5}
     # checks if we have enough rows 
     n_neighbors = min(X.shape[0]-1,n_neighbors)
 
-    if X.shape[0] < 200000:
+    if X.shape[0] < 200000 and allow_KDtree:
         knn = cKDTree(X)
         distances, indices = knn.query(X, k=n_neighbors+1)
     else:
