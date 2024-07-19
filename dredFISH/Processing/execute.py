@@ -3,6 +3,7 @@ import argparse
 from dredFISH.Processing.Section import *
 from dredFISH.Utils.imageu import *
 import time
+import gc
 """
 conda activate dredfish_3.9; nohup python -W ignore /home/zach/PythonRepos/dredFISH/dredFISH/Processing/execute.py /orangedata/Images2023/Gaby/dredFISH/Acrydite_77.5.A_DPNMF_97.5.B_2023Feb16/ -c dredfish_processing_config_v1 -w A; conda deactivate
 """
@@ -38,6 +39,7 @@ if __name__ == '__main__':
         hybe = [i for i in image_metadata.acqnames if config.parameters['nucstain_acq']+'_' in i.lower()]
         posnames = np.unique(image_metadata.image_table[np.isin(image_metadata.image_table.acq,hybe)].Position)
         sections = np.unique([i.split('-Pos')[0] for i in posnames if '-Pos' in i])
+        del image_metadata
     else:
         sections = np.array([args.section])
     if sections.shape[0]==0:
@@ -54,19 +56,18 @@ if __name__ == '__main__':
             raise(ValueError('Max Attempts Reached'))
         attempt+=1
         for idx,section in enumerate(sections):
+            gc.collect()
             self = Section_Class(metadata_path,section,cword_config,verbose=True)
             if isinstance(fishdata,str):
                 self.path = fishdata.copy()
-            # self.setup_output()
             self.update_user(str(np.sum(completion_array==False))+ ' Unfinished Sections')
             self.update_user('Processing Section '+section)
-            # try:
             self.run()
-            # except Exc
-            #     continue
             if isinstance(self.data,type(None)):
                 continue
             completion_array[idx] = True
+            del self
+            gc.collect()
         time.sleep(60)
-    self.update_user('Completed')
+    print('Completed')
 

@@ -398,6 +398,11 @@ class Section_Class(object):
             self.parameters['jitter_channel'] = 'FarRed'
             self.parameters['jitter_correction'] = False
             self.parameters['n_pixels']=[2448, 2048]
+        elif self.parameters['scope']=='BlueScope':
+            self.parameters['pixel_size'] = 0.495# 0.490#0.327#0.490 # um 490 or 330 # 0.428 #0.409
+            self.parameters['jitter_channel'] = ''
+            self.parameters['jitter_correction'] = False
+            self.parameters['n_pixels']=[2448, 2048]
         else:
             self.update_user(f" {self.parameters['scope']} isnt a default device please check config file for pixel size accuracy")
 
@@ -419,7 +424,6 @@ class Section_Class(object):
 
         hybe = [i for i in self.image_metadata.acqnames if 'hybe' in i.lower()][0]
         posnames = np.unique(self.image_metadata.image_table[np.isin(self.image_metadata.image_table.acq,hybe)].Position)
-        self.update_user(str(posnames.shape[0])+' Positions Found')
         sections = np.unique([i.split('-Pos')[0] for i in posnames if '-Pos' in i])
 
         if sections.shape[0] == 0:
@@ -432,10 +436,16 @@ class Section_Class(object):
             self.acqs = np.unique(self.image_metadata.image_table[np.isin(self.image_metadata.image_table.Position,self.posnames)].acq)
             if len(self.acqs)==0:
                 self.update_user(self.image_metadata.acqnames)
+            """ Ensure that every position is in every round """
+            for acq in self.acqs:
+                posnames = np.unique(self.image_metadata.image_table[self.image_metadata.image_table.acq==acq].Position)
+                self.posnames = np.array([i for i in self.posnames if i in posnames])
             self.coordinates = {}
             for posname in self.posnames:
                 self.coordinates[posname] = (self.image_metadata.image_table[(self.image_metadata.image_table.Position==posname)].XY.iloc[0]/self.parameters['process_pixel_size']).astype(int)
             self.posname_index_converter = {posname:posname_index for posname_index,posname in enumerate(self.posnames)}
+            self.update_user(str(posnames.shape[0])+' Positions Found')
+
 
     def find_acq(self,hybe,protocol='hybe'):
         """
@@ -576,12 +586,20 @@ class Section_Class(object):
                 # """ Maybe now is a good time to make them"""
                 self.update_user(f" {acq} Computing FF and Constant Now",level=40)
                 file_list = self.image_metadata.stkread(Channel=channel,acq=acq,groupby='Channel',fnames_only = True)
-                (FF, constant) = imageu.estimate_flatfield_and_constant(file_list)
-                fileu.save(FF,section=self.dataset.split('_')[0],path=path,hybe=acq,channel=channel,file_type='FF')
-                fileu.save(FF*1000,section=self.dataset.split('_')[0],path=path,hybe=acq,channel=channel,file_type='image_FF')
-                fileu.save(constant,section=self.dataset.split('_')[0],path=path,hybe=acq,channel=channel,file_type='constant')
-                fileu.save(constant,section=self.dataset.split('_')[0],path=path,hybe=acq,channel=channel,file_type='image_constant')
-                return FF,constant
+                if len(file_list)<10:
+                    self.update_user(f" {acq} Not Enough Images to Compute FF and Constant",level=40)
+                    return None,None
+                try:
+                    (FF, constant) = imageu.estimate_flatfield_and_constant(file_list)
+                    fileu.save(FF,section=self.dataset.split('_')[0],path=path,hybe=acq,channel=channel,file_type='FF')
+                    fileu.save(FF*1000,section=self.dataset.split('_')[0],path=path,hybe=acq,channel=channel,file_type='image_FF')
+                    fileu.save(constant,section=self.dataset.split('_')[0],path=path,hybe=acq,channel=channel,file_type='constant')
+                    fileu.save(constant,section=self.dataset.split('_')[0],path=path,hybe=acq,channel=channel,file_type='image_constant')
+                    return FF,constant
+                except Exception as e:
+                    print(e)
+                    self.update_user(f" {acq} Failed to Compute FF and Constant",level=40)
+                    return None,None
             elif imaging_batch == 'hybe':
                 """ load all FF for this hybe and average """
                 acq_list = [i for i in self.image_metadata.acqnames if acq+'_' in i]
@@ -1356,6 +1374,9 @@ class Section_Class(object):
             self.data.layers['nuc_raw'] = self.nuc_vectors.numpy().copy()
             self.data.obs['sum'] = self.data.layers['processed_vectors'].sum(axis=1)
 
+            # Need to have atleast 1 value over 100
+            self.data = self.data[self.data.X.max(1)>100] #THRESH
+
             # observations = ['PolyT','Housekeeping','Nonspecific_Encoding','Nonspecific_Readout'] # FIX upgrade to be everything but the rs in design 
             # for obs in observations:
             #     if obs in self.data.var.index:
@@ -1540,8 +1561,8 @@ class Section_Class(object):
             if (os.path.exists(path)==False)|self.parameters['overwrite_report']:
                 self.update_user('Generating Louvain Figure')
                 if self.parameters['overwrite_louvain']| (not 'louvain' in temp_data.obs.columns):
-                    bits = [i for i in temp_data.var.index if 'RS' in i]
-                    temp_data = temp_data[:,temp_data.var.index.isin(bits)]
+                    # bits = [i for i in temp_data.var.index if 'RS' in i]
+                    # temp_data = temp_data[:,temp_data.var.index.isin(bits)]
                     X = temp_data.layers['processed_vectors'].copy()
                     # X = basicu.robust_zscore(X)
                     # X = np.sqrt(np.clip(X,1,None))

@@ -20,6 +20,7 @@ import math
 import time
 import anndata
 import warnings
+import matplotlib
 
 class Registration_Class(object):
     def __init__(self, XYZC, 
@@ -126,6 +127,7 @@ class Registration_Class(object):
         return non_rigid_transformed_XYZC
 
     def fit(self):
+        matplotlib.use("QtAgg")
         self.load_reference_data()
         self.set_rigid()
         self.fit_X_model()
@@ -154,7 +156,7 @@ class Registration_Class(object):
                 points_cor_x = []
                 points_cor_y = []
 
-                fig,axs = plt.subplots(1,1,figsize=[5,5])
+                fig,axs = plt.subplots(1,1,figsize=[10,10])
                 fig.suptitle(f"Set Top and Bottom")
                 # axs = axs.ravel()
                 axs = [axs]
@@ -199,7 +201,7 @@ class Registration_Class(object):
             self.save(self.config,channel='Registration_Parameters',file_type='Config')
 
             rigid_transformed_XYZC = self.rigid_transformation()
-            fig,axs = plt.subplots(1,1,figsize=[5,5])
+            fig,axs = plt.subplots(1,1,figsize=[10,10])
             plt.suptitle('Rigid Registration')
             # axs = axs.ravel()
             axs = [axs]
@@ -397,7 +399,7 @@ class Registration_Class(object):
         self.update_user('Viewing Transformation',level=20)
         df_points = self.load(channel='df_points',file_type='matrix')
         
-        plt.figure(figsize=[5,5])
+        plt.figure(figsize=[10,10])
         plt.scatter(df_points['fix_z'],df_points['fix_y'],c='k',s=np.array(df_points.index))
         plt.scatter(df_points['mov_z'],df_points['mov_y'],c='r',s=np.array(df_points.index))
         for i in range(len(df_points)):
@@ -408,7 +410,7 @@ class Registration_Class(object):
 
         df_points['pred_z'] = self.Z_model(np.array(df_points['mov_y']),np.array(df_points['mov_z']))
         df_points['pred_y'] = self.Y_model(np.array(df_points['mov_y']),np.array(df_points['mov_z']))
-        plt.figure(figsize=[5,5])
+        plt.figure(figsize=[10,10])
         plt.scatter(df_points['fix_z'],df_points['fix_y'],c='k',s=np.array(df_points.index))
         plt.scatter(df_points['pred_z'],df_points['pred_y'],c='r',s=np.array(df_points.index))
         for i in range(len(df_points)):
@@ -417,7 +419,7 @@ class Registration_Class(object):
         plt.savefig(path,dpi=200)
         plt.show(block=False)
 
-        plt.figure(figsize=[5,5])
+        plt.figure(figsize=[10,10])
         plt.scatter(df_points['mov_z'],df_points['mov_y'],c='k',s=np.array(df_points.index))
         plt.scatter(df_points['pred_z'],df_points['pred_y'],c='r',s=np.array(df_points.index))
         for i in range(len(df_points)):
@@ -427,7 +429,7 @@ class Registration_Class(object):
         plt.show(block=False)
 
         XYZC = self.rigid_transformation()
-        fig = plt.figure(figsize=[5,5])
+        fig = plt.figure(figsize=[10,10])
         fig.suptitle('Raw vs Ref')
         plt.scatter(self.ref_XYZC.loc[self.ref_XYZC_sample,'ccf_z'],self.ref_XYZC.loc[self.ref_XYZC_sample,'ccf_y'],s=0.1,c='k',alpha=0.5)
         plt.scatter(XYZC['ccf_z'],XYZC['ccf_y'],s=0.1,c='r',alpha=0.5)
@@ -436,18 +438,18 @@ class Registration_Class(object):
         plt.show(block=False)
 
         XYZC = self.non_rigid_transformation()
-        fig = plt.figure(figsize=[5,5])
+        fig = plt.figure(figsize=[10,10])
         fig.suptitle('Raw vs Ref')
-        plt.scatter(self.ref_XYZC.loc[self.ref_XYZC_sample,'ccf_z'],self.ref_XYZC.loc[self.ref_XYZC_sample,'ccf_y'],s=0.1,c='k',alpha=0.5)
+        plt.scatter(self.ref_XYZC.loc[self.ref_XYZC_sample,'ccf_z']+5.71,self.ref_XYZC.loc[self.ref_XYZC_sample,'ccf_y'],s=0.1,c='k',alpha=0.5)
         plt.scatter(XYZC['ccf_z'],XYZC['ccf_y'],s=0.1,c='r',alpha=0.5)
         path = self.generate_filename(channel='Aligned',file_type='Figure')
         plt.savefig(path,dpi=200)
         plt.show(block=False)
 
-        fig = plt.figure(figsize=[5,5])
+        fig = plt.figure(figsize=[10,10])
         fig.suptitle('Distance Moved')
 
-        c = np.sqrt(np.sum((np.array(self.rigid_transformation()[['ccf_z','ccf_y']])-np.array(self.non_rigid_transformation()[['ccf_z','ccf_y']]))**2,1))
+        c = np.sqrt(np.sum(((np.array(self.rigid_transformation()[['ccf_z','ccf_y']])+np.array([5.71,0]))-np.array(self.non_rigid_transformation()[['ccf_z','ccf_y']]))**2,1))
         vmin,vmax = np.percentile(c,[1,99])
         c = np.clip(c,vmin,vmax)
         plt.scatter(XYZC['ccf_z'],XYZC['ccf_y'],s=0.1,c=c,cmap='jet')

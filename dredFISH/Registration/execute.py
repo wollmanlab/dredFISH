@@ -40,7 +40,7 @@ if __name__ == '__main__':
     parser.add_argument("-c","--cword_config", type=str,dest="cword_config",default='dredfish_processing_config_tree', action='store',help="Name of Config File for analysis ie. dredfish_processing_config")
     parser.add_argument("-s","--section", type=str,dest="section",default='all', action='store',help="keyword in posnames to identify which section to process")
     parser.add_argument("-w","--well", type=str,dest="well",default='', action='store',help="keyword in well to identify which section to process")
-    parser.add_argument("-f","--fishdata", type=str,dest="fishdata",default='fishdata', action='store',help="fishdata name for save directory")
+    parser.add_argument("-f","--fishdata", type=str,dest="fishdata",default='infer', action='store',help="fishdata name for save directory")
     
     args = parser.parse_args()
 
@@ -53,7 +53,12 @@ if __name__ == '__main__':
     cword_config = args.cword_config
     config = importlib.import_module(cword_config)
     config.parameters['nucstain_acq']
-    if not '_' in args.fishdata:
+    if args.fishdata=='infer':
+        processing_paths = [i for i in os.listdir(metadata_path) if 'Processing_' in i]
+        processing_date = [os.path.getctime(os.path.join(metadata_path,processing)) for processing in processing_paths]
+        sorted_processing_paths = [x for _, x in reversed(sorted(zip(processing_date, processing_paths)))]
+        fishdata = sorted_processing_paths[0]
+    elif not '_' in args.fishdata:
         fishdata = args.fishdata+str(datetime.today().strftime("_%Y%b%d"))
     else:
         fishdata = args.fishdata
