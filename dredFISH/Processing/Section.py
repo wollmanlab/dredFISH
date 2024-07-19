@@ -1374,6 +1374,9 @@ class Section_Class(object):
             self.data.layers['nuc_raw'] = self.nuc_vectors.numpy().copy()
             self.data.obs['sum'] = self.data.layers['processed_vectors'].sum(axis=1)
 
+            # Need to have atleast 1 value over 100
+            self.data = self.data[self.data.X.max(1)>100] #THRESH
+
             # observations = ['PolyT','Housekeeping','Nonspecific_Encoding','Nonspecific_Readout'] # FIX upgrade to be everything but the rs in design 
             # for obs in observations:
             #     if obs in self.data.var.index:
