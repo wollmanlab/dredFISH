@@ -26,8 +26,10 @@ if __name__ == '__main__':
         else:
             raise ValueError(f"{host} Host not recognized")
         # animals = ['Tax','WTF01','WTM01','MMSM01','MMSF01','WTM04','WTM07','WTF04','WTF06']
-        with multiprocessing.Pool(1) as p:
-            p.map(pfunc, animals)
+        for animal in animals:
+            pfunc(animal)
+        # with multiprocessing.Pool(1) as p:
+        #     p.map(pfunc, animals)
         # for animal in ['Tax','WTF01','WTM01','MMSM01','MMSF01','WTM04','WTM07','WTF04','WTF06']:
         #     pfunc = partial(analyze_mouse_brain_data,
         #                     project_path=args.project_path,
