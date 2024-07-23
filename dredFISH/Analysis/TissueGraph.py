@@ -907,6 +907,7 @@ class TissueGraph:
         self.SG = None # spatial graph (created by build_spatial_graph, or load in __init__)
         self.FG = dict() # Feature graph (created by build_feature_graph, or load in __init__)
         self._spatial_edge_list = None # for performance (of .contract_graph), going to save the edge list extermally from self.SG 
+        self._unqS = None
 
         # there are two mode of TG loading: 
         # 1. standard (from drive): load the full adata and create SG and FG 
@@ -1193,13 +1194,23 @@ class TissueGraph:
             return self.adata.obs[self.adata_mapping["Section"]]
 
     @property
+    @property
     def unqS(self):
-        Sections = self.Section
-        # return a list of (unique) section
-        return(list(np.unique(Sections)))
+        if self._unqS is None:
+            assert len(self.Layers)
+            Sections = self.Layers[0].Section
+            """ order based on ccf_location {animal}_{ccf_x}"""
+            def get_ccf_x(section):
+                return float(section.split('_')[1])
+            # Sort Sections based on ccf_x from lowest to highest
+            self._unqS = sorted(np.unique(Sections), key=get_ccf_x)
+            # self._unqS = list(np.unique(Sections))
+        # return a list of (unique) sections 
+        return(self._unqS)
 
     @property
     def size_of_sections(self):
+        # Likely Broken
         _,count = np.unique(self.Section,return_counts = True)
         return(count)
 
