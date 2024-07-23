@@ -745,14 +745,15 @@ class TissueMultiGraph:
     def unqS(self):
         if self._unqS is None:
             assert len(self.Layers)
-            Sections = self.Layers[0].Section
-            """ order based on ccf_location {animal}_{ccf_x}"""
-            def get_ccf_x(section):
-                return float(section.split('_')[1])
-            # Sort Sections based on ccf_x from lowest to highest
-            self._unqS = sorted(np.unique(Sections), key=get_ccf_x)
-            # self._unqS = list(np.unique(Sections))
-        # return a list of (unique) sections 
+            self._unqS = self.Layers[0].unqS
+        #     Sections = self.Layers[0].Section
+        #     """ order based on ccf_location {animal}_{ccf_x}"""
+        #     def get_ccf_x(section):
+        #         return float(section.split('_')[1])
+        #     # Sort Sections based on ccf_x from lowest to highest
+        #     self._unqS = sorted(np.unique(Sections), key=get_ccf_x)
+        #     # self._unqS = list(np.unique(Sections))
+        # # return a list of (unique) sections 
         return(self._unqS)
 
     @property
