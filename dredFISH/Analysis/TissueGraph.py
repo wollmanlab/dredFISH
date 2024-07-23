@@ -1397,11 +1397,11 @@ class TissueGraph:
         """
         unqS = self.unqS
         self.update_user(f"Building spatial graphs for {self.Nsections} sections")
-        section = self.Section.reset_index(drop=True)
-        sorted_section = section.sort_values().reset_index(drop=True)
-        if not np.all(sorted_section == section):
-            raise ValueError("Sections are not sorted. Please sort the sections before building the spatial graph.")
-        # self.adata = self.adata[self.adata.obs[self.adata_mapping['Section']].argsort()]
+        # section = self.Section.reset_index(drop=True)
+        # sorted_section = section.sort_values().reset_index(drop=True)
+        # if not np.all(sorted_section == section):
+        #     raise ValueError("Sections are not sorted. Please sort the sections before building the spatial graph.")
+        # # self.adata = self.adata[self.adata.obs[self.adata_mapping['Section']].argsort()]
         self.SG = list()
         for s in range(self.Nsections): 
             # get XY for a given section
