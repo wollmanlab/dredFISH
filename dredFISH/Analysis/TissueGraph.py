@@ -743,10 +743,17 @@ class TissueMultiGraph:
 
     @property
     def unqS(self):
-        def get_ccf_x(section):
-            return float(section.split('_')[1])
-        return sorted(np.unique(self.Section), key=get_ccf_x)
-
+        if self._unqS is None:
+            assert len(self.Layers)
+            Sections = self.Layers[0].Section
+            """ order based on ccf_location {animal}_{ccf_x}"""
+            def get_ccf_x(section):
+                return float(section.split('_')[1])
+            # Sort Sections based on ccf_x from lowest to highest
+            self._unqS = sorted(np.unique(Sections), key=get_ccf_x)
+            # self._unqS = list(np.unique(Sections))
+        # return a list of (unique) sections 
+        return(self._unqS)
 
     @property
     def tax_names(self): 
@@ -1185,19 +1192,12 @@ class TissueGraph:
         else: 
             return self.adata.obs[self.adata_mapping["Section"]]
 
+    
     @property
     def unqS(self):
-        if self._unqS is None:
-            assert len(self.Layers)
-            Sections = self.Layers[0].Section
-            """ order based on ccf_location {animal}_{ccf_x}"""
-            def get_ccf_x(section):
-                return float(section.split('_')[1])
-            # Sort Sections based on ccf_x from lowest to highest
-            self._unqS = sorted(np.unique(Sections), key=get_ccf_x)
-            # self._unqS = list(np.unique(Sections))
-        # return a list of (unique) sections 
-        return(self._unqS)
+        def get_ccf_x(section):
+            return float(section.split('_')[1])
+        return sorted(np.unique(self.Section), key=get_ccf_x)
 
     @property
     def size_of_sections(self):
