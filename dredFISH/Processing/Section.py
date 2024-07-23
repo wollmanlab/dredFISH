@@ -436,10 +436,16 @@ class Section_Class(object):
             self.acqs = np.unique(self.image_metadata.image_table[np.isin(self.image_metadata.image_table.Position,self.posnames)].acq)
             if len(self.acqs)==0:
                 self.update_user(self.image_metadata.acqnames)
+
             """ Ensure that every position is in every round """
-            for acq in self.acqs:
+            median_n_pos = np.median([np.unique(self.image_metadata.image_table[self.image_metadata.image_table.acq==acq].Position).shape[0] for acq in self.acqs])
+            acqs = self.acqs
+            for acq in acqs:
                 posnames = np.unique(self.image_metadata.image_table[self.image_metadata.image_table.acq==acq].Position)
-                self.posnames = np.array([i for i in self.posnames if i in posnames])
+                if posnames.shape[0]!=median_n_pos:
+                    self.acqs = [i for i in self.acqs if i!=acq]
+                else:
+                    self.posnames = np.array([i for i in self.posnames if i in posnames])
             self.coordinates = {}
             for posname in self.posnames:
                 self.coordinates[posname] = (self.image_metadata.image_table[(self.image_metadata.image_table.Position==posname)].XY.iloc[0]/self.parameters['process_pixel_size']).astype(int)
