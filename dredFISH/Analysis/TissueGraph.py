@@ -463,7 +463,7 @@ class TissueMultiGraph:
             adata.obs['animal'] = row['animal']
             if register_to_ccf: 
                 try:
-                    XYZC  = Registration_Class(adata.copy(),registration_path,section_acq_name,verbose=False).run()
+                    XYZC  = Registration_Class(adata.copy(),registration_path,section_acq_name,verbose=False,regularize=True).run()
                     adata.obs['ccf_x'] = XYZC['ccf_x']
                     adata.obs['ccf_y'] = XYZC['ccf_y']
                     adata.obs['ccf_z'] = XYZC['ccf_z']
@@ -497,14 +497,20 @@ class TissueMultiGraph:
             adata = adata[adata.obs['in_large_comp']==True].copy()
             self.update_user(f"Keeping {adata.shape[0]} cells after component filtering for {section_acq_name}")
 
+            n_cells_pre_nuc_filtering = adata.shape[0]
             adata.layers['nuc_mask'] = basicu.filter_cells_nuc(adata)
             adata = adata[np.sum(adata.layers['nuc_mask']==False,axis=1)<2].copy()
 
             adata = adata[np.clip(np.array(adata.layers['raw']).copy().sum(1),1,None)>100].copy()
             self.update_user(f"Keeping {adata.shape[0]} cells after nuc filtering for {section_acq_name}")
-
-            if adata.shape[0]<25000:
-                self.update_user(f" Not Enough Cells Found {section_acq_name} {adata.shape[0]} cells")
+            n_cells_post_nuc_filtering = adata.shape[0]
+            if n_cells_post_nuc_filtering < 0.6 * n_cells_pre_nuc_filtering:
+                self.update_user(f"Likely Gel issues: More than 40% cells Removed {adata.shape[0]} cells")
+                self.update_user(f"Tossing Section {section_acq_name}")
+                continue
+            if adata.shape[0]<60000:
+                self.update_user(f" Not Enough Cells Found {adata.shape[0]} cells")
+                self.update_user(f"Tossing Section {section_acq_name}")
                 continue
 
             adata.X = adata.layers['raw'].copy()
@@ -888,6 +894,13 @@ class TissueGraph:
         # what is stored in this layer (cells, zones, regions, etc)
         self.layer_type = layer_type # label layers by their type
         self.basepath = basepath
+
+        logging.basicConfig(
+                    filename=os.path.join(self.basepath,'tmg_log.txt'),filemode='a',
+                    format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
+                    datefmt='%Y %B %d %H:%M:%S',level=logging.INFO, force=True)
+        self.log = logging.getLogger("Analysis")
+        self.verbose = True
  
         # this dict stores the defaults field names in the anndata objects that maps to TissueGraph properties
         # this allows storing different versions (i.e. different cell type assignment) in the anndata object 
@@ -924,6 +937,7 @@ class TissueGraph:
             # SG is saved as a list of spatial graphs (one per section)
             for g_name in self.adata.obsp.keys():
                 if g_name=="SG":
+
                     # create SG and FG from Anndata
                     sg = self.adata.obsp["SG"] # csr matrix
                     self.SG =  tmgu.adjacency_to_igraph(sg, directed=False, simplify = False)
@@ -940,7 +954,7 @@ class TissueGraph:
                         knn = pickle.load(file)
                     self.SG_knn = knn
                 except Exception:
-                    warnings.warn("Failed to load SG_knn - please check")
+                    self.update_user("Failed to load SG_knn - please check")
                     self.SG_knn = None
 
             for key in self.adata.uns.keys():
@@ -952,7 +966,7 @@ class TissueGraph:
                             knn = pickle.load(file)
                         self.FG[fg_key]["knn"] = knn
                     except Exception:
-                        warnings.warn(f"Failed to load {key} - please check")
+                        self.update_user(f"Failed to load {key} - please check")
                         self.FG[fg_key]["knn"] = None
             
         else: # create an object from given feature_mat data
@@ -975,12 +989,6 @@ class TissueGraph:
         if layers!=None:
             self.adata.layers = layers
 
-        logging.basicConfig(
-                    filename=os.path.join(self.basepath,'tmg_log.txt'),filemode='a',
-                    format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
-                    datefmt='%Y %B %d %H:%M:%S',level=logging.INFO, force=True)
-        self.log = logging.getLogger("Processing")
-        self.verbose = True
         return 
 
     def update_user(self,message,level=20):
