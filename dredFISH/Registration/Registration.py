@@ -26,12 +26,13 @@ class Registration_Class(object):
     def __init__(self, XYZC, 
                  registration_path,
                  section,
-                 verbose=True):
+                 verbose=True,regularize=False):
         self.completed = False
         self.section = str(section)
         self.verbose=verbose
         self.window = 0.1
         self.overwrite = False
+        self.regularize = regularize
 
         warnings.filterwarnings('ignore', category=UserWarning, message='Trying to unpickle estimator LinearRegression*')
 
@@ -71,6 +72,10 @@ class Registration_Class(object):
         fit = True
         self.config = self.load(channel='Registration_Parameters',file_type='Config')
         self.X_model = self.load(channel='X',file_type='Model')
+        if self.regularize:
+            X_model = self.load(channel='X_regularized',file_type='Model')
+            if not isinstance(X_model,type(None)):
+                self.X_model = X_model
         self.Y_model = self.load(channel='Y',file_type='Model')
         self.Z_model = self.load(channel='Z',file_type='Model')
         if self.overwrite:
@@ -109,6 +114,10 @@ class Registration_Class(object):
     def non_rigid_transformation(self):
         self.config = self.load(channel='Registration_Parameters',file_type='Config')
         self.X_model = self.load(channel='X',file_type='Model')
+        if self.regularize:
+            X_model = self.load(channel='X_regularized',file_type='Model')
+            if not isinstance(X_model,type(None)):
+                self.X_model = X_model
         self.Y_model = self.load(channel='Y',file_type='Model')
         self.Z_model = self.load(channel='Z',file_type='Model')
         """ Center Rotate and Scale"""
