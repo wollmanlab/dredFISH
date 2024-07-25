@@ -6,7 +6,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("animal", type=str, help="Name of the animal to analyze")
     parser.add_argument("-p", "--project_path", type=str, dest="project_path", default='/scratchdata1/Images2024/Zach/MouseBrainAtlas', action='store', help="Path to the project directory (default: '/scratchdata1/Images2024/Zach/MouseBrainAtlas')")
-    parser.add_argument("-a", "--analysis_path", type=str, dest="analysis_path", default='/scratchdata1/MouseBrainAtlases_V2', action='store', help="Path to the analysis directory (default: '/scratchdata1/MouseBrainAtlases_V0')")
+    parser.add_argument("-a", "--analysis_path", type=str, dest="analysis_path", default='/scratchdata1/MouseBrainAtlases_V3', action='store', help="Path to the analysis directory (default: '/scratchdata1/MouseBrainAtlases_V0')")
 
     args = parser.parse_args()
     if not os.path.exists(args.analysis_path):
@@ -22,7 +22,7 @@ if __name__ == '__main__':
         elif host == 'blue':
             animals = ['Tax','MMSF01','WTM04','WTM07']
         elif host == 'orange':
-            animals = ['Tax','WTF04','WTF06','ASDM02']
+            animals = ['Tax','WTF04','WTF06','ASDM02','ASDM12']
         else:
             raise ValueError(f"{host} Host not recognized")
         # animals = ['Tax','WTF01','WTM01','MMSM01','MMSF01','WTM04','WTM07','WTF04','WTF06']
