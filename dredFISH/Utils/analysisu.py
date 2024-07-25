@@ -170,48 +170,9 @@ def analyze_mouse_brain_data(animal,
 
             if not os.path.exists(figure_path): 
                 os.mkdir(figure_path,mode=0o777)
-
-            adata = TMG.Layers[0].adata.copy()
-            for var in adata.var.index:
-                c = np.array(adata.layers['classification_space'][:,np.isin(adata.var.index,[var])])
-                vmin,vmax = np.percentile(c,[5,95])
-                bit = f"Measurement : {var} vmin: {round(vmin,2)} vmax: {round(vmax,2)}"
-                n_columns = np.min([6,len(TMG.unqS)])
-                n_rows = math.ceil(len(TMG.unqS)/n_columns)
-                fig,axs = plt.subplots(n_rows,n_columns,figsize=[n_columns*3,n_rows*3],dpi=300)
-                fig.patch.set_facecolor((1, 1, 1, 0))
-                fig.suptitle(f"{animal} {bit}", color='black')
-                if len(TMG.unqS)==1:
-                    axs = [axs]
-                else:
-                    axs = axs.ravel()
-                for ax in axs:
-                    ax.axis('off')
-                for i,section in tqdm(enumerate(TMG.unqS),desc=f"{var} Visualization"):
-                    m = (adata.obs['Slice']==section)
-                    temp_data = adata[m,:].copy()
-                    c = np.array(temp_data.layers['classification_space'][:,np.isin(adata.var.index,[var])])
-                    ax = axs[i]
-                    ax.set_title(section, color='black')
-                    ax.axis('off')
-                    ax.axis('off')
-                    im = ax.scatter(temp_data.obs['ccf_z'],temp_data.obs['ccf_y'],c=c,s=0.5,marker=',', edgecolors='none', linewidths=0,cmap='jet',vmin=vmin,vmax=vmax)
-                plt.savefig(os.path.join(figure_path,f"{animal} {bit.split(var)[0]} {var}.png"))
-                plt.close()
-            fnames = []
-            out_fname = os.path.join(figure_path,f"{animal} Measurement.gif")
-            if os.path.exists(out_fname):
-                os.remove(out_fname)
-            # Create a GIF writer object
-            with imageio.get_writer(out_fname, fps=1) as writer:
-                for var in tqdm(adata.var.index):
-                    bit = f"Measurement : {var} "
-                    fname = os.path.join(figure_path,f"{animal} {bit.split(var)[0]} {var}.png")
-                    image = imageio.imread(fname)
-                    writer.append_data(image)
-        if not 'subclass' in TMG.Layers[0].adata.obs.columns:
+        level = 'subclass'
+        if not level in TMG.Layers[0].adata.obs.columns:
             seq_adata = anndata.read_h5ad(pathu.get_path('allen_wmb_tree'))
-            level = 'subclass'
             pallette = dict(zip(seq_adata.obs[level],seq_adata.obs[f"{level}_color"]))
             del seq_adata
 
@@ -251,6 +212,42 @@ def analyze_mouse_brain_data(animal,
             print(TMG.Layers[0].adata)
             TMG.save()
             gc.collect()
+        if len(os.listdir(figure_path))==0:
+            """ Filter Bad Sections """
+            TMG.update_user(f"Filtering Bad Sections", verbose=True)
+            Allen = TissueMultiGraph(basepath = '/scratchdata1/MouseBrainAtlases_V0/Allen/')
+            good_sections = []
+            bad_sections = []
+            for section in TMG.Layers[0].unqS:
+                measured_m = np.array(TMG.Layers[0].Section)==section
+                measured_types = np.array(TMG.Layers[0].adata.obs['subclass'])[measured_m]
+                z = np.mean(np.array(TMG.Layers[0].Z)[measured_m])
+                reference_m = np.array(np.abs(Allen.Layers[0].Z-z)<0.3)
+                reference_types = np.array(Allen.Layers[0].adata.obs['subclass'])[reference_m]
+                # Convert vectors to pandas Series
+                series1 = pd.Series(measured_types)
+                series2 = pd.Series(reference_types)
+
+                # Count the occurrences of each type in both series
+                type_counts1 = series1.value_counts()
+                type_counts2 = series2.value_counts()
+
+                # Align the counts by type
+                aligned_counts1, aligned_counts2 = type_counts1.align(type_counts2, fill_value=0)
+                aligned_counts1 = np.log10(aligned_counts1+1)
+                aligned_counts2 = np.log10(aligned_counts2+1)
+                # Calculate the correlation coefficient
+                correlation = aligned_counts1.corr(aligned_counts2)
+                if correlation>0.7:
+                    good_sections.append(section)
+                else:
+                    bad_sections.append(section)
+            
+            TMG.Layers[0].adata = TMG.Layers[0].adata[np.isin(TMG.Layers[0].adata.obs['Slice'],good_sections)]
+            print(TMG.Layers[0].adata)
+            TMG.save()
+            gc.collect()
+
             
             adata = TMG.Layers[0].adata#.copy()
             bit = f"Supervised : {level}"
@@ -315,6 +312,45 @@ def analyze_mouse_brain_data(animal,
                     fname = os.path.join(figure_path,f"{animal} {bit.split(var)[0]} {var}.png")
                     image = imageio.imread(fname)
                     writer.append_data(image)
+            adata = TMG.Layers[0].adata.copy()
+            for var in adata.var.index:
+                c = np.array(adata.layers['classification_space'][:,np.isin(adata.var.index,[var])])
+                vmin,vmax = np.percentile(c,[5,95])
+                bit = f"Measurement : {var} vmin: {round(vmin,2)} vmax: {round(vmax,2)}"
+                n_columns = np.min([6,len(TMG.unqS)])
+                n_rows = math.ceil(len(TMG.unqS)/n_columns)
+                fig,axs = plt.subplots(n_rows,n_columns,figsize=[n_columns*3,n_rows*3],dpi=300)
+                fig.patch.set_facecolor((1, 1, 1, 0))
+                fig.suptitle(f"{animal} {bit}", color='black')
+                if len(TMG.unqS)==1:
+                    axs = [axs]
+                else:
+                    axs = axs.ravel()
+                for ax in axs:
+                    ax.axis('off')
+                for i,section in tqdm(enumerate(TMG.unqS),desc=f"{var} Visualization"):
+                    m = (adata.obs['Slice']==section)
+                    temp_data = adata[m,:].copy()
+                    c = np.array(temp_data.layers['classification_space'][:,np.isin(adata.var.index,[var])])
+                    ax = axs[i]
+                    ax.set_title(section, color='black')
+                    ax.axis('off')
+                    ax.axis('off')
+                    im = ax.scatter(temp_data.obs['ccf_z'],temp_data.obs['ccf_y'],c=c,s=0.5,marker=',', edgecolors='none', linewidths=0,cmap='jet',vmin=vmin,vmax=vmax)
+                plt.savefig(os.path.join(figure_path,f"{animal} {bit.split(var)[0]} {var}.png"))
+                plt.close()
+            fnames = []
+            out_fname = os.path.join(figure_path,f"{animal} Measurement.gif")
+            if os.path.exists(out_fname):
+                os.remove(out_fname)
+            # Create a GIF writer object
+            with imageio.get_writer(out_fname, fps=1) as writer:
+                for var in tqdm(adata.var.index):
+                    bit = f"Measurement : {var} "
+                    fname = os.path.join(figure_path,f"{animal} {bit.split(var)[0]} {var}.png")
+                    image = imageio.imread(fname)
+                    writer.append_data(image)
+
 
             adata = TMG.Layers[0].adata.copy()
             bit = f"Supervised 3D : {level}"
