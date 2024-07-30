@@ -2,20 +2,20 @@ conda create -n "dredfish_3.9" python=3.9.0
 pip install -e /home/zach/PythonRepos/PyImages/
 pip install -e /home/zach/PythonRepos/dredFISH/
 pip install antspyx==0.3.1
-pip install anndata
-python -m pip install cellpose --upgrade
+pip install anndata==0.7.8
+pip install cellpose==3.0.4
 pip uninstall torch
-conda install pytorch torchvision torchaudio cudatoolkit=11.3 -c pytorch
-conda install ipyparallel
-pip install igraph
-pip install pynndescent
-pip install Shapely
-conda install dill
-pip install pynrrd
-pip install datashader
-pip install seaborn
-pip install umap-learn
-pip install scanpy
-pip install ashlar
-pip install rasterio
+conda install pytorch==1.13.0 torchvision==0.14.0 torchaudio==0.13.0 cudatoolkit=11.3 -c pytorch
+conda install ipyparallel==8.2.0
+pip install igraph==0.10.6
+pip install pynndescent==0.5.5
+pip install Shapely==1.8.2
+conda install dill==0.3.4
+pip install pynrrd==0.4.2
+pip install datashader==0.16.0
+pip install seaborn==0.11.2
+pip install umap-learn==0.5.3
+pip install scanpy==1.9.3
+pip install ashlar==1.17.0
+pip install rasterio==1.2.10
 
