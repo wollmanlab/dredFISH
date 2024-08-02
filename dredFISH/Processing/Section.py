@@ -141,7 +141,8 @@ class Section_Class(object):
                         self.pull_vectors()
             if not isinstance(self.data,type(None)):
                 self.generate_report()
-                self.remove_temporary_files()
+                if self.parameters['delete_temp_files']:
+                    self.remove_temporary_files()
                 # self.qc_score()
                 # self.copy_to_drive()
         else:
@@ -399,7 +400,7 @@ class Section_Class(object):
             self.parameters['jitter_correction'] = False
             self.parameters['n_pixels']=[2448, 2048]
         elif self.parameters['scope']=='BlueScope':
-            self.parameters['pixel_size'] = 0.495# 0.490#0.327#0.490 # um 490 or 330 # 0.428 #0.409
+            self.parameters['pixel_size'] = 0.521 #0.495 # 0.490#0.327#0.490 # um 490 or 330 # 0.428 #0.409
             self.parameters['jitter_channel'] = ''
             self.parameters['jitter_correction'] = False
             self.parameters['n_pixels']=[2448, 2048]
@@ -1245,8 +1246,14 @@ class Section_Class(object):
                             seed[peaks[:,0],peaks[:,1]] = 1+np.array(range(peaks.shape[0]))
                             seed_max = morphology.binary_dilation(seed!=0,footprint=create_circle_array(int(1.5*self.parameters['segment_diameter']), int(1.5*self.parameters['segment_diameter'])))
                             for tx in range(-5,5):
+                                tx_idx = peaks[:,0]+tx
+                                if (tx_idx<0)|(tx_idx>=seed.shape[0]):
+                                    continue
                                 for ty in range(-5,5):
-                                    seed[peaks[:,0]+tx,peaks[:,1]+ty] = 1+np.array(range(peaks.shape[0]))
+                                    ty_idx = peaks[:,1]+ty
+                                    if (ty_idx<0)|(ty_idx>=seed.shape[1]):
+                                        continue
+                                    seed[tx_idx,ty_idx] = 1+np.array(range(peaks.shape[0]))
                             # Watershed
                             watershed_img = watershed(image=np.ones_like(img), markers=seed,mask=cell_mask&seed_max)
                             # Merge Cellpose and Watershed
