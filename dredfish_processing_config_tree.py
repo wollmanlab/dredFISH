@@ -288,7 +288,7 @@ parameters['config_overwrite'] = True
 parameters['overwrite'] = False #False
 parameters['segment_overwrite'] = False #False
 parameters['vector_overwrite'] = False #False
-
+parameters['delete_temp_files'] = True
 parameters['overwrite_report']= False
 parameters['overwrite_louvain'] = False
 
