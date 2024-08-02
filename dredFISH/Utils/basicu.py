@@ -823,9 +823,12 @@ def filter_cells_nuc(adata, thresh=10, vis=False, inplace=False):
     
     # Get the 'nuc_raw' layer data
     nuc = np.array(adata.layers['nuc_raw']).copy()
-    
+
     # Get the minimum value of nuc across the second axis
     nuc_min = np.min(nuc, axis=1)
+
+    # scale each bit to same brightness
+    nuc = np.median(np.median(nuc, axis=0, keepdims=True).ravel()) * nuc / np.median(nuc, axis=0, keepdims=True)
 
     # Keep Cells whose dapi is within 50% of median for all but at most 2 rounds
     mask = (nuc/np.clip(np.median(nuc,axis=1,keepdims=True),1,None))>0.5
