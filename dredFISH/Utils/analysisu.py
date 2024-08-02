@@ -121,7 +121,7 @@ def create_taxonomies(tax_basepath,bad_bits=[]):
 def analyze_mouse_brain_data(animal,
                             project_path='/scratchdata1/Images2024/Zach/MouseBrainAtlas',
                             analysis_path='/scratchdata1/MouseBrainAtlases_V1',
-                            verbose=False,repair=True):
+                            verbose=False,repair=False):
     """ 
     Analyze mouse brain data and perform various analysis steps.
     
@@ -212,12 +212,14 @@ def analyze_mouse_brain_data(animal,
             print(TMG.Layers[0].adata)
             TMG.save()
             gc.collect()
-        if len(os.listdir(figure_path))==0:
+
+
             """ Filter Bad Sections """
-            TMG.update_user(f"Filtering Bad Sections", verbose=True)
+            TMG.update_user(f"Checking For Bad Sections", verbose=True)
             Allen = TissueMultiGraph(basepath = '/scratchdata1/MouseBrainAtlases_V0/Allen/')
             good_sections = []
             bad_sections = []
+            status = {}
             for section in TMG.Layers[0].unqS:
                 measured_m = np.array(TMG.Layers[0].Section)==section
                 measured_types = np.array(TMG.Layers[0].adata.obs['subclass'])[measured_m]
@@ -238,22 +240,61 @@ def analyze_mouse_brain_data(animal,
                 aligned_counts2 = np.log10(aligned_counts2+1)
                 # Calculate the correlation coefficient
                 correlation = aligned_counts1.corr(aligned_counts2)
+                status[section] = correlation
                 if correlation>0.7:
                     good_sections.append(section)
                 else:
+                    TMG.update_user(f"Likely Bad Section {section} Correlation {correlation}", verbose=True)
                     bad_sections.append(section)
-            
-            TMG.Layers[0].adata = TMG.Layers[0].adata[np.isin(TMG.Layers[0].adata.obs['Slice'],good_sections)]
+            TMG.Layers[0].adata.obs['Correlation'] = TMG.Layers[0].adata.obs['Slice'].map(status)
+            # TMG.Layers[0].adata = TMG.Layers[0].adata[np.isin(TMG.Layers[0].adata.obs['Slice'],good_sections)]
             print(TMG.Layers[0].adata)
             TMG.save()
             gc.collect()
 
+        if repair:
+            """ Delete Layers """
+            TMG.update_user(f"Deleting Layers", verbose=True)
+            TMG.Layers = [TMG.Layers[0]]
             
-            adata = TMG.Layers[0].adata#.copy()
-            bit = f"Supervised : {level}"
+        """ Enforce Order """
+        TMG.update_user(f"Enforcing Order", verbose=True)
+        TMG.Layers[0].adata = anndata.concat([TMG.Layers[0].adata[TMG.Layers[0].adata.obs['Slice']==section] for section in TMG.unqS])
+
+
+        adata = TMG.Layers[0].adata#.copy()
+        bit = f"Supervised : {level}"
+        n_columns = np.min([6,len(TMG.unqS)])
+        n_rows = math.ceil(len(TMG.unqS)/n_columns)
+        fig,axs = plt.subplots(n_rows,n_columns,figsize=[n_columns*5,n_rows*5],dpi=300)
+        fig.patch.set_facecolor((1, 1, 1, 0))
+        fig.suptitle(f"{animal} {bit}", color='black')
+        if len(TMG.unqS)==1:
+            axs = [axs]
+        else:
+            axs = axs.ravel()
+        for ax in axs:
+            ax.axis('off')
+        for i,section in tqdm(enumerate(TMG.unqS),desc=f"{level} Visualization"):
+            m = (adata.obs['Slice']==section)
+            temp_data = adata[m,:].copy()
+            c = np.array(temp_data.obs[level+'_color'])
+            ax = axs[i]
+            ax.set_title(section, color='black')
+            ax.axis('off')
+            ax.axis('off')
+            im = ax.scatter(temp_data.obs['ccf_z'],temp_data.obs['ccf_y'],c=c,s=0.5,marker=',', edgecolors='none', linewidths=0)
+        plt.savefig(os.path.join(figure_path,f"{animal} {bit.split(level)[0]} {level}.png"))
+        plt.close()
+
+        adata = TMG.Layers[0].adata.copy()
+        for var in adata.var.index:
+            c = np.array(adata.layers['harmonized'][:,np.isin(adata.var.index,[var])])
+            vmin,vmax = np.percentile(c,[5,95])
+            bit = f"Harmonized : {var} vmin: {round(vmin,2)} vmax: {round(vmax,2)}"
             n_columns = np.min([6,len(TMG.unqS)])
             n_rows = math.ceil(len(TMG.unqS)/n_columns)
-            fig,axs = plt.subplots(n_rows,n_columns,figsize=[n_columns*5,n_rows*5],dpi=300)
+            fig,axs = plt.subplots(n_rows,n_columns,figsize=[n_columns*3,n_rows*3],dpi=300)
             fig.patch.set_facecolor((1, 1, 1, 0))
             fig.suptitle(f"{animal} {bit}", color='black')
             if len(TMG.unqS)==1:
@@ -262,141 +303,104 @@ def analyze_mouse_brain_data(animal,
                 axs = axs.ravel()
             for ax in axs:
                 ax.axis('off')
-            for i,section in tqdm(enumerate(TMG.unqS),desc=f"{level} Visualization"):
+            for i,section in tqdm(enumerate(TMG.unqS),desc=f"{var} Visualization"):
                 m = (adata.obs['Slice']==section)
                 temp_data = adata[m,:].copy()
-                c = np.array(temp_data.obs[level+'_color'])
+                c = np.array(temp_data.layers['harmonized'][:,np.isin(adata.var.index,[var])])
                 ax = axs[i]
                 ax.set_title(section, color='black')
                 ax.axis('off')
                 ax.axis('off')
-                im = ax.scatter(temp_data.obs['ccf_z'],temp_data.obs['ccf_y'],c=c,s=0.5,marker=',', edgecolors='none', linewidths=0)
-            plt.savefig(os.path.join(figure_path,f"{animal} {bit.split(level)[0]} {level}.png"))
+                im = ax.scatter(temp_data.obs['ccf_z'],temp_data.obs['ccf_y'],c=c,s=0.5,marker=',', edgecolors='none', linewidths=0,cmap='jet',vmin=vmin,vmax=vmax)
+            plt.savefig(os.path.join(figure_path,f"{animal} {bit.split(var)[0]} {var}.png"))
             plt.close()
-
-            adata = TMG.Layers[0].adata.copy()
-            for var in adata.var.index:
-                c = np.array(adata.layers['harmonized'][:,np.isin(adata.var.index,[var])])
-                vmin,vmax = np.percentile(c,[5,95])
-                bit = f"Harmonized : {var} vmin: {round(vmin,2)} vmax: {round(vmax,2)}"
-                n_columns = np.min([6,len(TMG.unqS)])
-                n_rows = math.ceil(len(TMG.unqS)/n_columns)
-                fig,axs = plt.subplots(n_rows,n_columns,figsize=[n_columns*3,n_rows*3],dpi=300)
-                fig.patch.set_facecolor((1, 1, 1, 0))
-                fig.suptitle(f"{animal} {bit}", color='black')
-                if len(TMG.unqS)==1:
-                    axs = [axs]
-                else:
-                    axs = axs.ravel()
-                for ax in axs:
-                    ax.axis('off')
-                for i,section in tqdm(enumerate(TMG.unqS),desc=f"{var} Visualization"):
-                    m = (adata.obs['Slice']==section)
-                    temp_data = adata[m,:].copy()
-                    c = np.array(temp_data.layers['harmonized'][:,np.isin(adata.var.index,[var])])
-                    ax = axs[i]
-                    ax.set_title(section, color='black')
-                    ax.axis('off')
-                    ax.axis('off')
-                    im = ax.scatter(temp_data.obs['ccf_z'],temp_data.obs['ccf_y'],c=c,s=0.5,marker=',', edgecolors='none', linewidths=0,cmap='jet',vmin=vmin,vmax=vmax)
-                plt.savefig(os.path.join(figure_path,f"{animal} {bit.split(var)[0]} {var}.png"))
-                plt.close()
-            fnames = []
-            out_fname = os.path.join(figure_path,f"{animal} Harmonized.gif")
-            if os.path.exists(out_fname):
-                os.remove(out_fname)
-            # Create a GIF writer object
-            with imageio.get_writer(out_fname, fps=1) as writer:
-                for var in tqdm(adata.var.index):
-                    bit = f"Harmonized : {var} "
-                    fname = os.path.join(figure_path,f"{animal} {bit.split(var)[0]} {var}.png")
-                    image = imageio.imread(fname)
-                    writer.append_data(image)
-            adata = TMG.Layers[0].adata.copy()
-            for var in adata.var.index:
-                c = np.array(adata.layers['classification_space'][:,np.isin(adata.var.index,[var])])
-                vmin,vmax = np.percentile(c,[5,95])
-                bit = f"Measurement : {var} vmin: {round(vmin,2)} vmax: {round(vmax,2)}"
-                n_columns = np.min([6,len(TMG.unqS)])
-                n_rows = math.ceil(len(TMG.unqS)/n_columns)
-                fig,axs = plt.subplots(n_rows,n_columns,figsize=[n_columns*3,n_rows*3],dpi=300)
-                fig.patch.set_facecolor((1, 1, 1, 0))
-                fig.suptitle(f"{animal} {bit}", color='black')
-                if len(TMG.unqS)==1:
-                    axs = [axs]
-                else:
-                    axs = axs.ravel()
-                for ax in axs:
-                    ax.axis('off')
-                for i,section in tqdm(enumerate(TMG.unqS),desc=f"{var} Visualization"):
-                    m = (adata.obs['Slice']==section)
-                    temp_data = adata[m,:].copy()
-                    c = np.array(temp_data.layers['classification_space'][:,np.isin(adata.var.index,[var])])
-                    ax = axs[i]
-                    ax.set_title(section, color='black')
-                    ax.axis('off')
-                    ax.axis('off')
-                    im = ax.scatter(temp_data.obs['ccf_z'],temp_data.obs['ccf_y'],c=c,s=0.5,marker=',', edgecolors='none', linewidths=0,cmap='jet',vmin=vmin,vmax=vmax)
-                plt.savefig(os.path.join(figure_path,f"{animal} {bit.split(var)[0]} {var}.png"))
-                plt.close()
-            fnames = []
-            out_fname = os.path.join(figure_path,f"{animal} Measurement.gif")
-            if os.path.exists(out_fname):
-                os.remove(out_fname)
-            # Create a GIF writer object
-            with imageio.get_writer(out_fname, fps=1) as writer:
-                for var in tqdm(adata.var.index):
-                    bit = f"Measurement : {var} "
-                    fname = os.path.join(figure_path,f"{animal} {bit.split(var)[0]} {var}.png")
-                    image = imageio.imread(fname)
-                    writer.append_data(image)
-
-
-            adata = TMG.Layers[0].adata.copy()
-            bit = f"Supervised 3D : {level}"
-            fig = plt.figure(figsize=[10,10],dpi=300)
-            ax = fig.add_subplot(111, projection='3d')
-            ax.axis('off')
-            ax.set_facecolor((1, 1, 1, 0))
-            plt.title(f"{animal} {bit}", color='black')
-            adata.obs['ccf_x'] = -10*adata.obs['ccf_x']
-            adata.obs['ccf_y'] = -1*adata.obs['ccf_y']
-            adata.obs['ccf_z'] = -1*adata.obs['ccf_z']
-            for i,section in tqdm(enumerate(TMG.unqS),desc=f"{level} Visualization"):
+        fnames = []
+        out_fname = os.path.join(figure_path,f"{animal} Harmonized.gif")
+        if os.path.exists(out_fname):
+            os.remove(out_fname)
+        # Create a GIF writer object
+        with imageio.get_writer(out_fname, fps=1) as writer:
+            for var in tqdm(adata.var.index):
+                bit = f"Harmonized : {var} "
+                fname = os.path.join(figure_path,f"{animal} {bit.split(var)[0]} {var}.png")
+                image = imageio.imread(fname)
+                writer.append_data(image)
+        adata = TMG.Layers[0].adata.copy()
+        for var in adata.var.index:
+            c = np.array(adata.layers['classification_space'][:,np.isin(adata.var.index,[var])])
+            vmin,vmax = np.percentile(c,[5,95])
+            bit = f"Measurement : {var} vmin: {round(vmin,2)} vmax: {round(vmax,2)}"
+            n_columns = np.min([6,len(TMG.unqS)])
+            n_rows = math.ceil(len(TMG.unqS)/n_columns)
+            fig,axs = plt.subplots(n_rows,n_columns,figsize=[n_columns*3,n_rows*3],dpi=300)
+            fig.patch.set_facecolor((1, 1, 1, 0))
+            fig.suptitle(f"{animal} {bit}", color='black')
+            if len(TMG.unqS)==1:
+                axs = [axs]
+            else:
+                axs = axs.ravel()
+            for ax in axs:
+                ax.axis('off')
+            for i,section in tqdm(enumerate(TMG.unqS),desc=f"{var} Visualization"):
                 m = (adata.obs['Slice']==section)
                 temp_data = adata[m,:].copy()
-                c = np.array(temp_data.obs[level+'_color'])
-                # ax.scatter(temp_data.obs['ccf_z'],temp_data.obs['ccf_x'],temp_data.obs['ccf_y'],c='k',s=0.1,marker=',')
-                ax.scatter(temp_data.obs['ccf_z'],temp_data.obs['ccf_x'],temp_data.obs['ccf_y'],c=c,s=0.5,marker=',', edgecolors='none', linewidths=0)
-            x = adata.obs['ccf_z']
-            y = adata.obs['ccf_x']
-            z = adata.obs['ccf_y']
-
-            zoom_factor = 0.6
-            max_range = np.array([x.max()-x.min(), y.max()-y.min(), z.max()-z.min()]).max() / 2.0
-            max_range = max_range*zoom_factor
-            x_offset_scale = 1
-            y_offset_scale = 1
-            z_offset_scale = 1
-            ax.set_xlim(x.mean() - x_offset_scale*max_range, x.mean() + x_offset_scale*max_range)
-            ax.set_ylim(y.mean() - y_offset_scale*max_range, y.mean() + y_offset_scale*max_range)
-            ax.set_zlim(z.mean() - z_offset_scale*max_range, z.mean() + z_offset_scale*max_range)
-
-            # Set view angle
-            ax.view_init(elev=25, azim=45)  # Adjust these values to change the view angle
-            plt.tight_layout()
-            plt.savefig(os.path.join(figure_path,f"{animal} {bit.split(level)[0]} {level}.png"))
+                c = np.array(temp_data.layers['classification_space'][:,np.isin(adata.var.index,[var])])
+                ax = axs[i]
+                ax.set_title(section, color='black')
+                ax.axis('off')
+                ax.axis('off')
+                im = ax.scatter(temp_data.obs['ccf_z'],temp_data.obs['ccf_y'],c=c,s=0.5,marker=',', edgecolors='none', linewidths=0,cmap='jet',vmin=vmin,vmax=vmax)
+            plt.savefig(os.path.join(figure_path,f"{animal} {bit.split(var)[0]} {var}.png"))
             plt.close()
+        fnames = []
+        out_fname = os.path.join(figure_path,f"{animal} Measurement.gif")
+        if os.path.exists(out_fname):
+            os.remove(out_fname)
+        # Create a GIF writer object
+        with imageio.get_writer(out_fname, fps=1) as writer:
+            for var in tqdm(adata.var.index):
+                bit = f"Measurement : {var} "
+                fname = os.path.join(figure_path,f"{animal} {bit.split(var)[0]} {var}.png")
+                image = imageio.imread(fname)
+                writer.append_data(image)
 
 
-        if repair:
-            """ Delete Layers """
-            TMG.update_user(f"Deleting Layers", verbose=True)
-            TMG.Layers = [TMG.Layers[0]]
+        adata = TMG.Layers[0].adata.copy()
+        bit = f"Supervised 3D : {level}"
+        fig = plt.figure(figsize=[10,10],dpi=300)
+        ax = fig.add_subplot(111, projection='3d')
+        ax.axis('off')
+        ax.set_facecolor((1, 1, 1, 0))
+        plt.title(f"{animal} {bit}", color='black')
+        adata.obs['ccf_x'] = -10*adata.obs['ccf_x']
+        adata.obs['ccf_y'] = -1*adata.obs['ccf_y']
+        adata.obs['ccf_z'] = -1*adata.obs['ccf_z']
+        for i,section in tqdm(enumerate(TMG.unqS),desc=f"{level} Visualization"):
+            m = (adata.obs['Slice']==section)
+            temp_data = adata[m,:].copy()
+            c = np.array(temp_data.obs[level+'_color'])
+            # ax.scatter(temp_data.obs['ccf_z'],temp_data.obs['ccf_x'],temp_data.obs['ccf_y'],c='k',s=0.1,marker=',')
+            ax.scatter(temp_data.obs['ccf_z'],temp_data.obs['ccf_x'],temp_data.obs['ccf_y'],c=c,s=0.5,marker=',', edgecolors='none', linewidths=0)
+        x = adata.obs['ccf_z']
+        y = adata.obs['ccf_x']
+        z = adata.obs['ccf_y']
 
-        """ Enforce Order """
-        TMG.update_user(f"Enforcing Order", verbose=True)
-        TMG.Layers[0].adata = anndata.concat([TMG.Layers[0].adata[TMG.Layers[0].adata.obs['Slice']==section] for section in TMG.unqS])
+        zoom_factor = 0.6
+        max_range = np.array([x.max()-x.min(), y.max()-y.min(), z.max()-z.min()]).max() / 2.0
+        max_range = max_range*zoom_factor
+        x_offset_scale = 1
+        y_offset_scale = 1
+        z_offset_scale = 1
+        ax.set_xlim(x.mean() - x_offset_scale*max_range, x.mean() + x_offset_scale*max_range)
+        ax.set_ylim(y.mean() - y_offset_scale*max_range, y.mean() + y_offset_scale*max_range)
+        ax.set_zlim(z.mean() - z_offset_scale*max_range, z.mean() + z_offset_scale*max_range)
+
+        # Set view angle
+        ax.view_init(elev=25, azim=45)  # Adjust these values to change the view angle
+        plt.tight_layout()
+        plt.savefig(os.path.join(figure_path,f"{animal} {bit.split(level)[0]} {level}.png"))
+        plt.close()
+
 
         TMG.update_user(f"Building Spatial Graph", verbose=True)
         TMG.Layers[0].build_spatial_graph(save_knn=True)
