@@ -461,6 +461,8 @@ class TissueMultiGraph:
                 self.update_user(f"Unable to Load Data {section_acq_name}")
                 continue
             adata.obs['animal'] = row['animal']
+            adata.obs['dataset'] = row['dataset']
+            adata.obs['processing'] = row['processing']
             if register_to_ccf: 
                 try:
                     XYZC  = Registration_Class(adata.copy(),registration_path,section_acq_name,verbose=False,regularize=True).run()
@@ -470,6 +472,7 @@ class TissueMultiGraph:
                     """ Rename Section """
                     section_name = f"{animal}_{adata.obs['ccf_x'].mean():.1f}"
                     adata.obs['old_section_name'] = section_acq_name
+                    adata.obs['registration_path'] = row['registration_path']
                 except:
                     self.update_user(f"Unable to Register Data {section_acq_name}")
                     continue
@@ -506,12 +509,12 @@ class TissueMultiGraph:
             n_cells_post_nuc_filtering = adata.shape[0]
             if n_cells_post_nuc_filtering < 0.6 * n_cells_pre_nuc_filtering:
                 self.update_user(f"Likely Gel issues: More than 40% cells Removed {adata.shape[0]} cells")
-                self.update_user(f"Tossing Section {section_acq_name}")
-                continue
+                self.update_user(f"Look Into Section {section_acq_name}")
+                # continue
             if adata.shape[0]<60000:
                 self.update_user(f" Not Enough Cells Found {adata.shape[0]} cells")
-                self.update_user(f"Tossing Section {section_acq_name}")
-                continue
+                self.update_user(f"Look Into Section {section_acq_name}")
+                # continue
 
             adata.X = adata.layers['raw'].copy()
             
