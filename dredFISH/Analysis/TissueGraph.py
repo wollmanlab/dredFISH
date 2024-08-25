@@ -27,6 +27,7 @@ import json
 import pickle
 import base64
 
+import re
 import igraph
 import pynndescent
 
@@ -1207,8 +1208,9 @@ class TissueGraph:
     
     @property
     def unqS(self):
+        
         def get_ccf_x(section):
-            return float(section.split('_')[1])
+            return float(re.split('[_\.]', section)[1])
         return sorted(np.unique(self.Section), key=get_ccf_x)
 
     @property

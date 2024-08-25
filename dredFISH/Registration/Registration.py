@@ -14,10 +14,12 @@ import time
 import numpy as np
 import torch
 
+import ants
+from dredFISH.Analysis.TissueGraph import *
+from dredFISH.Utils.imageu import gaussian_smoothing_with_nans
+
 from sklearn.linear_model import LinearRegression
 from scipy.interpolate import Rbf
-import math
-import time
 import anndata
 import warnings
 import matplotlib
@@ -701,3 +703,65 @@ def robust_input(message,options=[],dtype=None):
         except Exception as e:
             print(e)
     return out
+
+def kde_basis(XY,Basis, dx = 0.05, dy=0.05, sig=0.5):
+
+    # create the grid: 
+    x_bins = np.arange(0, 11.4 + dx, dx)  # bins with 0.1 mm spacing for x dimension
+    y_bins = np.arange(0, 8 + dy, dy)  # bins with 0.1 mm spacing for y dimension
+    bins = [x_bins, y_bins]
+    n = [len(b)-1 for b in bins]
+
+    BasisMat = np.zeros(n)
+    dens_ref, edges = np.histogramdd(XY, bins=bins,weights=Basis.flatten())
+    BasisMat = gaussian_smoothing_with_nans(dens_ref,sig)
+    return BasisMat
+
+def create_Allen_RS_ref_mat(Allen):
+    RS458_allen = list()
+    Z_allen = list()
+    for sec in Allen.unqS:
+        z = Allen.Layers[0].Z[Allen.Layers[0].Section==sec].mean()
+        xy = Allen.Layers[0].get_XY(section=sec)
+        RS458_sec = Allen.Layers[0].adata[Allen.Layers[0].Section==sec, 'RS458122_cy5'].X
+        RS458_allen.append(kde_basis(xy,RS458_sec))
+        Z_allen.append(z.mean())
+
+    Z_allen = np.array(Z_allen)
+
+    return RS458_allen, Z_allen
+
+def refine_TMG_xy(TMG, Allen, dx=0.05,dy=0.05):
+    RS458_allen, Z_allen = create_Allen_RS_ref_mat(Allen)
+    new_XY = np.zeros(TMG.Layers[0].get_XY().shape)
+    for sec in TMG.unqS:
+        # estimate the RS matrix for this sections
+        xy = TMG.Layers[0].get_XY(section=sec)
+        RS458_cells = TMG.Layers[0].adata[TMG.Layers[0].Section==sec, 'RS458122_cy5'].X
+        RS458_Mat = kde_basis(xy,RS458_cells)
+
+        # find the index of the matching Allen section
+        Z = TMG.Layers[0].Z[TMG.Layers[0].Section==sec]
+        ref_sec_ix = np.argmin(np.abs(Z_allen-Z.mean()))
+        
+        # Find transformation
+        fixed_image = ants.from_numpy(RS458_allen[ref_sec_ix])
+        fixed_image.set_spacing((dy,dx))
+        moving_image = ants.from_numpy(RS458_Mat)
+        moving_image.set_spacing((dy,dx))
+
+        reg = ants.registration(fixed_image, moving_image, 
+                                grad_step = 0.1,
+                                type_of_transform = 'SyN' ) #'SyN'
+        points = pd.DataFrame({
+            'x': xy[:,0],
+            'y': xy[:,1]
+        })
+
+        # Apply the transformation to the xy points in this section
+        new_XY[TMG.Layers[0].Section==sec,:] = ants.apply_transforms_to_points(
+            dim=2,  
+            points=points,
+            transformlist=reg['invtransforms']
+        ).to_numpy()
+    TMG.Layers[0].XY = new_XY
