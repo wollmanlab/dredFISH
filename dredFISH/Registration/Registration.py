@@ -396,7 +396,7 @@ class Registration_Class(object):
                 # y = np.linspace(Y.min(),Y.max(),100000)
                 # np.random.shuffle(x)
                 # np.random.shuffle(y)
-                # axs[1].scatter(click_X,click_Y,s=25,c=click_C,picker=True)
+                axs[1].scatter(click_X,click_Y,s=25,c='w',picker=True)
                 idxs = np.random.choice(np.array(range(X.shape[0])),100000)
                 axs[1].scatter(X[idxs],Y[idxs],s=0.25,c=C[idxs],cmap='jet')
                 axs[1].grid()
