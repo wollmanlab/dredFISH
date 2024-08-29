@@ -396,7 +396,7 @@ class Registration_Class(object):
                 # y = np.linspace(Y.min(),Y.max(),100000)
                 # np.random.shuffle(x)
                 # np.random.shuffle(y)
-                axs[1].scatter(click_X,click_Y,s=25,c=click_C,picker=True)
+                # axs[1].scatter(click_X,click_Y,s=25,c=click_C,picker=True)
                 idxs = np.random.choice(np.array(range(X.shape[0])),100000)
                 axs[1].scatter(X[idxs],Y[idxs],s=0.25,c=C[idxs],cmap='jet')
                 axs[1].grid()
@@ -820,15 +820,24 @@ class Registration_Class(object):
             self.XYZC['ccf_x'] = np.ones_like(data.obs['stage_x'])
             self.XYZC['ccf_y'] = np.array(data.obs['stage_y'])
             self.XYZC['ccf_z'] = np.array(data.obs['stage_x'])
+            # calculate density
+            from sklearn.neighbors import NearestNeighbors
+            # self.update_user('Calculating Density',level=20)
+            # coordinates = np.vstack((self.XYZC['ccf_y'], self.XYZC['ccf_z'])).T
+            # nbrs = NearestNeighbors(n_neighbors=51, algorithm='auto').fit(coordinates)  # 51 because the point itself is included
+            # distances, indices = nbrs.kneighbors(coordinates)
+            # average_distances = 1/np.clip(np.mean(distances[:, 1:], axis=1),1,None)
+            # c =  average_distances
             # bit = 'RS458122_cy5'
             # bit = 'RS0548_cy5'
+            bit = 'RS0332_cy5'
             from dredFISH.Utils import basicu
-            X = data.layers['processed_vectors'].copy()
+            X = data.layers['raw'].copy()
             # X = np.log10(np.clip(X,1,None))
-            # X = np.sum(X,axis=1,keepdims=True).mean()*X/np.sum(X,axis=1,keepdims=True)
+            X = np.sum(X,axis=1,keepdims=True).mean()*X/np.sum(X,axis=1,keepdims=True)
             # X = basicu.normalize_fishdata_robust_regression(X)
-            # c = X[:,data.var.index==bit]
-            c = np.sum(X,axis=1)
+            c = X[:,data.var.index==bit]
+            # c = np.max(X,axis=1)
             vmin,vmax = np.percentile(c,[5,95])
             c = np.clip(c,vmin,vmax)
             
