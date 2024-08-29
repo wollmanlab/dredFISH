@@ -402,3 +402,81 @@ def generate_image_parameters(base_path,overwrite=True,nthreads = 10):
                 path = fileu.generate_filename(section=well,path=out_path,hybe=acq,channel=channel,file_type='Figure')
                 plt.savefig(path)
                 plt.close('all')
+
+import numpy as np
+from scipy.ndimage import map_coordinates
+from scipy.ndimage import gaussian_filter
+from scipy.ndimage import binary_closing
+
+def zoom_with_nans(image, zoom_factors):
+    # Create a mask of NaNs
+    nan_mask = np.isnan(image)
+    
+    # Replace NaNs with a neutral value (e.g., 0) for the interpolation
+    image_no_nans = np.nan_to_num(image, nan=0)
+    
+    # Get the coordinates of the original image
+    coords = np.indices(image.shape)
+    
+    # Calculate the coordinates of the zoomed image
+    zoomed_coords = [np.linspace(0, s-1, int(s*zf)) for s, zf in zip(image.shape, zoom_factors)]
+    zoomed_coords = np.meshgrid(*zoomed_coords, indexing='ij')
+    
+    # Flatten the coordinates for map_coordinates
+    flat_zoomed_coords = [c.flatten() for c in zoomed_coords]
+    
+    # Interpolate the image with linear interpolation
+    zoomed_image = map_coordinates(image_no_nans, flat_zoomed_coords, order=1, mode='nearest').reshape(zoomed_coords[0].shape)
+    
+    # Interpolate the mask with nearest neighbor interpolation
+    zoomed_nan_mask = map_coordinates(nan_mask.astype(float), flat_zoomed_coords, order=0, mode='nearest').reshape(zoomed_coords[0].shape)
+    
+    # Reapply NaNs to the zoomed image based on the interpolated mask
+    zoomed_image[zoomed_nan_mask > 0.5] = np.nan
+    
+    return zoomed_image
+
+
+def gaussian_smoothing_with_nans(image, sigma):
+    # Create a mask of NaNs
+    nan_mask = np.isnan(image)
+    
+    # Replace NaNs with 0 for the smoothing operation
+    image_no_nans = np.nan_to_num(image, nan=0)
+    
+    # Create a weight array where non-NaN values are 1 and NaNs are 0
+    weights = np.ones_like(image)
+    weights[nan_mask] = 0
+    
+    # Apply Gaussian filter to the image and the weights
+    smoothed_image = gaussian_filter(image_no_nans, sigma=sigma)
+    smoothed_weights = gaussian_filter(weights, sigma=sigma)
+    
+    # Avoid division by zero
+    smoothed_weights[smoothed_weights == 0] = np.nan
+    
+    # Normalize the smoothed image by the smoothed weights
+    smoothed_image /= smoothed_weights
+    
+    # Reapply NaNs to the smoothed image based on the original mask
+    smoothed_image[nan_mask] = np.nan
+    
+    return smoothed_image
+
+def binary_closing_with_nans(binary_matrix, structure=None):
+    # Create a mask of NaNs
+    nan_mask = np.isnan(binary_matrix)
+    
+    # Replace NaNs with 0 for the binary closing operation
+    binary_matrix_no_nans = np.nan_to_num(binary_matrix, nan=0)
+    
+    # Perform the binary closing operation
+    closed_matrix = binary_closing(binary_matrix_no_nans, structure=structure)
+    
+    # Reapply NaNs to the closed matrix based on the original mask
+    closed_matrix[nan_mask] = np.nan
+    
+    return closed_matrix
+
+
+
