@@ -417,7 +417,7 @@ class TissueMultiGraph:
                           register_to_ccf = True,
                           metric='cosine',
                           build_spatial_graph = False,
-                          build_feature_graph = False,bad_bits=[]):
+                          build_feature_graph = False,bad_bits=[],ccf_x_min=4.5,ccf_x_max=9.5):
          
         """Creating cell layer from raw data. 
         
@@ -470,6 +470,12 @@ class TissueMultiGraph:
                     adata.obs['ccf_y'] = XYZC['ccf_y']
                     adata.obs['ccf_z'] = XYZC['ccf_z']
                     """ Rename Section """
+                    if adata.obs['ccf_x'].mean() < ccf_x_min:
+                        self.update_user(f"Outside ccf window {section_acq_name} {adata.obs['ccf_x'].mean()}")
+                        continue
+                    elif adata.obs['ccf_x'].mean() > ccf_x_max:
+                        self.update_user(f"Outside ccf window {section_acq_name} {adata.obs['ccf_x'].mean()}")
+                        continue
                     section_name = f"{animal}_{adata.obs['ccf_x'].mean():.1f}"
                     adata.obs['old_section_name'] = section_acq_name
                     adata.obs['registration_path'] = row['registration_path']
@@ -518,11 +524,15 @@ class TissueMultiGraph:
 
             adata.X = adata.layers['raw'].copy()
             
-            adata.X = basicu.normalize_fishdata_robust_regression(adata.X.copy())
+            # adata.X = basicu.normalize_fishdata_robust_regression(adata.X.copy())
+            adata.X = adata.X.sum(1).mean()*adata.X/adata.X.sum(1)[:,None]
 
             adata.X = basicu.image_coordinate_correction(adata.X.copy(),np.array(adata.obs[["image_x","image_y"]]))
 
-            adata.X = basicu.correct_linear_staining_patterns(adata.X.copy(),np.array(adata.obs[["image_x","image_y"]]))
+            if register_to_ccf: 
+                adata.X = basicu.correct_linear_staining_patterns(adata.X.copy(),np.array(adata.obs[["ccf_z","ccf_y"]]))
+            else:
+                adata.X = basicu.correct_linear_staining_patterns(adata.X.copy(),np.array(adata.obs[["stage_x","stage_y"]]))
 
             adata.layers['normalized'] = adata.X.copy()
 
