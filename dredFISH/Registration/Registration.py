@@ -390,7 +390,7 @@ class Registration_Class(object):
                 axs[0].scatter(click_X,click_Y,s=25,c=click_C,picker=True)
 
                 idxs = np.random.choice(np.array(range(ref_X.shape[0])),100000)
-                axs[0].scatter(ref_X[idxs],ref_Y[idxs],s=0.5,c=ref_C[idxs],cmap='jet')
+                axs[0].scatter(ref_X[idxs],ref_Y[idxs],s=0.25,c=ref_C[idxs])
                 axs[0].grid()
                 # x = np.linspace(X.min(),X.max(),100000)
                 # y = np.linspace(Y.min(),Y.max(),100000)
@@ -398,16 +398,16 @@ class Registration_Class(object):
                 # np.random.shuffle(y)
                 axs[1].scatter(click_X,click_Y,s=25,c=click_C,picker=True)
                 idxs = np.random.choice(np.array(range(X.shape[0])),100000)
-                axs[1].scatter(X[idxs],Y[idxs],s=0.5,c=C[idxs],cmap='jet')
+                axs[1].scatter(X[idxs],Y[idxs],s=0.25,c=C[idxs],cmap='jet')
                 axs[1].grid()
                 if not isinstance(df_points,type(None)):
                     for idx,row in df_points.iterrows():
-                        scatter = axs[0].scatter(row['fix_z'],row['fix_y'],marker='x',color='k',s=100,linewidth=2,edgecolor='w')
+                        scatter = axs[0].scatter(row['fix_z'],row['fix_y'],marker='x',color='k',s=100,linewidth=2)
                         # scatter.set_path_effects([path_effects.Stroke(linewidth=3, foreground='white'), path_effects.Normal()])
                         # axs[0].annotate(str(idx), xy = [row['fix_z'],row['fix_y']], color = 'w', fontsize = 18)
                         text = axs[0].annotate(str(idx), xy = [row['fix_z'],row['fix_y']], color = 'k', fontsize = 18)
                         text.set_path_effects([path_effects.Stroke(linewidth=3, foreground='white'), path_effects.Normal()])
-                        scatter = axs[1].scatter(row['mov_z'],row['mov_y'],marker='x',color='k',s=100,linewidth=2,edgecolor='w')
+                        scatter = axs[1].scatter(row['mov_z'],row['mov_y'],marker='x',color='k',s=100,linewidth=2)
                         # scatter.set_path_effects([path_effects.Stroke(linewidth=3, foreground='white'), path_effects.Normal()])
                         # axs[1].annotate(str(idx), xy = [row['mov_z'],row['mov_y']], color = 'w', fontsize = 18)
                         text = axs[1].annotate(str(idx), xy = [row['mov_z'],row['mov_y']], color = 'k', fontsize = 18)
@@ -436,17 +436,17 @@ class Registration_Class(object):
                 fig.suptitle('Registration Points')
                 axs = axs.ravel()
                 idxs = np.random.choice(np.array(range(ref_X.shape[0])),100000)
-                axs[0].scatter(ref_X[idxs],ref_Y[idxs],s=0.5,c=ref_C[idxs],cmap='jet')
+                axs[0].scatter(ref_X[idxs],ref_Y[idxs],s=0.25,c=ref_C[idxs])
                 idxs = np.random.choice(np.array(range(X.shape[0])),100000)
-                axs[1].scatter(X[idxs],Y[idxs],s=0.5,c=C[idxs],cmap='jet')
+                axs[1].scatter(X[idxs],Y[idxs],s=0.25,c=C[idxs],cmap='jet')
                 if not isinstance(df_points,type(None)):
                     for idx,row in df_points.iterrows():
-                        scatter = axs[0].scatter(row['fix_z'],row['fix_y'],marker='x',color='k',s=100,linewidth=2,edgecolor='w')
+                        scatter = axs[0].scatter(row['fix_z'],row['fix_y'],marker='x',color='k',s=100,linewidth=2)
                         # scatter.set_path_effects([path_effects.Stroke(linewidth=3, foreground='white'), path_effects.Normal()])
                         # axs[0].annotate(str(idx), xy = [row['fix_z'],row['fix_y']], color = 'w', fontsize = 18)
                         text = axs[0].annotate(str(idx), xy = [row['fix_z'],row['fix_y']], color = 'k', fontsize = 18)
                         text.set_path_effects([path_effects.Stroke(linewidth=3, foreground='white'), path_effects.Normal()])
-                        scatter = axs[1].scatter(row['mov_z'],row['mov_y'],marker='x',color='k',s=100,linewidth=2,edgecolor='w')
+                        scatter = axs[1].scatter(row['mov_z'],row['mov_y'],marker='x',color='k',s=100,linewidth=2)
                         # scatter.set_path_effects([path_effects.Stroke(linewidth=3, foreground='white'), path_effects.Normal()])
                         # axs[1].annotate(str(idx), xy = [row['mov_z'],row['mov_y']], color = 'w', fontsize = 18)
                         text = axs[1].annotate(str(idx), xy = [row['mov_z'],row['mov_y']], color = 'k', fontsize = 18)
@@ -455,10 +455,10 @@ class Registration_Class(object):
                 # y = np.array(points_cor_y)
                 # for i in range(x.shape[0]):
                 #     if i%2!=0:
-                #         axs[1].scatter(x[i], y[i] , marker = 'x', color = 'k', s = 100, linewidth = 2,edgecolor='w')
+                #         axs[1].scatter(x[i], y[i] , marker = 'x', color = 'k', s = 100, linewidth = 2)
                 #         axs[1].annotate(str(math.ceil(i/2)), xy = [x[i], y[i]], color = 'k', fontsize = 18)
                 #     else:
-                #         axs[0].scatter(x[i], y[i] , marker = 'x', color = 'k', s = 100, linewidth = 2,edgecolor='w')
+                #         axs[0].scatter(x[i], y[i] , marker = 'x', color = 'k', s = 100, linewidth = 2)
                 #         axs[0].annotate(str(math.ceil(i/2)+1), xy = [x[i], y[i]], color = 'k', fontsize = 18)
                 plt.savefig(path,dpi=200)
                 plt.show(block=False)
@@ -820,12 +820,15 @@ class Registration_Class(object):
             self.XYZC['ccf_x'] = np.ones_like(data.obs['stage_x'])
             self.XYZC['ccf_y'] = np.array(data.obs['stage_y'])
             self.XYZC['ccf_z'] = np.array(data.obs['stage_x'])
-            bit = 'RS458122_cy5'
+            # bit = 'RS458122_cy5'
+            # bit = 'RS0548_cy5'
             from dredFISH.Utils import basicu
             X = data.layers['processed_vectors'].copy()
-            X = np.log10(np.clip(X,1,None))
-            X = basicu.normalize_fishdata_robust_regression(X)
-            c = X[:,data.var.index==bit]
+            # X = np.log10(np.clip(X,1,None))
+            # X = np.sum(X,axis=1,keepdims=True).mean()*X/np.sum(X,axis=1,keepdims=True)
+            # X = basicu.normalize_fishdata_robust_regression(X)
+            # c = X[:,data.var.index==bit]
+            c = np.sum(X,axis=1)
             vmin,vmax = np.percentile(c,[5,95])
             c = np.clip(c,vmin,vmax)
             
