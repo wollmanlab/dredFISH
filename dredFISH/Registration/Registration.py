@@ -22,6 +22,8 @@ import anndata
 import warnings
 import matplotlib
 
+import matplotlib.patheffects as path_effects
+
 class Registration_Class(object):
     def __init__(self, XYZC, 
                  registration_path,
@@ -33,6 +35,7 @@ class Registration_Class(object):
         self.window = 0.1
         self.overwrite = False
         self.regularize = regularize
+        self.click_X = None
 
         warnings.filterwarnings('ignore', category=UserWarning, message='Trying to unpickle estimator LinearRegression*')
 
@@ -93,6 +96,14 @@ class Registration_Class(object):
             self.fit()
         self.update_user(f"Total Run Time : {str(time.time()-start)} seconds")
         return self.non_rigid_transformation()
+
+    def refine(self):
+        matplotlib.use("QtAgg")
+        self.run()
+        self.load_reference_data()
+        self.iterative_fit_YZ_models()
+        self.view_transformation()
+
     
     def rigid_transformation(self):
         rigid_transformed_XYZC = self.XYZC.copy()
@@ -140,7 +151,7 @@ class Registration_Class(object):
         self.load_reference_data()
         self.set_rigid()
         self.fit_X_model()
-        self.fit_YZ_models()
+        self.iterative_fit_YZ_models()
         self.view_transformation()
 
     def set_rigid(self):
@@ -282,9 +293,47 @@ class Registration_Class(object):
             self.X_model = model
             self.save(self.X_model,channel='X',file_type='Model')
 
+    def iterative_fit_YZ_models(self):
+        self.update_user('Refining Registration',level=20)
+        while True:
+            self.fit_YZ_models()
+
+            XYZC = self.non_rigid_transformation()
+            fig = plt.figure(figsize=[10,10])
+            fig.suptitle('Raw vs Ref')
+            plt.scatter(self.click_X+5.71,self.click_Y,s=25,c=self.click_C)
+            plt.scatter(self.ref_XYZC.loc[self.ref_XYZC_sample,'ccf_z']+5.71,self.ref_XYZC.loc[self.ref_XYZC_sample,'ccf_y'],s=0.1,c='k',alpha=0.5)
+            plt.scatter(XYZC['ccf_z'],XYZC['ccf_y'],s=0.1,c='w',alpha=0.5)
+            path = self.generate_filename(channel='Aligned',file_type='Figure')
+            # plt.savefig(path,dpi=200)
+            plt.show(block=False)
+
+            # XYZC = self.non_rigid_transformation()
+            # fig = plt.figure(figsize=[10,10])
+            # fig.suptitle('Raw vs Ref')
+            # plt.scatter(self.click_X+5.71,self.click_Y,s=25,c=self.click_C)
+            # plt.scatter(XYZC['ccf_z'],XYZC['ccf_y'],s=0.1,c='k',alpha=0.5)
+            # path = self.generate_filename(channel='Aligned_annoations',file_type='Figure')
+            # plt.savefig(path,dpi=200)
+            # plt.show(block=False)
+
+            # XYZC = self.non_rigid_transformation()
+            # fig = plt.figure(figsize=[10,10])
+            # fig.suptitle('Raw vs Ref')
+            # plt.scatter(self.click_X+5.71,self.click_Y,s=25,c=self.click_C)
+            # plt.scatter(XYZC['ccf_z'],XYZC['ccf_y'],s=0.1,c=XYZC['color'],alpha=0.5,cmap='jet')
+            # path = self.generate_filename(channel='Aligned_annoations_color',file_type='Figure')
+            # plt.savefig(path,dpi=200)
+            # plt.show(block=False)
+
+            out = str(robust_input("Continue Refining? (Y/N): ",dtype='str'))
+            if 'n' in out.lower():
+                break
+
+
     def fit_YZ_models(self):
         plt.close('all')
-        if isinstance(self.Y_model,type(None))|self.overwrite|isinstance(self.Z_model,type(None)):
+        if True:#isinstance(self.Y_model,type(None))|self.overwrite|isinstance(self.Z_model,type(None)):
             """ Pair Points between Reference and Data"""
             self.update_user('Setting Registation Points',level=20)
 
@@ -294,23 +343,35 @@ class Registration_Class(object):
             self.update_user(f"One Strategy is to allign the outer border then work your way in")
             self.update_user(f"Select atleast 20 points but you may need more if there are any sectioning artifacts")
             plt.close('all')
-            def set_registration_points(path,X,Y,C,ref_X,ref_Y,ref_C):
+
+
+
+
+            def set_registration_points(df_points,path,X,Y,C,ref_X,ref_Y,ref_C,click_X,click_Y,click_C):
                 def onpick(event):
                     xmouse = event.mouseevent.xdata
                     ymouse = event.mouseevent.ydata
                     points_cor_x.append(xmouse)
                     points_cor_y.append(ymouse)
+                    if isinstance(df_points,type(None)):
+                        idx = math.ceil(len(points_cor_x)/2) - 1
+                    else:
+                        idx = math.ceil(len(points_cor_x)/2)+df_points.shape[0] - 1
                     if len(points_cor_x)%2!=0:
-                        axs[0].set_title('Pick Right Side: '+str(math.ceil(len(points_cor_x)/2)))
+                        axs[0].set_title('Pick Right Side: '+str(idx))
                         # axs[0].scatter(xmouse, ymouse , marker = 'x', color = 'k', s = 100, linewidth = 3, edgecolor='w')
                         axs[0].scatter(xmouse, ymouse , marker = '.', color = 'k', s = 500)
                         axs[0].scatter(xmouse, ymouse , marker = '.', color = 'r', s = 300)
-                        # axs[0].annotate(str(math.ceil(len(points_cor_x)/2)), xy = [xmouse, ymouse], color = 'k', fontsize = 14, linewidth = 2)
+                        # axs[0].annotate(str(idx), xy = [xmouse, ymouse], color = 'w', fontsize = 18)
+                        text = axs[0].annotate(str(idx), xy = [xmouse, ymouse], color = 'k', fontsize = 18)
+                        text.set_path_effects([path_effects.Stroke(linewidth=3, foreground='white'), path_effects.Normal()])
                     else:
-                        axs[0].set_title('Pick Left Side: '+str(math.ceil(len(points_cor_x)/2)))
+                        axs[0].set_title('Pick Left Side: '+str(idx))
                         axs[0].scatter(points_cor_x[-2], points_cor_y[-2] , marker = '.', color = 'k', s = 500)
                         axs[1].scatter(xmouse, ymouse , marker = '.', color = 'k', s = 300)
-                        # axs[1].annotate(str(math.ceil(len(points_cor_x)/2)), xy = [xmouse, ymouse], color = 'k', fontsize = 14, linewidth = 2)
+                        # axs[1].annotate(str(idx), xy = [xmouse, ymouse], color = 'w', fontsize = 18)
+                        text = axs[1].annotate(str(idx), xy = [xmouse, ymouse], color = 'k', fontsize = 18)
+                        text.set_path_effects([path_effects.Stroke(linewidth=3, foreground='white'), path_effects.Normal()])
                     plt.draw()
 
                 points_cor_x = []
@@ -319,52 +380,119 @@ class Registration_Class(object):
                 fig,axs = plt.subplots(1,2,figsize=[20,10])
                 fig.suptitle('Pick Registration Points')
                 axs = axs.ravel()
-                x = np.linspace(ref_X.min(),ref_X.max(),100000)
-                y = np.linspace(ref_Y.min(),ref_Y.max(),100000)
-                np.random.shuffle(x)
-                np.random.shuffle(y)
+                # x = np.linspace(ref_X.min(),ref_X.max(),100000)
+                # y = np.linspace(ref_Y.min(),ref_Y.max(),100000)
+                # np.random.shuffle(x)
+                # np.random.shuffle(y)
                 axs[0].set_title('Pick Left Side First')
-                axs[0].scatter(x,y,s=25,c='w',picker=True)
+                axs[0].scatter(click_X,click_Y,s=25,c=click_C,picker=True)
+
                 idxs = np.random.choice(np.array(range(ref_X.shape[0])),100000)
-                axs[0].scatter(ref_X[idxs],ref_Y[idxs],s=5,c=ref_C[idxs],cmap='jet')
+                axs[0].scatter(ref_X[idxs],ref_Y[idxs],s=0.5,c=ref_C[idxs],cmap='jet')
                 axs[0].grid()
-                x = np.linspace(X.min(),X.max(),100000)
-                y = np.linspace(Y.min(),Y.max(),100000)
-                np.random.shuffle(x)
-                np.random.shuffle(y)
-                axs[1].scatter(x,y,s=25,c='w',picker=True)
+                # x = np.linspace(X.min(),X.max(),100000)
+                # y = np.linspace(Y.min(),Y.max(),100000)
+                # np.random.shuffle(x)
+                # np.random.shuffle(y)
+                axs[1].scatter(click_X,click_Y,s=25,c=click_C,picker=True)
                 idxs = np.random.choice(np.array(range(X.shape[0])),100000)
-                axs[1].scatter(X[idxs],Y[idxs],s=5,c=C[idxs],cmap='jet')
+                axs[1].scatter(X[idxs],Y[idxs],s=0.5,c=C[idxs],cmap='jet')
                 axs[1].grid()
+                if not isinstance(df_points,type(None)):
+                    for idx,row in df_points.iterrows():
+                        scatter = axs[0].scatter(row['fix_z'],row['fix_y'],marker='x',color='k',s=100,linewidth=2,edgecolor='w')
+                        # scatter.set_path_effects([path_effects.Stroke(linewidth=3, foreground='white'), path_effects.Normal()])
+                        # axs[0].annotate(str(idx), xy = [row['fix_z'],row['fix_y']], color = 'w', fontsize = 18)
+                        text = axs[0].annotate(str(idx), xy = [row['fix_z'],row['fix_y']], color = 'k', fontsize = 18)
+                        text.set_path_effects([path_effects.Stroke(linewidth=3, foreground='white'), path_effects.Normal()])
+                        scatter = axs[1].scatter(row['mov_z'],row['mov_y'],marker='x',color='k',s=100,linewidth=2,edgecolor='w')
+                        # scatter.set_path_effects([path_effects.Stroke(linewidth=3, foreground='white'), path_effects.Normal()])
+                        # axs[1].annotate(str(idx), xy = [row['mov_z'],row['mov_y']], color = 'w', fontsize = 18)
+                        text = axs[1].annotate(str(idx), xy = [row['mov_z'],row['mov_y']], color = 'k', fontsize = 18)
+                        text.set_path_effects([path_effects.Stroke(linewidth=3, foreground='white'), path_effects.Normal()])
                 fig.canvas.mpl_connect('pick_event', onpick)
                 plt.show()
+
+
+                if isinstance(df_points,type(None)):
+                    df_points = pd.DataFrame()
+                    df_points['fix_z'] = np.array(points_cor_x)[::2]
+                    df_points['fix_y'] = np.array(points_cor_y)[::2]
+                    df_points['mov_z'] = np.array(points_cor_x)[1::2]
+                    df_points['mov_y'] = np.array(points_cor_y)[1::2]
+                else:
+                    new_df_points = pd.DataFrame()
+                    new_df_points['fix_z'] = np.array(points_cor_x)[::2]
+                    new_df_points['fix_y'] = np.array(points_cor_y)[::2]
+                    new_df_points['mov_z'] = np.array(points_cor_x)[1::2]
+                    new_df_points['mov_y'] = np.array(points_cor_y)[1::2]
+                    df_points = pd.concat([df_points,new_df_points],ignore_index=True)
+                    # df_points = df_points['fix_z','fix_y','mov_z','mov_y']
 
 
                 fig,axs = plt.subplots(1,2,figsize=[20,10])
                 fig.suptitle('Registration Points')
                 axs = axs.ravel()
                 idxs = np.random.choice(np.array(range(ref_X.shape[0])),100000)
-                axs[0].scatter(ref_X[idxs],ref_Y[idxs],s=1,c=ref_C[idxs],cmap='jet')
+                axs[0].scatter(ref_X[idxs],ref_Y[idxs],s=0.5,c=ref_C[idxs],cmap='jet')
                 idxs = np.random.choice(np.array(range(X.shape[0])),100000)
-                axs[1].scatter(X[idxs],Y[idxs],s=1,c=C[idxs],cmap='jet')
-                x = np.array(points_cor_x)
-                y = np.array(points_cor_y)
-                for i in range(x.shape[0]):
-                    if i%2!=0:
-                        axs[1].scatter(x[i], y[i] , marker = 'x', color = 'k', s = 100, linewidth = 2,edgecolor='w')
-                        axs[1].annotate(str(math.ceil(i/2)), xy = [x[i], y[i]], color = 'k', fontsize = 14)
-                    else:
-                        axs[0].scatter(x[i], y[i] , marker = 'x', color = 'k', s = 100, linewidth = 2,edgecolor='w')
-                        axs[0].annotate(str(math.ceil(i/2)+1), xy = [x[i], y[i]], color = 'k', fontsize = 14)
+                axs[1].scatter(X[idxs],Y[idxs],s=0.5,c=C[idxs],cmap='jet')
+                if not isinstance(df_points,type(None)):
+                    for idx,row in df_points.iterrows():
+                        scatter = axs[0].scatter(row['fix_z'],row['fix_y'],marker='x',color='k',s=100,linewidth=2,edgecolor='w')
+                        # scatter.set_path_effects([path_effects.Stroke(linewidth=3, foreground='white'), path_effects.Normal()])
+                        # axs[0].annotate(str(idx), xy = [row['fix_z'],row['fix_y']], color = 'w', fontsize = 18)
+                        text = axs[0].annotate(str(idx), xy = [row['fix_z'],row['fix_y']], color = 'k', fontsize = 18)
+                        text.set_path_effects([path_effects.Stroke(linewidth=3, foreground='white'), path_effects.Normal()])
+                        scatter = axs[1].scatter(row['mov_z'],row['mov_y'],marker='x',color='k',s=100,linewidth=2,edgecolor='w')
+                        # scatter.set_path_effects([path_effects.Stroke(linewidth=3, foreground='white'), path_effects.Normal()])
+                        # axs[1].annotate(str(idx), xy = [row['mov_z'],row['mov_y']], color = 'w', fontsize = 18)
+                        text = axs[1].annotate(str(idx), xy = [row['mov_z'],row['mov_y']], color = 'k', fontsize = 18)
+                        text.set_path_effects([path_effects.Stroke(linewidth=3, foreground='white'), path_effects.Normal()])
+                # x = np.array(points_cor_x)
+                # y = np.array(points_cor_y)
+                # for i in range(x.shape[0]):
+                #     if i%2!=0:
+                #         axs[1].scatter(x[i], y[i] , marker = 'x', color = 'k', s = 100, linewidth = 2,edgecolor='w')
+                #         axs[1].annotate(str(math.ceil(i/2)), xy = [x[i], y[i]], color = 'k', fontsize = 18)
+                #     else:
+                #         axs[0].scatter(x[i], y[i] , marker = 'x', color = 'k', s = 100, linewidth = 2,edgecolor='w')
+                #         axs[0].annotate(str(math.ceil(i/2)+1), xy = [x[i], y[i]], color = 'k', fontsize = 18)
                 plt.savefig(path,dpi=200)
                 plt.show(block=False)
 
-                return points_cor_x,points_cor_y
+                return df_points#points_cor_x,points_cor_y
             Y = self.ref_XYZC['ccf_y']
             Z = self.ref_XYZC['ccf_z']
             design_matrix = np.c_[Y,Z]
             distance = self.ref_XYZC['ccf_x'] - self.X_model.predict(design_matrix)#[0]
             self.ref_XYZC_sample = np.random.choice(self.ref_XYZC[np.abs(distance)<self.window].index,100000)
+
+            if isinstance(self.click_X,type(None)):
+                ccf_x = np.array(self.ref_XYZC.loc[self.ref_XYZC_sample,'ccf_x'].copy()).mean()
+                import nrrd
+                from matplotlib.colors import Normalize, ListedColormap
+                filename = '/scratchdata1/MouseBrainAtlases/Taxonomies/CCF_Ref/ccf_2017/annotation_25.nrrd'
+                readdata, header = nrrd.read(filename)
+                readdata_z = int(ccf_x*1000/25)
+                readdata_x,readdata_y = np.where(readdata[readdata_z,:,:]>-1)
+                x = readdata_x
+                y = readdata_y
+                img = readdata[readdata_z,x,y]
+                values = np.zeros_like(img)
+                for i,value in enumerate(np.unique(img)):
+                    values[img==value] = i
+
+                norm = Normalize(vmin=values.min(), vmax=values.max())
+                cmap = plt.get_cmap('tab10')
+                colors = cmap(norm(values))
+                colors[values==0] = [0.5,0.5,0.5,0.5]
+                x  = x*25/1000
+                y = y*25/1000
+                self.click_X = y-5.71
+                self.click_Y = x
+                self.click_C = colors
+
 
             ref_X = np.array(self.ref_XYZC.loc[self.ref_XYZC_sample,'ccf_x'].copy())
             ref_Y = np.array(self.ref_XYZC.loc[self.ref_XYZC_sample,'ccf_y'].copy())
@@ -379,16 +507,62 @@ class Registration_Class(object):
             C = np.array(rigid_transformed_XYZC['color'].copy())
             path = self.generate_filename(channel='RegistrationPointPicking',file_type='Figure')
             df_points = self.load(channel='df_points',file_type='matrix')
-            if isinstance(df_points,type(None))|self.overwrite:
-                points_cor_x,points_cor_y = set_registration_points(path,Z,Y,C,ref_Z,ref_Y,ref_C)
 
-                df_points = pd.DataFrame()
-                df_points['fix_z'] = np.array(points_cor_x)[::2]
-                df_points['fix_y'] = np.array(points_cor_y)[::2]
-                df_points['mov_z'] = np.array(points_cor_x)[1::2]
-                df_points['mov_y'] = np.array(points_cor_y)[1::2]
-                self.save(df_points,channel='df_points',file_type='matrix')
-            self.update_user(df_points)
+            if not isinstance(df_points,type(None)):
+                XYZC = self.non_rigid_transformation()
+                fig = plt.figure(figsize=[10,10])
+                fig.suptitle('Raw vs Ref')
+                plt.scatter(self.click_X+5.71,self.click_Y,s=25,c=self.click_C)
+                plt.scatter(self.ref_XYZC.loc[self.ref_XYZC_sample,'ccf_z']+5.71,self.ref_XYZC.loc[self.ref_XYZC_sample,'ccf_y'],s=0.1,c='k',alpha=0.5)
+                plt.scatter(XYZC['ccf_z'],XYZC['ccf_y'],s=0.1,c='w',alpha=0.5)
+                path = self.generate_filename(channel='Aligned',file_type='Figure')
+                # plt.savefig(path,dpi=200)
+                plt.show(block=False)
+
+
+                # XYZC = self.non_rigid_transformation()
+                # fig = plt.figure(figsize=[10,10])
+                # fig.suptitle('Raw vs Ref')
+                # plt.scatter(self.click_X+5.71,self.click_Y,s=25,c=self.click_C)
+                # plt.scatter(XYZC['ccf_z'],XYZC['ccf_y'],s=0.1,c='k',alpha=0.5)
+                # path = self.generate_filename(channel='Aligned_annoations',file_type='Figure')
+                # # plt.savefig(path,dpi=200)
+                # plt.show(block=False)
+
+                # XYZC = self.non_rigid_transformation()
+                # fig = plt.figure(figsize=[10,10])
+                # fig.suptitle('Raw vs Ref')
+                # plt.scatter(self.click_X+5.71,self.click_Y,s=25,c=self.click_C)
+                # plt.scatter(XYZC['ccf_z'],XYZC['ccf_y'],s=0.1,c=XYZC['color'],alpha=0.5,cmap='jet')
+                # path = self.generate_filename(channel='Aligned_annoations_color',file_type='Figure')
+                # plt.savefig(path,dpi=200)
+                # plt.show(block=False)
+
+                # XYZC = self.non_rigid_transformation()
+                # fig = plt.figure(figsize=[10,10])
+                # fig.suptitle('Raw vs Ref')
+                # plt.scatter(self.ref_XYZC.loc[self.ref_XYZC_sample,'ccf_z']+5.71,self.ref_XYZC.loc[self.ref_XYZC_sample,'ccf_y'],s=0.1,c='k',alpha=0.5)
+                # plt.scatter(XYZC['ccf_z'],XYZC['ccf_y'],s=0.1,c='r',alpha=0.5)
+                # path = self.generate_filename(channel='Aligned',file_type='Figure')
+                # plt.savefig(path,dpi=200)
+                # plt.show(block=False)
+            # if isinstance(df_points,type(None))|self.overwrite|self.refine:
+            # points_cor_x,points_cor_y = set_registration_points(df_points,path,Z,Y,C,ref_Z,ref_Y,ref_C)
+            df_points = set_registration_points(df_points,path,Z,Y,C,ref_Z,ref_Y,ref_C,self.click_X,self.click_Y,self.click_C)
+            # Check to see if any points need to be removed
+            bad_idxes = []
+            while True:
+                out = str(robust_input("Remove Any Bad points? (#/N): ",dtype='str'))
+                if 'n' in out.lower():
+                    break
+                else:
+                    idx = int(out)
+                    if idx in df_points.index:
+                        bad_idxes.append(idx)
+            df_points = df_points.drop(bad_idxes)
+
+            self.save(df_points,channel='df_points',file_type='matrix')
+            # self.update_user(df_points)
             """ Fit Model """
             self.Z_model = Rbf(np.array(df_points['mov_y']),np.array(df_points['mov_z']), np.array(df_points['fix_z']))
             self.save(self.Z_model,channel='Z',file_type='Model')
@@ -397,7 +571,20 @@ class Registration_Class(object):
             self.save(self.Y_model,channel='Y',file_type='Model')
 
 
+
+
+        
     def view_transformation(self):
+        XYZC = self.non_rigid_transformation()
+        fig = plt.figure(figsize=[10,10])
+        fig.suptitle('Raw vs Ref')
+        plt.scatter(self.click_X+5.71,self.click_Y,s=25,c=self.click_C)
+        plt.scatter(XYZC['ccf_z'],XYZC['ccf_y'],s=0.1,c='k',alpha=0.5)
+        path = self.generate_filename(channel='Aligned_annoations',file_type='Figure')
+        plt.savefig(path,dpi=200)
+        plt.close()
+        # plt.show(block=False)
+
 
         Y = self.ref_XYZC['ccf_y']
         Z = self.ref_XYZC['ccf_z']
@@ -415,7 +602,8 @@ class Registration_Class(object):
             plt.plot([df_points['fix_z'][i], df_points['mov_z'][i]], [df_points['fix_y'][i], df_points['mov_y'][i]], c='b')
         path = self.generate_filename(channel='RegPointsRaw',file_type='Figure')
         plt.savefig(path,dpi=200)
-        plt.show(block=False)
+        plt.close()
+        # plt.show(block=False)
 
         df_points['pred_z'] = self.Z_model(np.array(df_points['mov_y']),np.array(df_points['mov_z']))
         df_points['pred_y'] = self.Y_model(np.array(df_points['mov_y']),np.array(df_points['mov_z']))
@@ -426,7 +614,8 @@ class Registration_Class(object):
             plt.plot([df_points['fix_z'][i], df_points['pred_z'][i]], [df_points['fix_y'][i], df_points['pred_y'][i]], c='b')
         path = self.generate_filename(channel='RegPointsAligned',file_type='Figure')
         plt.savefig(path,dpi=200)
-        plt.show(block=False)
+        plt.close()
+        # plt.show(block=False)
 
         plt.figure(figsize=[10,10])
         plt.scatter(df_points['mov_z'],df_points['mov_y'],c='k',s=np.array(df_points.index))
@@ -435,7 +624,8 @@ class Registration_Class(object):
             plt.plot([df_points['mov_z'][i], df_points['pred_z'][i]], [df_points['mov_y'][i], df_points['pred_y'][i]], c='b')
         path = self.generate_filename(channel='RegPointsDistanceMoved',file_type='Figure')
         plt.savefig(path,dpi=200)
-        plt.show(block=False)
+        # plt.show(block=False)
+        plt.close()
 
         XYZC = self.rigid_transformation()
         fig = plt.figure(figsize=[10,10])
@@ -444,7 +634,8 @@ class Registration_Class(object):
         plt.scatter(XYZC['ccf_z'],XYZC['ccf_y'],s=0.1,c='r',alpha=0.5)
         path = self.generate_filename(channel='RoughAlignment',file_type='Figure')
         plt.savefig(path,dpi=200)
-        plt.show(block=False)
+        # plt.show(block=False)
+        plt.close()
 
         XYZC = self.non_rigid_transformation()
         fig = plt.figure(figsize=[10,10])
@@ -453,7 +644,8 @@ class Registration_Class(object):
         plt.scatter(XYZC['ccf_z'],XYZC['ccf_y'],s=0.1,c='r',alpha=0.5)
         path = self.generate_filename(channel='Aligned',file_type='Figure')
         plt.savefig(path,dpi=200)
-        plt.show(block=False)
+        # plt.show(block=False)
+        plt.close()
 
         fig = plt.figure(figsize=[10,10])
         fig.suptitle('Distance Moved')
@@ -465,7 +657,8 @@ class Registration_Class(object):
         plt.colorbar()
         path = self.generate_filename(channel='DistanceMoved',file_type='Figure')
         plt.savefig(path,dpi=200)
-        plt.show(block=False)
+        # plt.show(block=False)
+        plt.close()
 
     def update_user(self,message,level=20):
         """
