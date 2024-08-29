@@ -62,8 +62,9 @@ if __name__ == '__main__':
         fishdata = args.fishdata+str(datetime.today().strftime("_%Y%b%d"))
     else:
         fishdata = args.fishdata
-
+    
     fishdata_path = os.path.join(metadata_path,fishdata)
+    print(fishdata_path)
     print(args)
     if args.section=='all':
         image_metadata = Metadata(metadata_path)
