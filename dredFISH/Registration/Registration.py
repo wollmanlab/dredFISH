@@ -844,6 +844,7 @@ class Registration_Class(object):
             c = np.clip(c,vmin,vmax)
             c[np.isnan(c)] = np.nanmean(c)
             self.XYZC['color'] = c#np.array(data.obs['louvain_colors'])
+            print(self.XYZC)
             del data
         if isinstance(self.XYZC,type(None)):
             self.update_user('Data Not Found',level=50) 
