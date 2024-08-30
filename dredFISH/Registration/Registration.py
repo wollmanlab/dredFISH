@@ -833,14 +833,15 @@ class Registration_Class(object):
             bit = 'RS0332_cy5'
             from dredFISH.Utils import basicu
             X = data.layers['raw'].copy()
+            X = np.clip(X,1,np.inf)
             # X = np.log10(np.clip(X,1,None))
             X = np.sum(X,axis=1,keepdims=True).mean()*X/np.sum(X,axis=1,keepdims=True)
             # X = basicu.normalize_fishdata_robust_regression(X)
             c = X[:,data.var.index==bit]
             # c = np.max(X,axis=1)
-            vmin,vmax = np.percentile(c,[5,95])
+            vmin,vmax = np.percentile(c[np.isnan(c)==False],[5,95])
             c = np.clip(c,vmin,vmax)
-            
+            c[np.isnan(c)] = np.nanmean(c)
             self.XYZC['color'] = c#np.array(data.obs['louvain_colors'])
             del data
         if isinstance(self.XYZC,type(None)):
