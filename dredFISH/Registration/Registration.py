@@ -833,9 +833,10 @@ class Registration_Class(object):
             bit = 'RS0332_cy5'
             from dredFISH.Utils import basicu
             X = data.layers['raw'].copy()
+            X[np.isnan(X)] = 1
             X = np.clip(X,1,np.inf)
             # X = np.log10(np.clip(X,1,None))
-            X = np.sum(X,axis=1,keepdims=True).mean()*X/np.sum(X,axis=1,keepdims=True)
+            X = X/np.sum(X,axis=1,keepdims=True)
             # X = basicu.normalize_fishdata_robust_regression(X)
             c = X[:,data.var.index==bit]
             # c = np.max(X,axis=1)
