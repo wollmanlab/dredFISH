@@ -137,10 +137,10 @@ if __name__ == '__main__':
     master_section_df = master_section_df[master_section_df['user']==user]
     print(master_section_df.shape)
 
-
-    # project_path = '/scratchdata1/Images2024/Haley/dredfish/'
-    # master_section_df = fileu.create_input_df(project_path, 'RNA') 
-    # master_section_df = master_section_df[master_section_df['dataset']=='RNA_2024Jul23']
+    if user=='Zach':
+        project_path = '/scratchdata1/Images2024/Haley/dredfish/'
+        master_section_df = fileu.create_input_df(project_path, 'RNA') 
+        master_section_df = master_section_df[master_section_df['dataset']=='RNA_2024Jul23']
     ticker = 0
     for idx,row in master_section_df.iterrows():
         ticker+=1

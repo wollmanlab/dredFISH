@@ -8,6 +8,9 @@ from dredFISH.Utils import fileu, basicu, ccfu
 import gc
 import traceback
 import imageio
+import warnings 
+from sklearn.exceptions import ConvergenceWarning
+
 
 def create_taxonomies(tax_basepath,bad_bits=[]):
     cell_tax_to_build = ['class', 'subclass', 'supertype']
@@ -131,6 +134,7 @@ def analyze_mouse_brain_data(animal,
     - analysis_path: str, the path to the analysis directory (default: '/scratchdata1/MouseBrainAtlases_V1')
     - verbose: bool, whether to print verbose output (default: False)
     """
+    warnings.filterwarnings("ignore", category=ConvergenceWarning)
     try:
         bad_bits = ['RS0109_cy5','RSN9927.0_cy5','RS0468_cy5','RS643.0_cy5','RS156.0_cy5','RS0237_cy5']
 
@@ -142,6 +146,9 @@ def analyze_mouse_brain_data(animal,
 
         # Create analysis directory for the animal
         input_df = fileu.create_input_df(project_path, animal)
+        if animal =='RNA':
+            print(input_df)
+            input_df = input_df[input_df['dataset']=='RNA_2024Jul23']
         basepath = os.path.join(analysis_path, animal)
         figure_path = os.path.join(basepath,'Figures')
         tax_basepath = os.path.join(analysis_path, "Taxonomies")
@@ -173,42 +180,36 @@ def analyze_mouse_brain_data(animal,
         level = 'subclass'
         if not level in TMG.Layers[0].adata.obs.columns:
             seq_adata = anndata.read_h5ad(pathu.get_path('allen_wmb_tree'))
+            seq_adata.index = [i.split('raise')[0] for i in seq_adata.obs.index]
             pallette = dict(zip(seq_adata.obs[level],seq_adata.obs[f"{level}_color"]))
-            del seq_adata
-
+            
             TMG.update_user(f"Harmonizing to Reference and Classifying", verbose=True)
-            X = np.zeros_like(TMG.Layers[0].adata.X)
-            y = np.array(["Unknown"] * TMG.Layers[0].adata.shape[0], dtype=object)
-            for section in TMG.unqS:
-                print(section)
+            out = []
+            for idx,section in enumerate(TMG.unqS):
+                TMG.update_user(f" {section} {idx}  out of {len(TMG.unqS)}")
                 m = TMG.Layers[0].adata.obs['Slice'] == section
                 if np.sum(m) == 0:
                     continue
                 idx = np.where(m)[0]
                 adata = TMG.Layers[0].adata[idx]
-                scale = SingleCellAlignmentLeveragingExpectations(adata, 
-                        tax_name='iterative_spatial_assisted_label_transfer',
-                        ref='allen_wmb_tree', 
-                        spatial_ref='spatial_reference',
-                        ref_level=level, 
-                        model='logreg',
-                        out_path='',
-                        batch_name='section_index',
-                        save_fig=False,
-                        neuron=None,
-                        weighted=False,
-                        verbose=False,
-                        kde_kernel = (0.25,0.1,0.1),
-                        binary_spatial_thresh=None,
-                        use_prior=True)
-                # scale.reference = reference_adata.copy()
-                scale.train()
-                features,labels = scale.classify()
-                X[idx] = features
-                y[idx] = labels
-            TMG.Layers[0].adata.layers['harmonized'] = X
-            TMG.Layers[0].adata.obs['subclass'] = y
-            TMG.Layers[0].adata.obs['subclass_color'] = TMG.Layers[0].adata.obs['subclass'].map(pallette)
+                scale = SingleCellAlignmentLeveragingExpectations(adata,visualize=False,verbose=False)
+                scale.complete_reference = seq_adata
+                adata_updated = scale.run()
+                out.append(adata_updated)
+                print(adata_updated)
+            adata = anndata.concat(out)
+            adata = adata[TMG.Layers[0].adata.obs.index].copy()
+            for layer in ['harmonized','imputed','zscored']:
+                TMG.Layers[0].adata.layers[layer] = adata.layers[layer]
+
+            for label in ['subclass','leiden','neuron']:
+                TMG.Layers[0].adata.obs[label] = adata.obs[label].astype(str)
+                TMG.Layers[0].adata.obs[label+'_color'] = adata.obs[label+'_color'].astype(str)
+
+            neighbor_columns = [i for i in adata.obs.columns if 'neighbor' in i]
+            for col in neighbor_columns:
+                TMG.Layers[0].adata.obs[col] = adata.obs[col]
+            
             print(TMG.Layers[0].adata)
             TMG.save()
             gc.collect()
@@ -216,7 +217,7 @@ def analyze_mouse_brain_data(animal,
 
             """ Filter Bad Sections """
             TMG.update_user(f"Checking For Bad Sections", verbose=True)
-            Allen = TissueMultiGraph(basepath = '/scratchdata1/MouseBrainAtlases_V0/Allen/')
+            Allen = TissueMultiGraph(basepath = '/scratchdata2/MouseBrainAtlases/MouseBrainAtlases_V0/Allen/')
             good_sections = []
             bad_sections = []
             status = {}
@@ -260,14 +261,16 @@ def analyze_mouse_brain_data(animal,
         """ Enforce Order """
         TMG.update_user(f"Enforcing Order", verbose=True)
         TMG.Layers[0].adata = anndata.concat([TMG.Layers[0].adata[TMG.Layers[0].adata.obs['Slice']==section] for section in TMG.unqS])
-
+        print(TMG.Layers[0].adata)
+        TMG.save()
+        gc.collect()
 
         adata = TMG.Layers[0].adata#.copy()
         bit = f"Supervised : {level}"
         n_columns = np.min([6,len(TMG.unqS)])
         n_rows = math.ceil(len(TMG.unqS)/n_columns)
         fig,axs = plt.subplots(n_rows,n_columns,figsize=[n_columns*5,n_rows*5],dpi=300)
-        fig.patch.set_facecolor((1, 1, 1, 0))
+        fig.patch.set_facecolor((1, 1, 1, 1))
         fig.suptitle(f"{animal} {bit}", color='black')
         if len(TMG.unqS)==1:
             axs = [axs]
@@ -295,7 +298,7 @@ def analyze_mouse_brain_data(animal,
             n_columns = np.min([6,len(TMG.unqS)])
             n_rows = math.ceil(len(TMG.unqS)/n_columns)
             fig,axs = plt.subplots(n_rows,n_columns,figsize=[n_columns*3,n_rows*3],dpi=300)
-            fig.patch.set_facecolor((1, 1, 1, 0))
+            fig.patch.set_facecolor((1, 1, 1, 1))
             fig.suptitle(f"{animal} {bit}", color='black')
             if len(TMG.unqS)==1:
                 axs = [axs]
@@ -333,7 +336,7 @@ def analyze_mouse_brain_data(animal,
             n_columns = np.min([6,len(TMG.unqS)])
             n_rows = math.ceil(len(TMG.unqS)/n_columns)
             fig,axs = plt.subplots(n_rows,n_columns,figsize=[n_columns*3,n_rows*3],dpi=300)
-            fig.patch.set_facecolor((1, 1, 1, 0))
+            fig.patch.set_facecolor((1, 1, 1, 1))
             fig.suptitle(f"{animal} {bit}", color='black')
             if len(TMG.unqS)==1:
                 axs = [axs]
@@ -370,7 +373,7 @@ def analyze_mouse_brain_data(animal,
         fig = plt.figure(figsize=[10,10],dpi=300)
         ax = fig.add_subplot(111, projection='3d')
         ax.axis('off')
-        ax.set_facecolor((1, 1, 1, 0))
+        ax.set_facecolor((1, 1, 1, 1))
         plt.title(f"{animal} {bit}", color='black')
         adata.obs['ccf_x'] = -10*adata.obs['ccf_x']
         adata.obs['ccf_y'] = -1*adata.obs['ccf_y']
@@ -448,20 +451,20 @@ def analyze_mouse_brain_data(animal,
             TMG.create_merged_layer(layer_type=tx, tax_name=tx)
         TMG.save()
 
-        geoms_to_make = ["parcellation_label", "parcellation_division", 'parcellation_structure', 'parcellation_substructure', 'parcellation_index']
-        all_layers = [l.layer_type for l in TMG.Layers]
+        # geoms_to_make = ["parcellation_label", "parcellation_division", 'parcellation_structure', 'parcellation_substructure', 'parcellation_index']
+        # all_layers = [l.layer_type for l in TMG.Layers]
 
-        """ Create Geoms"""
-        TMG.update_user(f"Creating Geometries", verbose=True)
-        TMG.add_and_save_vor_mask_geoms()
-        TMG.save()
+        # """ Create Geoms"""
+        # TMG.update_user(f"Creating Geometries", verbose=True)
+        # TMG.add_and_save_vor_mask_geoms()
+        # TMG.save()
 
-        # Add and save merged geometries
-        TMG.update_user(f"Adding and Saving Merged Geometries", verbose=True)
-        for lyr in geoms_to_make:
-            print(lyr)
-            TMG.add_and_save_merged_geoms(all_layers.index(lyr))
-        TMG.save()
+        # # Add and save merged geometries
+        # TMG.update_user(f"Adding and Saving Merged Geometries", verbose=True)
+        # for lyr in geoms_to_make:
+        #     print(lyr)
+        #     TMG.add_and_save_merged_geoms(all_layers.index(lyr))
+        # TMG.save()
 
         # Generate Figures For Inspection ToDo
 

@@ -418,7 +418,7 @@ class TissueMultiGraph:
                           register_to_ccf = True,
                           metric='cosine',
                           build_spatial_graph = False,
-                          build_feature_graph = False,bad_bits=[],ccf_x_min=4.5,ccf_x_max=9.5):
+                          build_feature_graph = False,bad_bits=[],ccf_x_min=0,ccf_x_max=16):
          
         """Creating cell layer from raw data. 
         
@@ -460,6 +460,8 @@ class TissueMultiGraph:
                 adata = fileu.load(os.path.join(dataset_path,dataset,processing,section_acq_name),file_type='anndata')
             except:
                 self.update_user(f"Unable to Load Data {section_acq_name}")
+                continue
+            if adata.shape[0]<100:
                 continue
             adata.obs['animal'] = row['animal']
             adata.obs['dataset'] = row['dataset']
@@ -507,11 +509,21 @@ class TissueMultiGraph:
             adata = adata[adata.obs['in_large_comp']==True].copy()
             self.update_user(f"Keeping {adata.shape[0]} cells after component filtering for {section_acq_name}")
 
+            if adata.shape[0]<100:
+                self.update_user(f" Not Enough Cells Found {adata.shape[0]} cells")
+                self.update_user(f"Look Into Section {section_acq_name}")
+                continue
+
             n_cells_pre_nuc_filtering = adata.shape[0]
             adata.layers['nuc_mask'] = basicu.filter_cells_nuc(adata)
             adata = adata[np.sum(adata.layers['nuc_mask']==False,axis=1)<2].copy()
-
             adata = adata[np.clip(np.array(adata.layers['raw']).copy().sum(1),1,None)>100].copy()
+
+            if adata.shape[0]<100:
+                self.update_user(f" Not Enough Cells Found {adata.shape[0]} cells")
+                self.update_user(f"Look Into Section {section_acq_name}")
+                continue
+
             self.update_user(f"Keeping {adata.shape[0]} cells after nuc filtering for {section_acq_name}")
             n_cells_post_nuc_filtering = adata.shape[0]
             if n_cells_post_nuc_filtering < 0.6 * n_cells_pre_nuc_filtering:
@@ -524,16 +536,23 @@ class TissueMultiGraph:
                 # continue
 
             adata.X = adata.layers['raw'].copy()
-            
-            # adata.X = basicu.normalize_fishdata_robust_regression(adata.X.copy())
-            adata.X = adata.X.sum(1).mean()*adata.X/adata.X.sum(1)[:,None]
 
+            if adata.shape[0]<100:
+                self.update_user(f" Not Enough Cells Found {adata.shape[0]} cells")
+                self.update_user(f"Look Into Section {section_acq_name}")
+                continue
+            
+            adata.X = basicu.normalize_fishdata_robust_regression(adata.X.copy())
+            # adata.X = adata.X.sum(1).mean()*adata.X/adata.X.sum(1)[:,None]
+
+            
             adata.X = basicu.image_coordinate_correction(adata.X.copy(),np.array(adata.obs[["image_x","image_y"]]))
 
-            if register_to_ccf: 
-                adata.X = basicu.correct_linear_staining_patterns(adata.X.copy(),np.array(adata.obs[["ccf_z","ccf_y"]]))
-            else:
-                adata.X = basicu.correct_linear_staining_patterns(adata.X.copy(),np.array(adata.obs[["stage_x","stage_y"]]))
+            # Problematic causes over correction
+            # if register_to_ccf: 
+            #     adata.X = basicu.correct_linear_staining_patterns(adata.X.copy(),np.array(adata.obs[["ccf_z","ccf_y"]]))
+            # else:
+            #     adata.X = basicu.correct_linear_staining_patterns(adata.X.copy(),np.array(adata.obs[["stage_x","stage_y"]]))
 
             adata.layers['normalized'] = adata.X.copy()
 

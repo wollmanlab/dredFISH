@@ -631,7 +631,52 @@ def normalize_fishdata_robust_regression(X):
 
 #     return I
 
-def quantile_matching(M1, M2):
+# def quantile_matching(M1, M2):
+#     """
+#     Matches quantiles between matrices M1 and M2, minimizing NaNs.
+#     """
+
+#     if M1.shape[1] != M2.shape[1]:
+#         raise ValueError("Matrices must have the same number of columns.")
+
+#     # Prepare data: Replace NaNs with column-specific values (median or mean)
+#     M1_filled = np.nan_to_num(M1, nan=np.nanmedian(M1, axis=0))
+#     M2_filled = np.nan_to_num(M2, nan=np.nanmedian(M2, axis=0))
+    
+#     # Optionally consider scaling the data using StandardScaler before interpolating:
+#     # from sklearn.preprocessing import StandardScaler
+#     # scaler = StandardScaler()
+#     # M1_scaled = scaler.fit_transform(M1_filled)
+#     # M2_scaled = scaler.transform(M2_filled)
+#     # M1_filled = M1_scaled
+#     # M2_filled = M2_scaled
+
+#     interpolators = []
+#     quantiles = np.linspace(0, 1, np.min([M1.shape[1], M2.shape[1],1000]))
+#     for i in range(M1.shape[1]):
+#         quantiles_M1 = np.quantile(M1_filled[:, i], quantiles)
+#         quantiles_M2 = np.quantile(M2_filled[:, i], quantiles)
+        
+#         quantiles_M1 += np.random.normal(0, 1e-8, quantiles_M1.shape) 
+#         quantiles_M2 += np.random.normal(0, 1e-8, quantiles_M2.shape)
+
+#         # Use linear interpolation for better NaN handling
+#         interpolators.append(interp1d(quantiles_M2, quantiles_M1, kind='linear', 
+#                                       bounds_error=False, fill_value="extrapolate"))
+        
+#         # Optionally clip extrapolated values:
+#         # upper_bound = np.quantile(M1_filled[:, i], 0.99)
+#         # lower_bound = np.quantile(M1_filled[:, i], 0.01)
+#         # interp = lambda x: np.clip(interp(x), lower_bound, upper_bound)
+
+#     I = np.zeros(M2.shape)
+#     for i, interp in enumerate(interpolators):
+#         interpolated = interp(M2_filled[:, i])
+#         I[:, i] = np.nan_to_num(interpolated, nan=np.nanmedian(interpolated))
+
+#     return I
+
+def quantile_matching(M1, M2,n=100):
     """
     Matches quantiles between matrices M1 and M2, minimizing NaNs.
     """
@@ -652,13 +697,13 @@ def quantile_matching(M1, M2):
     # M2_filled = M2_scaled
 
     interpolators = []
-    quantiles = np.linspace(0, 1, np.min([M1.shape[1], M2.shape[1],1000]))
+    quantiles = np.linspace(0, 1, np.min([M1.shape[0], M2.shape[0],n]))
     for i in range(M1.shape[1]):
         quantiles_M1 = np.quantile(M1_filled[:, i], quantiles)
         quantiles_M2 = np.quantile(M2_filled[:, i], quantiles)
         
-        quantiles_M1 += np.random.normal(0, 1e-8, quantiles_M1.shape) 
-        quantiles_M2 += np.random.normal(0, 1e-8, quantiles_M2.shape)
+        # quantiles_M1 += np.random.normal(0, 1e-8, quantiles_M1.shape) 
+        # quantiles_M2 += np.random.normal(0, 1e-8, quantiles_M2.shape)
 
         # Use linear interpolation for better NaN handling
         interpolators.append(interp1d(quantiles_M2, quantiles_M1, kind='linear', 
@@ -769,7 +814,136 @@ def normalize_fishdata_regress(X,value='sum',leave_log=False,log=True,bitwise=Fa
         else:
             X = zscore(X, axis=0, allow_nan=False,balancedX=BalancedX) # 0 - across rows (cells) for each col (bit)
     return X
+
+def process_batch(args):
+    X_batch, Y_batch, BalancedX, BalancedY, log, leave_log = args
+    Res_batch = np.zeros_like(X_batch)
+    for i in range(X_batch.shape[1]):
+        if isinstance(Y_batch, str):
+            Res_batch[:, i] = X_batch[:, i]
+        else:
+            model = LinearRegression().fit(BalancedY.reshape(-1, 1), BalancedX[:, i])
+            if log:
+                Res_batch[:, i] = (X_batch[:, i] - model.predict(Y_batch.reshape(-1, 1))) + model.predict(Y_batch.reshape(-1, 1)).mean()
+            else:
+                Res_batch[:, i] = (X_batch[:, i] / model.predict(X_batch.sum(1).reshape(-1, 1))) * model.predict(X_batch.sum(1).reshape(-1, 1)).mean()
+    if log and not leave_log:
+        Res_batch = 10**Res_batch
+    return Res_batch
+
+from multiprocessing import Pool
+
+def multiprocess_normalize_fishdata_regress(X, value='sum', leave_log=False, log=True, bitwise=False, labels=False, n_cells=100):
+    """
+    X -- cell by basis raw count matrix
     
+    Advanced normalization using sum. Key idea is instead of divide by the sum
+    regress in log space and use the residual. 
+    """
+    X = X.copy()
+    if isinstance(labels, bool):
+        BalancedX = X.copy()
+    else:
+        _df = pd.Series(labels).to_frame('label')
+        idx = stratified_sample(_df, 'label', n_cells, random_state=None).sort_index().index.values
+        BalancedX = X[idx, :].copy()
+    if isinstance(value, str):
+        if value == 'sum':
+            Y = X.sum(axis=1)
+        elif value == 'mean':
+            Y = X.mean(axis=1)
+        elif value == 'min':
+            Y = X.min(axis=1)
+        elif value == 'max':
+            Y = X.max(axis=1)
+        elif value == 'median':
+            Y = np.median(X, axis=1)
+        elif value == 'none':
+            Y = ''
+        else:
+            raise ValueError('Incorrect value type ' + str(value))
+    else:
+        Y = value
+
+    if log:
+        X = np.log10(np.clip(X, 1, None))
+        BalancedX = np.log10(np.clip(BalancedX, 1, None))
+        if not isinstance(Y, str):
+            Y = np.log10(np.clip(Y, 1, None))
+    if not isinstance(Y, str):
+        if isinstance(labels, bool):
+            BalancedY = Y.copy()
+        else:
+            BalancedY = Y[idx].copy()
+
+    # Split data into 10 batches
+    n_batches = 10
+    batch_size = X.shape[0] // n_batches
+    batches = [(X[i*batch_size:(i+1)*batch_size], Y[i*batch_size:(i+1)*batch_size], BalancedX, BalancedY, log, leave_log) for i in range(n_batches)]
+
+    # Handle the last batch if the number of rows is not perfectly divisible
+    if X.shape[0] % n_batches != 0:
+        batches.append((X[n_batches*batch_size:], Y[n_batches*batch_size:], BalancedX, BalancedY, log, leave_log))
+
+    # Use multiprocessing to process batches
+    with Pool(n_batches) as pool:
+        results = pool.map(process_batch, batches)
+
+    # Combine results
+    Res = np.vstack(results)
+
+    if bitwise:
+        if isinstance(labels, bool):
+            X = zscore(Res, axis=0, allow_nan=False, balancedX=False)  # 0 - across rows (cells) for each col (bit)
+        else:
+            X = zscore(Res, axis=0, allow_nan=False, balancedX=BalancedX)  # 0 - across rows (cells) for each col (bit)
+    else:
+        X = Res
+
+    return X
+    
+
+def zscore_matching(M1, M2):
+    if M1.shape[1] != M2.shape[1]:
+        raise ValueError("Matrices must have the same number of columns.")
+
+    # print(np.median(M1, axis=0))
+    # print(np.std(M1, axis=0))
+    # print(np.median(M2, axis=0))
+    # print(np.std(M2, axis=0))
+
+    # Prepare data: Replace NaNs with column-specific values (median or mean)
+    M1_filled = np.nan_to_num(M1, nan=np.nanmedian(M1, axis=0))
+    M2_filled = np.nan_to_num(M2, nan=np.nanmedian(M2, axis=0))
+
+
+    I = np.zeros(M2.shape)
+    for i in range(M1.shape[1]):
+        vmin,vmax = np.percentile(M1_filled[:,i][~np.isnan(M1_filled[:,i])],[5,95])
+        ref_mask = (M1_filled[:,i]>vmin)&(M1_filled[:,i]<vmax)
+        vmin,vmax = np.percentile(M2_filled[:,i][~np.isnan(M2_filled[:,i])],[5,95])
+        measured_mask = (M2_filled[:,i]>vmin)&(M2_filled[:,i]<vmax)
+
+        if (np.sum(ref_mask)>25) & (np.sum(measured_mask)>25):
+
+            ref_mu = np.nanmedian(M1_filled[ref_mask, i])
+            ref_sigma = np.nanstd(M1_filled[ref_mask, i])
+            measured_mu = np.nanmedian(M2_filled[measured_mask, i])
+            measured_sigma = np.nanstd(M2_filled[measured_mask, i])
+            if ref_sigma == 0:
+                ref_sigma = 1
+            if measured_sigma == 0:
+                measured_sigma = 1
+            
+            I[:, i] = (((M2_filled[:, i] - np.median(M2_filled[:, i])) / np.std(M2_filled[:, i])) * ref_sigma )+ ref_mu
+        else:
+            I[:, i] = np.nanmedian(M1_filled[:, i]) + (M2_filled[:, i] - np.nanmedian(M2_filled[:, i]))
+    
+    # Replace any nans with the median of the column
+    I = np.nan_to_num(I, nan=np.nanmedian(I, axis=0))
+
+    return I
+
 
 def zscore(X,allow_nan=False, ignore_zero=False, zero_threshold=1e-10,balancedX=False, **kwargs):
     """

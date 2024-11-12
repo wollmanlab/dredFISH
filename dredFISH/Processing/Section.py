@@ -1246,9 +1246,9 @@ class Section_Class(object):
                             seed[peaks[:,0],peaks[:,1]] = 1+np.array(range(peaks.shape[0]))
                             seed_max = morphology.binary_dilation(seed!=0,footprint=create_circle_array(int(1.5*self.parameters['segment_diameter']), int(1.5*self.parameters['segment_diameter'])))
                             for tx in range(-5,5):
-                                tx_idx = np.clip(peaks[:,0]+tx,0,seed.shape[0])
+                                tx_idx = np.clip(peaks[:,0]+tx,0,seed.shape[0]-1)
                                 for ty in range(-5,5):
-                                    ty_idx = np.clip(peaks[:,1]+ty,0,seed.shape[1])
+                                    ty_idx = np.clip(peaks[:,1]+ty,0,seed.shape[1]-1)
                                     seed[tx_idx,ty_idx] = 1+np.array(range(peaks.shape[0]))
                             # Watershed
                             watershed_img = watershed(image=np.ones_like(img), markers=seed,mask=cell_mask&seed_max)

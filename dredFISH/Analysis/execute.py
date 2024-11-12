@@ -2,6 +2,8 @@
 import argparse
 from dredFISH.Utils.analysisu import *
 import socket
+
+# conda activate dredfish_3.9; nohup python -W ignore /home/zach/PythonRepos/dredFISH/dredFISH/Analysis/execute.py all -p /scratchdata1/Images2024/Zach/MouseBrainAtlas -a /scratchdata1/MouseBrainAtlases_V3 > /scratchdata1/MouseBrainAtlases_V3/execute.log 2>&1 &
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("animal", type=str, help="Name of the animal to analyze")
@@ -15,10 +17,10 @@ if __name__ == '__main__':
         pfunc = partial(analyze_mouse_brain_data,
                         project_path=args.project_path,
                         analysis_path=args.analysis_path,
-                        verbose=False)
+                        verbose=False,repair=True)
         host = socket.gethostname()
         if host == 'purple':
-            animals = ['Tax','WTF01','WTM01','MMSM01']
+            animals = ['Tax','WTF01','WTM01','MMSM01','ASDM13']
         elif host == 'blue':
             animals = ['Tax','MMSF01','WTM04','WTM07']
         elif host == 'orange':
@@ -28,6 +30,7 @@ if __name__ == '__main__':
         # animals = ['Tax','WTF01','WTM01','MMSM01','MMSF01','WTM04','WTM07','WTF04','WTF06']
         for animal in animals:
             pfunc(animal)
+            print(f"Analysis of {animal} complete")
         # with multiprocessing.Pool(1) as p:
         #     p.map(pfunc, animals)
         # for animal in ['Tax','WTF01','WTM01','MMSM01','MMSF01','WTM04','WTM07','WTF04','WTF06']:
@@ -51,4 +54,5 @@ if __name__ == '__main__':
         analyze_mouse_brain_data(args.animal,
                             project_path=args.project_path,
                             analysis_path=args.analysis_path,
-                            verbose=False)
+                            verbose=False,repair=True)
+        print(f"Analysis of {args.animal} complete")
