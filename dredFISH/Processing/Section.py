@@ -42,6 +42,7 @@ from skimage.measure import block_reduce
 from scipy.ndimage import zoom
 from scipy.interpolate import griddata
 from scipy.interpolate import RectBivariateSpline
+from scipy.ndimage import label
 
 
 
@@ -1098,6 +1099,46 @@ class Section_Class(object):
             elif 'beads' in self.model_type:
                 self.update_user('Bead Segmentation Not Implemented',level=50)
                 """ Add Bead Segmentation Code Here """
+            elif 'threshold' in self.model_type:
+                threshold = self.parameters['segment_thresh']
+                if self.check_existance(hybe=self.parameters['total_acq'],channel=self.parameters['total_channel'],file_type='stitched'):
+                        total = self.load(hybe=self.parameters['total_acq'],channel=self.parameters['total_channel'],file_type='stitched')
+                else:
+                    if 'all' in self.parameters['total_acq']:
+                        total = ''
+                        for r,h,c in self.generate_iterable(self.parameters['bitmap'],f"Loading Total by {self.parameters['total_acq']} All Measurements"):
+                            if self.check_existance(hybe=h,channel=c,file_type='stitched'):
+                                temp = self.load(hybe=h,channel=c,file_type='stitched')
+                                if isinstance(total,str):
+                                    if 'mean' in self.parameters['total_acq']:
+                                        total = temp/len(self.parameters['bitmap'])
+                                    else:
+                                        total = temp
+                                else:
+                                    if 'max' in self.parameters['total_acq']:
+                                        total = torch.max(torch.dstack([total,temp]),axis=2).values
+                                    else:
+                                        total = total+temp/len(self.parameters['bitmap'])
+                                # total.append(self.load(hybe=h,channel=c,file_type='stitched'))
+                            else:
+                                self.update_user(f" Missing {h} for generating total",value=50)
+                                total=None
+                if not isinstance(total,type(None)):
+                    self.save(total,hybe=self.parameters['total_acq'],channel=self.parameters['total_channel'],file_type='stitched')
+                    signal = total[self.parameters['border']:-self.parameters['border'],
+                                    self.parameters['border']:-self.parameters['border']].numpy()
+                    scale = (np.array(signal.shape)*self.parameters['ratio']).astype(int)
+                    signal_down = np.array(Image.fromarray(signal.astype(self.parameters['numpy_dtype'])).resize((scale[1],scale[0]), Image.BICUBIC))
+                    self.save(signal_down,hybe=self.parameters['total_acq'],channel=self.parameters['total_channel'],file_type='image')
+
+                mask = total.numpy()>threshold
+                # Remove small objects
+                mask = morphology.remove_small_objects(mask, int(self.parameters['segment_diameter'])**2)
+                # label seperable masks
+                labeled_image, num_labels = label(mask)
+                self.mask = torch.tensor(labeled_image)
+                self.save(self.mask,file_type='mask',model_type=self.model_type)
+
             else:
                 """ Total & Nuclei"""
                 total = None
