@@ -56,5 +56,5 @@ if __name__ == '__main__':
         analyze_mouse_brain_data(args.animal,
                             project_path=args.project_path,
                             analysis_path=args.analysis_path,
-                            verbose=False,repair=True)
+                            verbose=False,repair=True,section_name=args.section_name,dataset_name=args.dataset_name)
         print(f"Analysis of {args.animal} complete")
