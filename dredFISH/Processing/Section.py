@@ -757,8 +757,8 @@ class Section_Class(object):
         acq_fnames = self.image_metadata.stkread(Channel=channel,acq=acq,groupby='Position',fnames_only = True)
 
         if self.parameters['strip']==False:
-            nuc_bkg_fnames = {posname:'' for posname,img in nuc_acq_fnames.items()}
-            bkg_fnames =  {posname:'' for posname,img in acq_fnames.items()}
+            nuc_bkg_fnames = {posname:[''] for posname,img in nuc_acq_fnames.items()}
+            bkg_fnames =  {posname:[''] for posname,img in acq_fnames.items()}
 
         """ Load FlatField and Constant for Hybe and Strip"""
         base_data = {}
