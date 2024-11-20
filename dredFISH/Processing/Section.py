@@ -8,7 +8,8 @@ from tqdm import tqdm
 from datetime import datetime
 from metadata import Metadata
 from functools import partial
-from ashlar.utils import register
+# from ashlar.utils import register
+from dredFISH.Utils.imageu import register
 from PIL import Image
 import multiprocessing
 import sys
@@ -19,7 +20,6 @@ import pandas as pd
 from scipy import interpolate
 import matplotlib.pyplot as plt
 import anndata
-import pywt
 import logging
 from dredFISH.Utils import fileu
 import shutil
@@ -43,8 +43,6 @@ from scipy.ndimage import zoom
 from scipy.interpolate import griddata
 from scipy.interpolate import RectBivariateSpline
 from scipy.ndimage import label
-
-
 
 """ TO DO LIST
  1. Add blocking so multiple computers could work on one dataset
@@ -793,9 +791,13 @@ class Section_Class(object):
         """ Process Images """
         results = {}
         pfunc = partial(preprocess_images)
-        with multiprocessing.Pool(self.parameters['ncpu']) as p:
-            for data in self.generate_iterable(p.imap(pfunc,Input),'Processing '+acq+'_'+channel,length=len(Input)):
-                results[data['posname']] = data
+        if self.parameters['ncpu']==1:
+            for data in self.generate_iterable(Input,'Processing '+acq+'_'+channel,length=len(Input)):
+                results[data['posname']] = pfunc(data) 
+        else:
+            with multiprocessing.Pool(self.parameters['ncpu']) as p:
+                for data in self.generate_iterable(p.imap(pfunc,Input),'Processing '+acq+'_'+channel,length=len(Input)):
+                    results[data['posname']] = data
 
         """ Estimate Residual Constant after processing """
         constant = 0

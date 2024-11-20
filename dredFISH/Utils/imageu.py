@@ -8,11 +8,11 @@ from sklearn.decomposition import PCA
 import datashader as ds
 
 import torch
-
+import skimage
 from skimage import io
 from scipy.ndimage import gaussian_filter, median_filter
 from skimage.measure import block_reduce
-
+import itertools
 from . import powerplots
 
 
@@ -480,3 +480,57 @@ def binary_closing_with_nans(binary_matrix, structure=None):
 
 
 
+""" From ASHLAR """
+
+
+def whiten(img, sigma):
+    img = skimage.img_as_float32(img)
+    if sigma == 0:
+        output = ndimage.convolve(img, _laplace_kernel)
+    else:
+        output = ndimage.gaussian_laplace(img, sigma)
+    return output
+
+def window(img):
+    assert img.ndim == 2
+    return img * get_window(img.shape)
+
+def get_window(shape):
+    # Build a 2D Hann window by taking the outer product of two 1-D windows.
+    wy = np.hanning(shape[0]).astype(np.float32)
+    wx = np.hanning(shape[1]).astype(np.float32)
+    window = np.outer(wy, wx)
+    return window
+
+
+def register(img1, img2, sigma, upsample=10):
+    img1w = window(whiten(img1, sigma))
+    img2w = window(whiten(img2, sigma))
+
+    shift = skimage.registration.phase_cross_correlation(
+        img1w,
+        img2w,
+        upsample_factor=upsample,
+        normalization=None
+    )[0]
+
+        # At this point we may have a shift in the wrong quadrant since the FFT
+    # assumes the signal is periodic. We test all four possibilities and return
+    # the shift that gives the highest direct correlation (sum of products).
+    shape = np.array(img1.shape)
+    shift_pos = (shift + shape) % shape
+    shift_neg = shift_pos - shape
+    shifts = list(itertools.product(*zip(shift_pos, shift_neg)))
+    correlations = [
+        np.abs(np.sum(img1w * ndimage.shift(img2w, s, order=0)))
+        for s in shifts
+    ]
+    idx = np.argmax(correlations)
+    shift = shifts[idx]
+    correlation = correlations[idx]
+    total_amplitude = np.linalg.norm(img1w) * np.linalg.norm(img2w)
+    if correlation > 0 and total_amplitude > 0:
+        error = -np.log(correlation / total_amplitude)
+    else:
+        error = np.inf
+    return shift, error
