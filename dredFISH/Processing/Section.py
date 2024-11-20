@@ -756,6 +756,10 @@ class Section_Class(object):
         bkg_fnames = self.image_metadata.stkread(Channel=channel,acq=bkg_acq,groupby='Position',fnames_only = True)
         acq_fnames = self.image_metadata.stkread(Channel=channel,acq=acq,groupby='Position',fnames_only = True)
 
+        if self.parameters['strip']==False:
+            nuc_bkg_fnames = {posname:'' for posname,img in nuc_acq_fnames.items()}
+            bkg_fnames =  {posname:'' for posname,img in acq_fnames.items()}
+
         """ Load FlatField and Constant for Hybe and Strip"""
         base_data = {}
         fname_only = False
@@ -2110,7 +2114,7 @@ def preprocess_images(data):
     try:
         nuc = load_image(data['nuc'],data['nuc_FF'],data['nuc_constant'],parameters=parameters)
         img = load_image(data['img'],data['img_FF'],data['img_constant'],parameters=parameters)
-        if not data['bkg']=='':
+        if (not data['bkg']=='')&(parameters['strip']):
             bkg_nuc = load_image(data['bkg_nuc'],data['bkg_nuc_FF'],data['bkg_nuc_constant'],parameters=parameters)
             bkg = load_image(data['bkg'],data['bkg_FF'],data['bkg_constant'],parameters=parameters)
             # Check if beads work here
