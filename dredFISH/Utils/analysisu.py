@@ -124,7 +124,7 @@ def create_taxonomies(tax_basepath,bad_bits=[]):
 def analyze_mouse_brain_data(animal,
                             project_path='/scratchdata1/Images2024/Zach/MouseBrainAtlas',
                             analysis_path='/scratchdata1/MouseBrainAtlases_V1',
-                            verbose=False,repair=False):
+                            verbose=False,repair=False,section_name=''):
     """ 
     Analyze mouse brain data and perform various analysis steps.
     
@@ -146,6 +146,8 @@ def analyze_mouse_brain_data(animal,
 
         # Create analysis directory for the animal
         input_df = fileu.create_input_df(project_path, animal)
+        if section_name != '':
+            input_df = input_df[input_df['Slice']==section_name]
         if animal =='RNA':
             print(input_df)
             input_df = input_df[input_df['dataset']=='RNA_2024Jul23']
