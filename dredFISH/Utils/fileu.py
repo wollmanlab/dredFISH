@@ -349,7 +349,9 @@ def load_config_module(inputpath):
 
 def create_input_df(project_path, animal): 
     sections = {}
+    print('project_path ',project_path)
     for dataset in os.listdir(project_path):
+        print('dataset ',dataset)
         if not os.path.isdir(os.path.join(project_path,dataset)):
             continue
         if not animal in dataset:
@@ -359,14 +361,17 @@ def create_input_df(project_path, animal):
         else:
             wells = [i.split('.')[-1] for i in dataset.split('_') if ('.' in i)&(animal in i)]
         if len(wells)==0:
-            wells = '1'
+            wells = ['1','A','B','C','D','E','F']
             # continue
+        print('wells ',wells)
         dataset_sections = []
         processing_paths = [i for i in os.listdir(os.path.join(project_path,dataset)) if 'Processing_' in i]
         processing_date = [os.path.getctime(os.path.join(project_path,dataset,processing)) for processing in processing_paths]
         sorted_processing_paths = [x for _, x in reversed(sorted(zip(processing_date, processing_paths)))]
         for processing in sorted_processing_paths:
+            print('processing ',processing)
             for section in [i for i in os.listdir(os.path.join(project_path,dataset,processing)) if i.split('-')[0].split('Well')[-1] in wells]:
+                print('section ',section)
                 if f"{dataset}_{section}" in sections.keys():
                     continue
                 if not os.path.exists(os.path.join(project_path,dataset,processing,section)):
@@ -383,7 +388,9 @@ def create_input_df(project_path, animal):
         registration_date = [os.path.getctime(os.path.join(project_path,dataset,registration)) for registration in registration_paths]
         sorted_registration_paths = [x for _, x in reversed(sorted(zip(registration_date, registration_paths)))]
         for registration in sorted_registration_paths:
+            print('registration ',registration)
             for section in dataset_sections:
+                print('section ',section)
                 if 'registration_path' in sections[f"{dataset}_{section}"].keys():
                     continue
                 if not os.path.exists(os.path.join(project_path,dataset,registration,section)):
