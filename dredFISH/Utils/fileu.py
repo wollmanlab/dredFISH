@@ -387,6 +387,7 @@ def create_input_df(project_path, animal):
                         'dataset':dataset,
                         'dataset_path':project_path}
                     dataset_sections.append(section)
+                    print('section added')
                 else:
                     print('Unable to find anndata')
                     print(os.path.join(project_path,dataset,processing,section))
@@ -406,6 +407,7 @@ def create_input_df(project_path, animal):
                 if check_existance(os.path.join(project_path,dataset,registration,section.split('_')[-1]),channel='X',file_type='Model'):
                     sections[f"{dataset}_{section}"]['registration_path'] = os.path.join(project_path,dataset,registration)
                     sections[f"{dataset}_{section}"]['registration'] = registration
+                    print('registration added')
                 else:
                     print('Unable to find registration')
                     print(os.path.join(project_path,dataset,registration,section.split('_')[-1]))
@@ -413,6 +415,7 @@ def create_input_df(project_path, animal):
     for section,items in sections.items():
         if not 'registration_path' in items.keys():
             incomplete_sections.append(section)
+    print(len(incomplete_sections), ' incomplete_sections')
     for section in incomplete_sections:
         del sections[section]
 
@@ -421,5 +424,6 @@ def create_input_df(project_path, animal):
     input_df['section_acq_name']  = [i.split('_')[-1] for i in input_df.index]
     input_df.reset_index(drop=True, inplace=True)
     input_df = input_df[['animal', 'section_acq_name','processing','registration','dataset', 'registration_path', 'processing_path', 'dataset_path']]
-
+    print('input_df')
+    print(input_df)
     return input_df
