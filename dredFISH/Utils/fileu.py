@@ -373,8 +373,11 @@ def create_input_df(project_path, animal):
             for section in [i for i in os.listdir(os.path.join(project_path,dataset,processing)) if i.split('-')[0].split('Well')[-1] in wells]:
                 print('section ',section)
                 if f"{dataset}_{section}" in sections.keys():
+                    print('section already in sections')
                     continue
                 if not os.path.exists(os.path.join(project_path,dataset,processing,section)):
+                    print('section does not exist')
+                    print(os.path.join(project_path,dataset,processing,section))
                     continue
                 if check_existance(os.path.join(project_path,dataset,processing,section),file_type='anndata'):
                     sections[f"{dataset}_{section}"] = {
@@ -384,6 +387,9 @@ def create_input_df(project_path, animal):
                         'dataset':dataset,
                         'dataset_path':project_path}
                     dataset_sections.append(section)
+                else:
+                    print('Unable to find anndata')
+                    print(os.path.join(project_path,dataset,processing,section))
         registration_paths = [i for i in os.listdir(os.path.join(project_path,dataset)) if 'Registration_' in i]
         registration_date = [os.path.getctime(os.path.join(project_path,dataset,registration)) for registration in registration_paths]
         sorted_registration_paths = [x for _, x in reversed(sorted(zip(registration_date, registration_paths)))]
@@ -392,12 +398,17 @@ def create_input_df(project_path, animal):
             for section in dataset_sections:
                 print('section ',section)
                 if 'registration_path' in sections[f"{dataset}_{section}"].keys():
+                    print('registration path already in sections')
                     continue
                 if not os.path.exists(os.path.join(project_path,dataset,registration,section)):
+                    print('registration does not exist')
                     continue
                 if check_existance(os.path.join(project_path,dataset,registration,section.split('_')[-1]),channel='X',file_type='Model'):
                     sections[f"{dataset}_{section}"]['registration_path'] = os.path.join(project_path,dataset,registration)
                     sections[f"{dataset}_{section}"]['registration'] = registration
+                else:
+                    print('Unable to find registration')
+                    print(os.path.join(project_path,dataset,registration,section.split('_')[-1]))
     incomplete_sections = []
     for section,items in sections.items():
         if not 'registration_path' in items.keys():
