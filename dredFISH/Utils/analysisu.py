@@ -203,8 +203,14 @@ def analyze_mouse_brain_data(animal,
                 print(adata_updated)
             adata = anndata.concat(out)
             adata = adata[TMG.Layers[0].adata.obs.index].copy()
+            # fix issue with missing columns (didnt use all bits for classification)
+            order = 
             for layer in ['harmonized','imputed','zscored']:
-                TMG.Layers[0].adata.layers[layer] = adata.layers[layer]
+                TMG.Layers[0].adata.layers[layer] = TMG.Layers[0].adata.X.copy()*0 # Prepopulate
+                for idx,bit in enumerate(TMG.Layers[0].adata.var.index):
+                    if bit in adata.var.index:
+                        TMG.Layers[0].adata.layers[layer][:,idx] = adata.layers[layer][:,np.where(adata.var.index==bit)[0][0]]
+                # TMG.Layers[0].adata.layers[layer] = adata.layers[layer]
 
             for label in ['subclass','leiden','neuron']:
                 TMG.Layers[0].adata.obs[label] = adata.obs[label].astype(str)
