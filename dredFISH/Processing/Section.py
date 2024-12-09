@@ -1113,6 +1113,10 @@ class Section_Class(object):
                     if 'all' in self.parameters['total_acq']:
                         total = ''
                         for r,h,c in self.generate_iterable(self.parameters['bitmap'],f"Loading Total by {self.parameters['total_acq']} All Measurements"):
+                            if 'key:' in self.parameters['total_acq']: # Allow you to only use the readouts that match a keyword example 'all_max_key:RS' 
+                                keyword = self.parameters['total_acq'].split('key:')[-1]
+                                if not keyword in r:
+                                    continue
                             if self.check_existance(hybe=h,channel=c,file_type='stitched'):
                                 temp = self.load(hybe=h,channel=c,file_type='stitched')
                                 if isinstance(total,str):
@@ -1157,8 +1161,12 @@ class Section_Class(object):
                     dapi_mask = nucstain<self.parameters['dapi_thresh']
                     nucstain[dapi_mask] = 0
                 else:
-                    if self.parameters['nucstain_acq'] == 'all':
+                    if 'all' in self.parameters['nucstain_acq']:
                         for r,h,c in self.generate_iterable(self.parameters['bitmap'],'Loading Total by Averaging All Measurements'):
+                            if 'key:' in self.parameters['nucstain_acq']: # Allow you to only use the readouts that match a keyword example 'all_max_key:RS' 
+                                keyword = self.parameters['nucstain_acq'].split('key:')[-1]
+                                if not keyword in r:
+                                    continue
                             if self.check_existance(hybe=h,channel=self.parameters['nucstain_channel'],file_type='stitched'):
                                 if isinstance(nucstain,type(None)):
                                     nucstain = self.load(hybe=h,channel=self.parameters['nucstain_channel'],file_type='stitched')/len(self.parameters['bitmap'])
@@ -1183,6 +1191,10 @@ class Section_Class(object):
                         if 'all' in self.parameters['total_acq']:
                             total = ''
                             for r,h,c in self.generate_iterable(self.parameters['bitmap'],f"Loading Total by {self.parameters['total_acq']} All Measurements"):
+                                if 'key:' in self.parameters['total_acq']: # Allow you to only use the readouts that match a keyword example 'all_max_key:RS' 
+                                    keyword = self.parameters['total_acq'].split('key:')[-1]
+                                    if not keyword in r:
+                                        continue
                                 if self.check_existance(hybe=h,channel=c,file_type='stitched'):
                                     temp = self.load(hybe=h,channel=c,file_type='stitched')
                                     if isinstance(total,str):
