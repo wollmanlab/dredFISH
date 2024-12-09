@@ -2276,6 +2276,12 @@ class SingleCellAlignmentLeveragingExpectations():
         self.reference = self.reference[:, shared_var].copy()
         self.measured = self.measured[:, shared_var].copy()
 
+        # Normalize Measured Data
+        self.update_user("Normalizing Measured Data")
+        self.measured.X = self.measured.layers['raw'].copy()
+        self.measured.layers['normalized'] = basicu.normalize_fishdata_robust_regression(self.measured.X.copy()) #Fix Staining Efficiency
+        self.measured.layers['normalized'] = basicu.image_coordinate_correction(self.measured.X.copy(),np.array(self.measured.obs[["image_x","image_y"]])) # Fix Flat field
+
         self.update_user("Resampling Reference Data")
         # Balance Reference to Section Area
         Nbases = self.measured.shape[1]
@@ -2542,9 +2548,9 @@ class SingleCellAlignmentLeveragingExpectations():
         self.visualize_layers('imputed',measured_color=f"{self.ref_level}_color",reference_color=f"{self.ref_level}_color",reference_layer = 'raw')
 
     def run(self):
+        self.load_reference()
         self.unsupervised_clustering()
         self.calculate_spatial_priors()
-        self.load_reference()
         self.unsupervised_neuron_annotation()
         self.supervised_harmonization()
         self.determine_neighbors()
