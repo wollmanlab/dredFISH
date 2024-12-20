@@ -2548,9 +2548,9 @@ class SingleCellAlignmentLeveragingExpectations():
         self.visualize_layers('imputed',measured_color=f"{self.ref_level}_color",reference_color=f"{self.ref_level}_color",reference_layer = 'raw')
 
     def run(self):
+        self.calculate_spatial_priors()
         self.load_reference()
         self.unsupervised_clustering()
-        self.calculate_spatial_priors()
         self.unsupervised_neuron_annotation()
         self.supervised_harmonization()
         self.determine_neighbors()
