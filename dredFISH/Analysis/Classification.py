@@ -436,7 +436,7 @@ class KnownCellTypeClassifier(Classifier):
         super().__init__(tax=None)
         self.tax.name = tax_name
         self._TG = TG # data
-        self.ref_path = pathu.get_path(ref, check=True) # refdata
+        self.ref_path = pathu.get_path(ref) # refdata
         self.ref_levels = ref_levels 
 
         # model could be a string or simply sklearn classifier (many kinds)
@@ -517,8 +517,8 @@ class SpatialPriorAssistedClassifier(Classifier):
         super().__init__(tax=None)
         self.tax.name = tax_name
         self._TG = TG # data
-        self.ref_path = pathu.get_path(ref, check=True) # refdata
-        self.spatial_ref_path = pathu.get_path(spatial_ref, check=True) # refdata
+        self.ref_path = pathu.get_path(ref) # refdata
+        self.spatial_ref_path = pathu.get_path(spatial_ref) # refdata
         self.ref_levels = ref_levels 
 
         # model could be a string or simply sklearn classifier (many kinds)
@@ -895,8 +895,8 @@ class SpatialAssistedLabelTransfer(Classifier):
         super().__init__(tax=None)
         self.save_fig = save_fig
         self.tax.name = tax_name
-        self.ref_path = pathu.get_path(ref, check=True) # refdata
-        self.spatial_ref_path = pathu.get_path(spatial_ref, check=True) # refdata
+        self.ref_path = pathu.get_path(ref) # refdata
+        self.spatial_ref_path = pathu.get_path(spatial_ref) # refdata
         self.ref_levels = ref_levels 
         self.out_path = out_path
         self.batch_name = batch_name
@@ -1226,7 +1226,7 @@ class KDESpatialPriors(Classifier):
         XYZ_coordinates = XYZ.copy()
         for dim in range(3):
             XYZ_coordinates[:,dim] = (XYZ_coordinates[:,dim]-self.bins[dim][0])/(self.bins[dim][1]-self.bins[dim][0])
-        XYZ_coordinates = XYZ_coordinates.astype(int)
+        XYZ_coordinates = XYZ_coordinates.round().astype(int)
 
         priors = self.typedata[XYZ_coordinates[:,0],XYZ_coordinates[:,1],XYZ_coordinates[:,2],:]
         types = self.types
@@ -1541,7 +1541,7 @@ class NeuronClassifier(Classifier):
 
     def train(self):
         fileu.update_user(f"Training Model",verbose=self.verbose)
-        reference = anndata.read(pathu.get_path('allen_wmb_tree', check=True))
+        reference = anndata.read(pathu.get_path('allen_wmb_tree'))
         reference = reference[:,np.isin(reference.var.index,self.bad_bits,invert=True)].copy()
         reference.layers['classification_space'] = basicu.robust_zscore(basicu.normalize_fishdata_robust_regression(reference.X.copy()))
         converter = {True:'Non_Neuron', False:'Neuron'}
@@ -1894,8 +1894,8 @@ class DepricatedSingleCellAlignmentLeveragingExpectations(Classifier):
         self.save_fig = save_fig
         self.ref = ref
         # self.tax.name = tax_name
-        self.ref_path = pathu.get_path(ref, check=True) # refdata
-        self.spatial_ref_path = pathu.get_path(spatial_ref, check=True) # refdata
+        self.ref_path = pathu.get_path(ref) # refdata
+        self.spatial_ref_path = pathu.get_path(spatial_ref) # refdata
         self.ref_level = ref_level 
         self.out_path = out_path
         self.batch_name = batch_name
@@ -2266,7 +2266,7 @@ class SingleCellAlignmentLeveragingExpectations():
     def load_reference(self):
         if isinstance(self.complete_reference,str):
             self.update_user("Loading Reference Data")
-            self.complete_reference = anndata.read(pathu.get_path(self.complete_reference, check=True))
+            self.complete_reference = anndata.read(pathu.get_path(self.complete_reference))
         
         shared_var = list(self.complete_reference.var.index.intersection(self.measured.var.index))
         self.reference = self.complete_reference[:,np.isin(self.complete_reference.var.index,shared_var)].copy()
