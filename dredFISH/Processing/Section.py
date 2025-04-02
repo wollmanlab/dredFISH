@@ -1337,7 +1337,7 @@ class Section_Class(object):
                             mask = torch.tensor(updated_mask.astype(int),dtype=self.parameters['pytorch_dtype'])
 
                         # Add tile to stitched
-                        mask[mask>0] = mask[mask>0]+self.mask.max() # ensure unique labels
+                        mask[mask>0] = mask[mask>0]+self.mask.max()+1 # ensure unique labels
                         self.mask[(x*x_step):((x+1)*x_step),(y*y_step):((y+1)*y_step)] = mask
                         del raw_mask_image,flows,styles,diams
                         torch.cuda.empty_cache()
