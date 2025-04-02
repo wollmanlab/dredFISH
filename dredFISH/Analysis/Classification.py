@@ -1108,7 +1108,7 @@ class SpatialOnlyLabelTransfer(Classifier):
 
 class KDESpatialPriors(Classifier):
     def __init__(self,
-    ref='/scratchdata2/MouseBrainAtlases/MouseBrainAtlases_V0/Allen/',
+    ref='/bluedata/scratchdata2_backup/MouseBrainAtlases/MouseBrainAtlases_V0/Allen/',
     ref_levels=['class', 'subclass'],neuron=None,kernel = (0.25,0.1,0.1),
     border=1,binsize=0.1,bins=None,gates=None,types=None,symetric=False):
         self.out_path = f"/scratchdata1/KDE_kernel_{kernel[0]}_{kernel[1]}_{kernel[2]}_border_{border}_binsize_{binsize}_level_{ref_levels[-1]}_neuron_{neuron}_symetric_{symetric}.pkl"
