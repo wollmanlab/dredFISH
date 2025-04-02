@@ -91,7 +91,7 @@ def create_taxonomies(tax_basepath,bad_bits=[]):
     feature_mats[tx] = np.zeros((len(ix),1))
     types_std[tx] = np.zeros((len(ix),1))
 
-    metadata = pd.read_csv('/orangedata/ExternalData/Allen_WMB_2024Mar06/metadata/MERFISH-C57BL6J-638850-CCF/20230830/views/cell_metadata_with_parcellation_annotation.csv')
+    metadata = pd.read_csv('/scratchdata1/ExternalData/Allen_WMB_2024Mar06/metadata/MERFISH-C57BL6J-638850-CCF/20230830/views/cell_metadata_with_parcellation_annotation.csv')
 
     # Update the colors in types_color_dict for 'parcellation_division' using the mapping from parcellation_division_to_color
     parcellation_levels = ['parcellation_division', 'parcellation_structure', 'parcellation_substructure']
@@ -226,7 +226,7 @@ def analyze_mouse_brain_data(animal,
 
             """ Filter Bad Sections """
             TMG.update_user(f"Checking For Bad Sections", verbose=True)
-            Allen = TissueMultiGraph(basepath = '/scratchdata2/MouseBrainAtlases/MouseBrainAtlases_V0/Allen/')
+            Allen = TissueMultiGraph(basepath = '/bluedata/scratchdata2_backup/MouseBrainAtlases/MouseBrainAtlases_V0/Allen/')
             good_sections = []
             bad_sections = []
             status = {}
