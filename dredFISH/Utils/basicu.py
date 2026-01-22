@@ -11,6 +11,8 @@ from sklearn.linear_model import LinearRegression,RANSACRegressor
 import matplotlib.pyplot as plt
 import logging
 import torch
+from sklearn.decomposition import PCA
+
 
 def reset_logging(**kwargs):
     """reset logging.
@@ -603,6 +605,94 @@ def normalize_fishdata_robust_regression(X):
     Nrm = X/Xrobust.mean(axis=1).reshape(-1,1)*Xrobust.mean()
 
     return Nrm
+
+def normalize_fishdata_remove_first_pc_robust(X):
+    """
+    Remove first PC in a robust way that targets shared technical artifacts.
+    
+    Logic:
+    1. Create P via cross-prediction: each feature predicted from others
+       - P retains shared/common variation across features
+       - P loses feature-specific unique patterns
+    2. Compute PC1 on P: this captures the main shared variation
+       - If technical artifact affects all features → it's shared → PC1(P)
+    3. Remove PC1(P) direction from actual data X
+    """
+    
+    # Step 1: Cross-prediction matrix P
+    # This emphasizes shared patterns, suppresses unique feature patterns
+    P = np.zeros_like(X)
+    
+    for target_col in range(X.shape[1]):
+        F = np.delete(X, target_col, axis=1)
+        y = X[:, target_col]
+        linear_model = LinearRegression().fit(F, y)
+        P[:, target_col] = linear_model.predict(F)
+    
+    # Step 2: PC1 of P captures the main SHARED variation (technical artifact)
+    pca = PCA()
+    pca.fit(P)  # Fit on P where shared variation is emphasized
+    
+    # Step 3: Project actual data onto this shared PC1 direction and remove it
+    X_pca = pca.transform(X)
+    X_pca[:, 0] = 0  # Remove the shared/technical component
+    
+    # Step 4: Transform back to original space
+    X_corrected = pca.inverse_transform(X_pca)
+    
+    return X_corrected
+
+def normalize_fishdata_remove_shared_factor_regression(X):
+    """
+    For each feature, regress against all others simultaneously,
+    keep only the unique variance (residuals).
+    """
+    X_corrected = np.zeros_like(X)
+    
+    for i in range(X.shape[1]):
+        # Regress feature i on all others
+        other_features = np.delete(X, i, axis=1)
+        model = LinearRegression().fit(other_features, X[:, i])
+        
+        # Keep residuals (unique variance)
+        residuals = X[:, i] - model.predict(other_features)
+        X_corrected[:, i] = residuals
+    
+    # Re-center and scale
+    X_corrected = X_corrected - X_corrected.mean(axis=0)
+    X_corrected = X_corrected / X_corrected.std(axis=0)
+    
+    return X_corrected
+
+def normalize_fishdata_remove_shared_factor_ransac(X):
+    """
+    For each feature, use RANSAC regression against all others
+    to robustly estimate and remove shared variance.
+    Preserves original units - only removes shared variance.
+    """
+    X_corrected = np.zeros_like(X)
+    
+    for i in range(X.shape[1]):
+        # Regress feature i on all others using RANSAC
+        other_features = np.delete(X, i, axis=1)
+        
+        # Use initial regression to estimate residual threshold
+        init_reg = LinearRegression().fit(other_features, X[:, i])
+        std_residuals = np.std(X[:, i] - init_reg.predict(other_features))
+        
+        # RANSAC regression
+        ransac = RANSACRegressor(
+            LinearRegression(),
+            residual_threshold=std_residuals,
+            random_state=42
+        )
+        ransac.fit(other_features, X[:, i])
+        
+        # Keep residuals but center around mean to preserve scale
+        residuals = X[:, i] - ransac.predict(other_features)
+        X_corrected[:, i] = residuals + residuals.mean()
+    
+    return X_corrected
 
 # def quantile_matching(M1, M2):
 #     """
