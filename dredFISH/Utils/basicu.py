@@ -694,6 +694,73 @@ def normalize_fishdata_remove_shared_factor_ransac(X):
     
     return X_corrected
 
+def normalize_fishdata_remove_shared_pc1_via_crosspred(
+    X,
+    alpha=1.0,          # Ridge strength; increase if you worry you're removing biology
+    standardize=True,   # recommended
+    center_X=True,      # recommended
+    clip_nonneg=False,  # optional
+):
+    """
+    1) Build cross-prediction matrix P using Ridge (each feature predicted from others).
+    2) Compute PC1 direction v from P.
+    3) Remove projection of centered X onto v.
+
+    Returns: X_corr (same shape as X)
+    """
+    X = np.asarray(X, dtype=np.float64)
+    n, p = X.shape
+    if p < 2:
+        raise ValueError("Need at least 2 features.")
+
+    # Optionally standardize for the cross-prediction step only
+    if standardize:
+        scaler = StandardScaler(with_mean=True, with_std=True)
+        Xs = scaler.fit_transform(X)
+    else:
+        Xs = X.copy()
+
+    # Cross-prediction
+    P = np.zeros_like(Xs)
+    model = Ridge(alpha=alpha, fit_intercept=True)
+
+    for j in range(p):
+        F = np.delete(Xs, j, axis=1)
+        y = Xs[:, j]
+        model.fit(F, y)
+        P[:, j] = model.predict(F)
+
+    # PC1 direction from P (in standardized space)
+    # Use PCA just to get components; DON'T transform/inverse_transform X with PCA(P)
+    pca = PCA(n_components=1)
+    pca.fit(P)
+    v = pca.components_[0]           # unit vector length p
+
+    # Remove that direction from X (centered in the SAME space as v)
+    if center_X:
+        Xc = Xs - Xs.mean(axis=0, keepdims=True)
+    else:
+        Xc = Xs
+
+    Xc_corr = Xc - (Xc @ v)[:, None] * v[None, :]
+
+    # Add mean back if we centered
+    if center_X:
+        Xs_corr = Xc_corr + Xs.mean(axis=0, keepdims=True)
+    else:
+        Xs_corr = Xc_corr
+
+    # Unstandardize if needed
+    if standardize:
+        X_corr = scaler.inverse_transform(Xs_corr)
+    else:
+        X_corr = Xs_corr
+
+    if clip_nonneg:
+        X_corr = np.maximum(X_corr, 0.0)
+
+    return X_corr
+
 # def quantile_matching(M1, M2):
 #     """
 #     function gets matrices M1 and M2 and for each pairs of cols, calculate the qq-plot and uses that to interpolate values 
